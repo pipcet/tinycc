@@ -1,0 +1,68 @@
+#!/usr/bin/make -f
+
+configure: configure-stamp
+
+configure-stamp:
+	dh_testdir
+	QUILT_PATCHES=debian/patches quilt push -a || test $$? = 2
+	./configure --prefix=/usr                     \
+		    --mandir=/usr/share/man           \
+		    --docdir=/usr/share/doc
+	touch configure-stamp
+
+build: build-stamp
+
+build-stamp: configure-stamp 
+	dh_testdir
+	$(MAKE)
+	$(MAKE) test
+	makeinfo tcc-doc.texi
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp configure-stamp
+	if [ -f config.mak ]; then    \
+		$(MAKE) clean;        \
+		rm -f tcc-doc.info config.mak config.h config.texi libtcc1.a; \
+		rm -f tcc-doc.html tcc.1;	\
+	fi
+	QUILT_PATCHES=debian/patches quilt pop -a -R || test $$? = 2
+	rm -rf .pc
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+	dh_installdirs
+	$(MAKE) install bindir=$(CURDIR)/debian/tcc/usr/bin                   \
+			mandir=$(CURDIR)/debian/tcc/usr/share/man             \
+			libdir=$(CURDIR)/debian/tcc/usr/lib                   \
+			includedir=$(CURDIR)/debian/tcc/usr/lib/tcc/include   \
+			docdir=$(CURDIR)/debian/tcc/usr/share/doc/tcc         \
+			tccdir=$(CURDIR)/debian/tcc/usr/lib/tcc
+	mkdir -p $(CURDIR)/debian/tcc/usr/share/info
+	cp tcc-doc.info $(CURDIR)/debian/tcc/usr/share/info/tcc.info
+
+binary-indep: build install;
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installdocs
+	dh_installexamples
+#	dh_installman debian/tcc.1
+	dh_installchangelogs Changelog
+	dh_link
+	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure

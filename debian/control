@@ -1,0 +1,27 @@
+Source: tcc
+Section: devel
+Priority: optional
+Maintainer: Aurélien GÉRÔME <ag@debian.org>
+Uploaders: Thomas Preud'homme <robotux@celest.fr>, Arthur Loiret <arthur.loiret@gmail.com>
+Build-Depends: debhelper (>= 4), quilt, texi2html, texinfo, perl
+Standards-Version: 3.8.0
+Homepage: http://www.tinycc.org/
+DM-Upload-Allowed: yes
+
+Package: tcc
+Architecture: i386 kfreebsd-i386 hurd-i386
+Depends: ${shlibs:Depends}
+Recommends: libc6-dev | libc-dev
+Provides: c-compiler
+Description: the smallest ANSI C compiler
+ TCC (for Tiny C Compiler) is a small and fast ANSI C compiler.  It
+ generates optimized x86 code, and can compile, assemble, and link
+ several times faster than 'gcc -O0'.  Any C dynamic library can be used
+ directly.  It includes an optional memory and bounds checker, and
+ bounds-checked code can be mixed freely with standard code.  C script
+ is also supported via the usual hash-bang mechanism.
+ .
+ NOTE: TCC is still somewhat experimental and is not recommended for
+ production use.  The code it generates is much less optimized than what
+ GCC produces, and compiler bugs can have serious security consequences
+ for your program.

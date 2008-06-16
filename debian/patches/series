@@ -1,0 +1,10 @@
+buildsys.diff
+fhs.diff
+hurd.diff
+259619_error_init_char_array_with_non_literal.diff
+322913_fix_casts_from_fp_to_bool.diff
+372908_add_kfreebsd_arch.diff
+419203_fix_sizeof_parse_error.diff
+438097_configure_allow_nostrip.diff
+474883_fix_segmentation_fault_when_compiling.diff
+tcc-doc_texi_formatting.diff

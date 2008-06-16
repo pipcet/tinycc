@@ -1,0 +1,43 @@
+This package was debianized by Cyril Bouthors <cyril@bouthors.org>
+on Fri, 14 Jun 2002 17:09:24 +0200.
+
+It has been maintained by Romain Francoise <rfrancoise@debian.org>.
+
+It is now maintained by:
+    Aurélien GÉRÔME <ag@roxor.cx>,
+    Thomas Preud'homme <robotux@celest.fr>,
+    Arthur Loiret <arthur.loiret@gmail.com>
+
+It was downloaded from
+<http://fabrice.bellard.free.fr/tcc/tcc-0.9.23.tar.gz>
+and later checked out from its CVS repository at
+<http://cvs.savannah.nongnu.org/viewcvs/tinycc/?root=tinycc>.
+
+Upstream Author: Fabrice Bellard <fabrice.bellard@free.fr>
+
+TCC itself is under the LGPL, but please note that some of the files in
+the source package come from the GCC distribution, and are under the GNU
+GPL.  The complete text of the GNU GPL can be found in
+`/usr/share/common-licenses/GPL'.
+
+Copyright:
+
+     Copyright (c) 2001, 2002, 2003 Fabrice Bellard
+    
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc.  51 Franklin St, Fifth Floor, Boston, MA 02110-1301
+    USA.
+
+On Debian GNU/Linux systems, the complete text of the GNU Lesser General
+Public License can be found in `/usr/share/common-licenses/LGPL'.

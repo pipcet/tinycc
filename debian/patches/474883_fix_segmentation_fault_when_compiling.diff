@@ -1,0 +1,12 @@
+diff -Naur tcc-0.9.24~cvs20070502.orig/tcctest.c tcc-0.9.24~cvs20070502/tcctest.c
+--- tcc-0.9.24~cvs20070502.orig/tcctest.c	2008-04-11 17:23:17.000000000 +0100
++++ tcc-0.9.24~cvs20070502/tcctest.c	2008-04-11 17:23:49.000000000 +0100
+@@ -311,7 +311,7 @@
+ 
+ void string_test()
+ {
+-    int b;
++    unsigned int b;
+     printf("string:\n");
+     printf("\141\1423\143\n");/* dezdez test */
+     printf("\x41\x42\x43\x3a\n");

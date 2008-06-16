@@ -1,0 +1,77 @@
+Index: tcc/tcc.c
+===================================================================
+--- tcc.orig/tcc.c	2007-05-08 02:12:27.492992751 +0200
++++ tcc/tcc.c	2007-05-08 02:12:27.533003862 +0200
+@@ -7532,7 +7532,50 @@
+         t = tok;
+         next();
+         if (tok == '(') {
++/* Beginning of sizeof parsing error correction */
++            int tbis = tok;
++            uint8_t *p = file->buf_ptr;
+             parse_expr_type(&type);
++/* if we met sizeof (*fct)(param) or sizeof (identifier)[index] */
++            if (((type.t & VT_BTYPE) == VT_FUNC) && (tok == '(')) {
++                    file->buf_ptr = p;
++                    tok = tbis;
++                    tbis = '(';
++                    skip('(');
++                    file->buf_ptr -= 2;
++/* Add of parenthesis to frame (*fct)(param) : could partially erase sizeof */
++                    *(file->buf_ptr-1) = '(';
++                    while (*file->buf_ptr != ')') {
++                        *file->buf_ptr = *(file->buf_ptr+1);
++                        file->buf_ptr++;
++                    }
++                    do {
++                        *file->buf_ptr = *(file->buf_ptr+1);
++                        file->buf_ptr++;
++                    } while (*file->buf_ptr != ')');
++/* Make like nothing happen and launch parsing again */
++                    file->buf_ptr = p-2;
++                    type.t = VT_PTR | VT_ARRAY;
++                    tok = '(';
++                    expr_type(&type);
++            } else if (((type.t & VT_BTYPE) == VT_PTR) && (tok == '[')) {
++                    file->buf_ptr = p;
++                    tok = tbis;
++                    tbis = '[';
++                    skip('(');
++                    p = file->buf_ptr;
++/* Moving parenthesis from (identifier)[index] to (indentifier[index]) */
++                    while (*file->buf_ptr != ']') {
++                        *file->buf_ptr = *(file->buf_ptr+1);
++                        file->buf_ptr++;
++                    }
++/* Make like nothing happen and launch parsing again */
++                    *file->buf_ptr = ')';
++                    file->buf_ptr = p;
++                    expr_type(&type);
++                    skip(')');
++                }
++/* End of sizeof parsing error correction */
+         } else {
+             unary_type(&type);
+         }
+Index: tcc/tcctest.c
+===================================================================
+--- tcc.orig/tcctest.c	2007-05-08 02:12:27.496993862 +0200
++++ tcc/tcctest.c	2007-05-08 02:12:27.533003862 +0200
+@@ -1761,6 +1761,8 @@
+ {
+     int a;
+     int **ptr;
++    int array[2];
++    int (*func)(int) = fib;
+ 
+     printf("sizeof(int) = %d\n", sizeof(int));
+     printf("sizeof(unsigned int) = %d\n", sizeof(unsigned int));
+@@ -1774,6 +1776,8 @@
+     printf("a=%d\n", a);
+     ptr = NULL;
+     printf("sizeof(**ptr) = %d\n", sizeof (**ptr));
++    printf("sizeof(array)[0] = %d\n", sizeof(array)[0]);
++    printf("sizeof(*func)(4) = %d\n", sizeof(*func)(4));
+ 
+     /* some alignof tests */
+     printf("__alignof__(int) = %d\n", __alignof__(int));

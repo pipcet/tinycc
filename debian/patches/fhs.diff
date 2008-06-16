@@ -1,0 +1,46 @@
+Index: tcc-0.9.24~cvs20070502.orig/examples/ex1.c
+===================================================================
+--- tcc-0.9.24~cvs20070502.orig.orig/examples/ex1.c	2007-05-03 03:54:44.050781039 +0200
++++ tcc-0.9.24~cvs20070502.orig/examples/ex1.c	2007-05-03 03:55:25.970417479 +0200
+@@ -1,4 +1,4 @@
+-#! /usr/local/bin/tcc -run
++#! /usr/bin/tcc -run
+ #include <tcclib.h>
+ 
+ int main() 
+Index: tcc-0.9.24~cvs20070502.orig/examples/ex4.c
+===================================================================
+--- tcc-0.9.24~cvs20070502.orig.orig/examples/ex4.c	2007-05-03 03:54:44.066785482 +0200
++++ tcc-0.9.24~cvs20070502.orig/examples/ex4.c	2007-05-03 03:55:25.970417479 +0200
+@@ -1,4 +1,4 @@
+-#!./tcc -run -L/usr/X11R6/lib -lX11
++#!/usr/bin/tcc -run -L/usr/X11R6/lib -lX11
+ #include <stdlib.h>
+ /* Yes, TCC can use X11 too ! */
+ #include <stdio.h>
+Index: tcc-0.9.24~cvs20070502.orig/tcc-doc.texi
+===================================================================
+--- tcc-0.9.24~cvs20070502.orig.orig/tcc-doc.texi	2007-05-03 03:54:44.082789925 +0200
++++ tcc-0.9.24~cvs20070502.orig/tcc-doc.texi	2007-05-03 03:55:25.974418590 +0200
+@@ -125,10 +125,10 @@
+ Scripting:
+ 
+ TCC can be invoked from @emph{scripts}, just as shell scripts. You just
+-need to add @code{#!/usr/local/bin/tcc -run} at the start of your C source:
++need to add @code{#!/usr/bin/tcc -run} at the start of your C source:
+ 
+ @example
+-#!/usr/local/bin/tcc -run
++#!/usr/bin/tcc -run
+ #include <stdio.h>
+ 
+ int main() 
+@@ -181,7 +181,7 @@
+ In a script, it gives the following header:
+ 
+ @example
+-#!/usr/local/bin/tcc -run -L/usr/X11R6/lib -lX11
++#!/usr/bin/tcc -run -L/usr/X11R6/lib -lX11
+ #include <stdlib.h>
+ int main(int argc, char **argv)
+ @{

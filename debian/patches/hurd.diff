@@ -1,0 +1,24 @@
+--- tcc.orig/configure	2007-08-23 22:30:52.000000000 +0200
++++ tcc/configure	2007-08-23 22:31:30.000000000 +0200
+@@ -34,7 +34,7 @@
+ strip="strip"
+ cpu=`uname -m`
+ case "$cpu" in
+-  i386|i486|i586|i686|i86pc|BePC)
++  i386|i486|i586|i686|i86pc|BePC|i686-AT386)
+     cpu="x86"
+   ;;
+   armv4l)
+--- tcc.orig/tcc.c	2007-08-23 22:30:56.000000000 +0200
++++ tcc/tcc.c	2007-08-23 22:32:34.000000000 +0200
+@@ -61,6 +61,10 @@
+ #define O_BINARY 0
+ #endif
+ 
++#ifndef SA_SIGINFO
++#define SA_SIGINFO 0x00000004u
++#endif
++
+ #include "libtcc.h"
+ 
+ /* parser debug */

@@ -1,0 +1,43 @@
+Index: tcc-0.9.24~cvs20070502.orig/Makefile
+===================================================================
+--- tcc-0.9.24~cvs20070502.orig.orig/Makefile	2007-05-03 03:54:50.632608074 +0200
++++ tcc-0.9.24~cvs20070502.orig/Makefile	2007-05-03 03:55:19.856720374 +0200
+@@ -3,7 +3,7 @@
+ #
+ include config.mak
+ 
+-CFLAGS+=-g -Wall
++CFLAGS+=-O2 -g -Wall
+ ifndef CONFIG_WIN32
+ LIBS=-lm
+ ifndef CONFIG_NOLDL
+@@ -189,7 +189,7 @@
+ endif
+ 
+ %.o: %.c
+-	$(LIBTCC1_CC) -O2 -Wall -c -o $@ $<
++	$(LIBTCC1_CC) $(CFLAGS) -c -o $@ $<
+ 
+ %.o: %.S
+ 	$(LIBTCC1_CC) -c -o $@ $<
+@@ -198,9 +198,9 @@
+ 	$(AR) rcs $@ $^
+ 
+ bcheck.o: bcheck.c
+-	$(CC) -O2 -Wall -c -o $@ $<
++	$(CC) $(CFLAGS) -c -o $@ $<
+ 
+-install: tcc_install libinstall
++install: tcc_install #libinstall
+ 
+ tcc_install: $(PROGS) tcc.1 libtcc1.a $(BCHECK_O) tcc-doc.html
+ 	mkdir -p "$(bindir)"
+@@ -289,7 +289,7 @@
+ 	@if diff -u --ignore-matching-lines="file format" asmtest.ref asmtest.out ; then echo "ASM Auto Test OK"; fi
+ 
+ instr.o: instr.S
+-	$(CC) -O2 -Wall -g -c -o $@ $<
++	$(CC) $(CFLAGS) -c -o $@ $<
+ 
+ cache: tcc_g
+ 	cachegrind ./tcc_g -o /tmp/linpack -lm bench/linpack.c
