@@ -4,7 +4,6 @@ configure: configure-stamp
 
 configure-stamp:
 	dh_testdir
-	QUILT_PATCHES=debian/patches quilt push -a || test $$? = 2
 	./configure --prefix=/usr                     \
 		    --mandir=/usr/share/man           \
 		    --docdir=/usr/share/doc
@@ -28,8 +27,6 @@ clean:
 		rm -f tcc-doc.info config.mak config.h config.texi libtcc1.a; \
 		rm -f tcc-doc.html tcc.1;	\
 	fi
-	QUILT_PATCHES=debian/patches quilt pop -a -R || test $$? = 2
-	rm -rf .pc
 	dh_clean
 
 install: build
