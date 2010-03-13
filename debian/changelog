@@ -5,6 +5,9 @@ tcc (0.9.25-1) unstable; urgency=low
   * Fix Hurd FTBS (Closes: #532503).
   * Improve tcc handling of ld scripts: libs in GROUP command are
     searched repeatedly, as required.
+  * Add support for kfreebsd-amd64.
+  * Cherry-pick 55cb217 from upstream to fix incorrect elf output on
+    FreeBSD kernels.
   * Make the package compile on armel (Closes: #506517).
   * x86_64_alloca.diff: Add alloca on x86-64, from upstream commits
     8ea8305 and dca2b15, to fix a test failure.
@@ -28,8 +31,10 @@ tcc (0.9.25-1) unstable; urgency=low
   * Bump debhelper compatibility from 4 to 7 (no changes needed).
   * Bump Standard-Version from 3.8.0 to 3.8.4 (no changes needed).
   * Fill Vcs-Browser and Vcs-Git fields.
+  * Correctly support DEB_BUILD_OPTIONS.
+  * Don't rebuild the package if it was already built before.
 
- -- Thomas Preud'homme <robotux@celest.fr>  Sat, 13 Mar 2010 22:36:55 +0100
+ -- Thomas Preud'homme <robotux@celest.fr>  Sat, 17 Apr 2010 20:41:12 +0200
 
 tcc (0.9.24-1) unstable; urgency=high
 
