@@ -1,8 +1,17 @@
-Index: tcc/tcc.c
-===================================================================
---- tcc.orig/tcc.c	2007-05-08 02:12:27.492992751 +0200
-+++ tcc/tcc.c	2007-05-08 02:12:27.533003862 +0200
-@@ -7532,7 +7532,50 @@
+From: Thomas Preud'homme <robotux@celest.fr>
+Date: Sat, 13 Mar 2010 18:10:17 +0100
+Subject: [PATCH] 419203_fix_sizeof_parse_error.diff
+
+---
+ tccgen.c        |   43 +++++++++++++++++++++++++++++++++++++++++++
+ tests/tcctest.c |    4 ++++
+ 2 files changed, 47 insertions(+), 0 deletions(-)
+
+diff --git a/tccgen.c b/tccgen.c
+index b4b5d59..266fb51 100644
+--- a/tccgen.c
++++ b/tccgen.c
+@@ -3115,7 +3115,50 @@ static void unary(void)
          t = tok;
          next();
          if (tok == '(') {
@@ -53,11 +62,11 @@ Index: tcc/tcc.c
          } else {
              unary_type(&type);
          }
-Index: tcc/tcctest.c
-===================================================================
---- tcc.orig/tcctest.c	2007-05-08 02:12:27.496993862 +0200
-+++ tcc/tcctest.c	2007-05-08 02:12:27.533003862 +0200
-@@ -1761,6 +1761,8 @@
+diff --git a/tests/tcctest.c b/tests/tcctest.c
+index a2d481a..9deef62 100644
+--- a/tests/tcctest.c
++++ b/tests/tcctest.c
+@@ -1953,6 +1953,8 @@ void sizeof_test(void)
  {
      int a;
      int **ptr;
@@ -66,7 +75,7 @@ Index: tcc/tcctest.c
  
      printf("sizeof(int) = %d\n", sizeof(int));
      printf("sizeof(unsigned int) = %d\n", sizeof(unsigned int));
-@@ -1774,6 +1776,8 @@
+@@ -1968,6 +1970,8 @@ void sizeof_test(void)
      printf("a=%d\n", a);
      ptr = NULL;
      printf("sizeof(**ptr) = %d\n", sizeof (**ptr));
@@ -75,3 +84,4 @@ Index: tcc/tcctest.c
  
      /* some alignof tests */
      printf("__alignof__(int) = %d\n", __alignof__(int));
+-- 

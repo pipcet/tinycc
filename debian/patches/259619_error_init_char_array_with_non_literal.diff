@@ -1,12 +1,20 @@
-  * Error out with an explicit message when trying to initialize a
+From: Romain Francoise <rfrancoise@debian.org>
+Date: Sat, 13 Mar 2010 18:07:57 +0100
+Subject: [PATCH] 259619_error_init_char_array_with_non_literal.diff
+
+* Error out with an explicit message when trying to initialize a
     character array with something that's not a literal (optionally
     enclosed in braces) as per C99 6.7.8:14; thanks to Antti-Juhani
     Kaijanaho <ajk@debian.org> who did all the work (closes: #259619).
-Index: tcc-0.9.24~cvs20070502.orig/tcc.c
-===================================================================
---- tcc-0.9.24~cvs20070502.orig.orig/tcc.c	2007-05-03 03:37:24.934358000 +0200
-+++ tcc-0.9.24~cvs20070502.orig/tcc.c	2007-05-03 03:55:29.955523709 +0200
-@@ -8737,6 +8737,9 @@
+---
+ tccgen.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/tccgen.c b/tccgen.c
+index 942c503..b4b5d59 100644
+--- a/tccgen.c
++++ b/tccgen.c
+@@ -4385,6 +4385,9 @@ static void decl_initializer(CType *type, Section *sec, unsigned long c,
          no_oblock = 1;
          if ((first && tok != TOK_LSTR && tok != TOK_STR) || 
              tok == '{') {
@@ -16,3 +24,4 @@ Index: tcc-0.9.24~cvs20070502.orig/tcc.c
              skip('{');
              no_oblock = 0;
          }
+-- 

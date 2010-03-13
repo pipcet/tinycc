@@ -1,10 +1,41 @@
-  * Add support for kfreebsd-i386, with thanks to Pierre Chifflier
+From: Romain Francoise <rfrancoise@debian.org>
+Date: Sat, 13 Mar 2010 18:09:01 +0100
+Subject: [PATCH] 372908_add_kfreebsd_arch.diff
+
+* Add support for kfreebsd-i386, with thanks to Pierre Chifflier
     <chifflier@cpe.fr> (closes: #372908).
-Index: tcc-0.9.24~cvs20070502.orig/tcc.c
-===================================================================
---- tcc-0.9.24~cvs20070502.orig.orig/tcc.c	2007-05-03 03:55:36.673388531 +0200
-+++ tcc-0.9.24~cvs20070502.orig/tcc.c	2007-05-03 03:55:41.170636931 +0200
-@@ -754,8 +754,8 @@
+---
+ libtcc.c |    4 ++--
+ tcc.h    |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/libtcc.c b/libtcc.c
+index ade77c0..b0eb0d8 100644
+--- a/libtcc.c
++++ b/libtcc.c
+@@ -1473,7 +1473,7 @@ static int rt_get_caller_pc(unsigned long *paddr,
+     int i;
+ 
+     if (level == 0) {
+-#if defined(__FreeBSD__)
++#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+         *paddr = uc->uc_mcontext.mc_eip;
+ #elif defined(__dietlibc__)
+         *paddr = uc->uc_mcontext.eip;
+@@ -1482,7 +1482,7 @@ static int rt_get_caller_pc(unsigned long *paddr,
+ #endif
+         return 0;
+     } else {
+-#if defined(__FreeBSD__) 
++#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+         fp = uc->uc_mcontext.mc_ebp;
+ #elif defined(__dietlibc__)
+         fp = uc->uc_mcontext.ebp;
+diff --git a/tcc.h b/tcc.h
+index 4986d26..4eccd23 100644
+--- a/tcc.h
++++ b/tcc.h
+@@ -701,8 +701,8 @@ enum tcc_token {
    #define strtof (float)strtod
    #define strtoll (long long)strtol
  #endif
@@ -15,21 +46,4 @@ Index: tcc-0.9.24~cvs20070502.orig/tcc.c
  /* currently incorrect */
  long double strtold(const char *nptr, char **endptr)
  {
-@@ -9869,7 +9869,7 @@
-     int i;
- 
-     if (level == 0) {
--#if defined(__FreeBSD__)
-+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
-         *paddr = uc->uc_mcontext.mc_eip;
- #elif defined(__dietlibc__)
-         *paddr = uc->uc_mcontext.eip;
-@@ -9878,7 +9878,7 @@
- #endif
-         return 0;
-     } else {
--#if defined(__FreeBSD__) 
-+#if defined(__FreeBSD__)  || defined(__FreeBSD_kernel__)
-         fp = uc->uc_mcontext.mc_ebp;
- #elif defined(__dietlibc__)
-         fp = uc->uc_mcontext.ebp;
+-- 

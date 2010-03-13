@@ -1,14 +1,38 @@
---- tcc.orig/configure	2007-08-15 19:15:52.000000000 +0000
-+++ tcc/configure	2007-08-15 19:19:22.000000000 +0000
-@@ -31,7 +31,6 @@
+From: Arthur Loiret <arthur.loiret@gmail.com>
+Date: Sat, 13 Mar 2010 18:11:06 +0100
+Subject: [PATCH] 438097_configure_allow_nostrip.diff
+
+---
+ Makefile  |    2 +-
+ configure |    3 ---
+ 2 files changed, 1 insertions(+), 4 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 17d3e98..5956e21 100644
+--- a/Makefile
++++ b/Makefile
+@@ -202,7 +202,7 @@ INSTALL=install
+ ifndef CONFIG_WIN32
+ install: $(PROGS) $(LIBTCC1) $(BCHECK_O) libtcc.a tcc.1 tcc-doc.html
+ 	mkdir -p "$(bindir)"
+-	$(INSTALL) -s -m755 $(PROGS) "$(bindir)"
++	$(INSTALL) -m755 $(PROGS) "$(bindir)"
+ 	mkdir -p "$(mandir)/man1"
+ 	$(INSTALL) tcc.1 "$(mandir)/man1"
+ 	mkdir -p "$(tccdir)"
+diff --git a/configure b/configure
+index 2045770..3c37e7e 100755
+--- a/configure
++++ b/configure
+@@ -32,7 +32,6 @@ cross_prefix=""
+ cc="gcc"
  host_cc="gcc"
  ar="ar"
- make="make"
 -strip="strip"
  cpu=`uname -m`
  case "$cpu" in
    i386|i486|i586|i686|i86pc|BePC|i686-AT386)
-@@ -134,7 +133,6 @@
+@@ -140,7 +139,6 @@ fi
  
  cc="${cross_prefix}${cc}"
  ar="${cross_prefix}${ar}"
@@ -16,7 +40,7 @@
  
  if test "$mingw32" = "yes" ; then
      LIBSUF=".lib"
-@@ -294,7 +292,6 @@
+@@ -302,7 +300,6 @@ echo "GCC_MAJOR=$gcc_major" >> config.mak
  echo "#define GCC_MAJOR $gcc_major" >> $TMPH
  echo "HOST_CC=$host_cc" >> config.mak
  echo "AR=$ar" >> config.mak
@@ -24,14 +48,4 @@
  echo "CFLAGS=$CFLAGS" >> config.mak
  echo "LDFLAGS=$LDFLAGS" >> config.mak
  echo "LIBSUF=$LIBSUF" >> config.mak
---- tcc.orig/Makefile	2007-08-15 20:24:57.000000000 +0000
-+++ tcc/Makefile	2007-08-15 20:25:16.000000000 +0000
-@@ -204,7 +204,7 @@
- 
- tcc_install: $(PROGS) tcc.1 libtcc1.a $(BCHECK_O) tcc-doc.html
- 	mkdir -p "$(bindir)"
--	$(INSTALL) -s -m755 $(PROGS) "$(bindir)"
-+	$(INSTALL) -m755 $(PROGS) "$(bindir)"
- ifndef CONFIG_WIN32
- 	mkdir -p "$(mandir)/man1"
- 	$(INSTALL) tcc.1 "$(mandir)/man1"
+-- 

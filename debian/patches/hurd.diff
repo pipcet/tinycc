@@ -1,6 +1,17 @@
---- tcc.orig/configure	2007-08-23 22:30:52.000000000 +0200
-+++ tcc/configure	2007-08-23 22:31:30.000000000 +0200
-@@ -34,7 +34,7 @@
+From: Romain Francoise <rfrancoise@debian.org>
+Date: Sat, 13 Mar 2010 18:07:28 +0100
+Subject: [PATCH] hurd.diff
+
+---
+ configure |    2 +-
+ tcc.h     |    4 ++++
+ 2 files changed, 5 insertions(+), 1 deletions(-)
+
+diff --git a/configure b/configure
+index 5b38f28..2045770 100755
+--- a/configure
++++ b/configure
+@@ -35,7 +35,7 @@ ar="ar"
  strip="strip"
  cpu=`uname -m`
  case "$cpu" in
@@ -8,10 +19,12 @@
 +  i386|i486|i586|i686|i86pc|BePC|i686-AT386)
      cpu="x86"
    ;;
-   armv4l)
---- tcc.orig/tcc.c	2007-08-23 22:30:56.000000000 +0200
-+++ tcc/tcc.c	2007-08-23 22:32:34.000000000 +0200
-@@ -61,6 +61,10 @@
+   x86_64)
+diff --git a/tcc.h b/tcc.h
+index be9c4cc..4986d26 100644
+--- a/tcc.h
++++ b/tcc.h
+@@ -68,6 +68,10 @@
  #define O_BINARY 0
  #endif
  
@@ -22,3 +35,4 @@
  #include "libtcc.h"
  
  /* parser debug */
+-- 

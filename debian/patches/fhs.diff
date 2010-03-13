@@ -1,28 +1,38 @@
-Index: tcc-0.9.24~cvs20070502.orig/examples/ex1.c
-===================================================================
---- tcc-0.9.24~cvs20070502.orig.orig/examples/ex1.c	2007-05-03 03:54:44.050781039 +0200
-+++ tcc-0.9.24~cvs20070502.orig/examples/ex1.c	2007-05-03 03:55:25.970417479 +0200
+From: Romain Francoise <rfrancoise@debian.org>
+Date: Sat, 13 Mar 2010 18:07:21 +0100
+Subject: [PATCH] fhs.diff
+
+---
+ examples/ex1.c |    2 +-
+ examples/ex4.c |    2 +-
+ tcc-doc.texi   |    6 +++---
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/examples/ex1.c b/examples/ex1.c
+index 28139f9..1db5cfe 100755
+--- a/examples/ex1.c
++++ b/examples/ex1.c
 @@ -1,4 +1,4 @@
 -#! /usr/local/bin/tcc -run
 +#! /usr/bin/tcc -run
  #include <tcclib.h>
  
- int main() 
-Index: tcc-0.9.24~cvs20070502.orig/examples/ex4.c
-===================================================================
---- tcc-0.9.24~cvs20070502.orig.orig/examples/ex4.c	2007-05-03 03:54:44.066785482 +0200
-+++ tcc-0.9.24~cvs20070502.orig/examples/ex4.c	2007-05-03 03:55:25.970417479 +0200
+ int main()
+diff --git a/examples/ex4.c b/examples/ex4.c
+index b33b033..0f3f87e 100755
+--- a/examples/ex4.c
++++ b/examples/ex4.c
 @@ -1,4 +1,4 @@
 -#!./tcc -run -L/usr/X11R6/lib -lX11
 +#!/usr/bin/tcc -run -L/usr/X11R6/lib -lX11
  #include <stdlib.h>
- /* Yes, TCC can use X11 too ! */
  #include <stdio.h>
-Index: tcc-0.9.24~cvs20070502.orig/tcc-doc.texi
-===================================================================
---- tcc-0.9.24~cvs20070502.orig.orig/tcc-doc.texi	2007-05-03 03:54:44.082789925 +0200
-+++ tcc-0.9.24~cvs20070502.orig/tcc-doc.texi	2007-05-03 03:55:25.974418590 +0200
-@@ -125,10 +125,10 @@
+ #include <X11/Xlib.h>
+diff --git a/tcc-doc.texi b/tcc-doc.texi
+index 7cc61bb..e5fb51c 100644
+--- a/tcc-doc.texi
++++ b/tcc-doc.texi
+@@ -126,10 +126,10 @@ Compile @file{a.c} and @file{b.c}, link them together and generate the object fi
  Scripting:
  
  TCC can be invoked from @emph{scripts}, just as shell scripts. You just
@@ -35,7 +45,7 @@ Index: tcc-0.9.24~cvs20070502.orig/tcc-doc.texi
  #include <stdio.h>
  
  int main() 
-@@ -181,7 +181,7 @@
+@@ -182,7 +182,7 @@ tcc "-run -L/usr/X11R6/lib -lX11" ex4.c
  In a script, it gives the following header:
  
  @example
@@ -44,3 +54,4 @@ Index: tcc-0.9.24~cvs20070502.orig/tcc-doc.texi
  #include <stdlib.h>
  int main(int argc, char **argv)
  @{
+-- 
