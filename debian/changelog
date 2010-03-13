@@ -1,3 +1,36 @@
+tcc (0.9.25-1) unstable; urgency=low
+
+  * New upstream release (Closes: #549100, LP: #500296).
+    - Supports amd64 architecture.
+  * Fix Hurd FTBS (Closes: #532503).
+  * Improve tcc handling of ld scripts: libs in GROUP command are
+    searched repeatedly, as required.
+  * Make the package compile on armel (Closes: #506517).
+  * x86_64_alloca.diff: Add alloca on x86-64, from upstream commits
+    8ea8305 and dca2b15, to fix a test failure.
+  * 528902_texi_direntry.diff: Add @dircategory and @direntry
+    (Closes: #528902).
+  * Complain for static fct declared without file scope
+    (Closes: #170105).
+  * Install the libtcc library in the new libtcc-dev package
+    (Closes: #234245).
+  * Remove unnecessary patches.
+    - 322913_fix_casts_from_fp_to_bool.diff (already fixed in 0.9.24)
+    - 474883_fix_segmentation_fault_when_compiling.diff
+    - tcc-doc_texi_formatting.diff
+  * Rewrite 419203_fix_sizeof_parse_error.diff patch.
+  * Rebase patch on tcc version 0.9.25.
+  * Add debian/watch file.
+  * Switch to dpkg-source 3.0 (quilt) format.
+  * Add DESTDIR support in configure script.
+  * Move info file creation from debian/rules to upstream Makefile.
+  * Use a dh based debian/rule Makefile.
+  * Bump debhelper compatibility from 4 to 7 (no changes needed).
+  * Bump Standard-Version from 3.8.0 to 3.8.4 (no changes needed).
+  * Fill Vcs-Browser and Vcs-Git fields.
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Sat, 13 Mar 2010 22:36:55 +0100
+
 tcc (0.9.24-1) unstable; urgency=high
 
   [ Aurélien GÉRÔME ]
