@@ -9,8 +9,8 @@ Homepage: http://www.tinycc.org/
 DM-Upload-Allowed: yes
 
 Package: tcc
-Architecture: i386 kfreebsd-i386 hurd-i386
-Depends: ${shlibs:Depends}
+Architecture: i386 kfreebsd-i386 hurd-i386 amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
 Recommends: libc6-dev | libc-dev
 Provides: c-compiler
 Description: the smallest ANSI C compiler
