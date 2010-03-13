@@ -6,3 +6,4 @@ hurd.diff
 372908_add_kfreebsd_arch.diff
 419203_fix_sizeof_parse_error.diff
 438097_configure_allow_nostrip.diff
+528902_texi_direntry.diff

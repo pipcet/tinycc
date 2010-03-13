@@ -1,0 +1,24 @@
+From: Anders Kaseorg <andersk@MIT.EDU>
+Date: Sat, 13 Mar 2010 23:44:15 +0100
+Subject: [PATCH] 528902_texi_direntry.diff
+
+---
+ tcc-doc.texi |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
+
+diff --git a/tcc-doc.texi b/tcc-doc.texi
+index e5fb51c..e47c917 100644
+--- a/tcc-doc.texi
++++ b/tcc-doc.texi
+@@ -2,6 +2,10 @@
+ @c %**start of header
+ @setfilename tcc-doc.info
+ @settitle Tiny C Compiler Reference Documentation
++@dircategory Software development
++@direntry
++* TCC: (tcc-doc).               The Tiny C Compiler.
++@end direntry
+ @c %**end of header
+ 
+ @include config.texi
+-- 
