@@ -8,7 +8,6 @@ case "$1" in
 	    rm -f /usr/doc/tcc
         fi
 	update-alternatives --quiet --remove cc /usr/bin/tcc;
-        install-info --quiet --remove /usr/share/info/tcc.info
         ;;
     failed-upgrade)
         ;;

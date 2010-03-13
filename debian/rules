@@ -43,16 +43,16 @@ install: build
 			includedir=$(CURDIR)/debian/tcc/usr/lib/tcc/include   \
 			docdir=$(CURDIR)/debian/tcc/usr/share/doc/tcc         \
 			tccdir=$(CURDIR)/debian/tcc/usr/lib/tcc
-	mkdir -p $(CURDIR)/debian/tcc/usr/share/info
-	cp tcc-doc.info $(CURDIR)/debian/tcc/usr/share/info/tcc.info
 
 binary-indep: build install;
 binary-arch: build install
 	dh_testdir
 	dh_testroot
+	dh_install --sourcedir=debian/tmp
 	dh_installdocs
 	dh_installexamples
 #	dh_installman debian/tcc.1
+	dh_installinfo tcc-doc.info
 	dh_installchangelogs Changelog
 	dh_link
 	dh_strip

@@ -7,9 +7,6 @@ case "$1" in
 	update-alternatives --quiet --install /usr/bin/cc cc /usr/bin/tcc 10 \
        --slave /usr/share/man/man1/cc.1.gz cc.1.gz                           \
        /usr/share/man/man1/tcc.1.gz;
-        install-info --quiet --section Development Development \
-       --description="TCC - The smallest ANSI C compiler"      \
-       /usr/share/info/tcc.info
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
