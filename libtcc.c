@@ -1473,7 +1473,7 @@ static int rt_get_caller_pc(unsigned long *paddr,
     int i;
 
     if (level == 0) {
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
         *paddr = uc->uc_mcontext.mc_eip;
 #elif defined(__dietlibc__)
         *paddr = uc->uc_mcontext.eip;
@@ -1482,7 +1482,7 @@ static int rt_get_caller_pc(unsigned long *paddr,
 #endif
         return 0;
     } else {
-#if defined(__FreeBSD__) 
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
         fp = uc->uc_mcontext.mc_ebp;
 #elif defined(__dietlibc__)
         fp = uc->uc_mcontext.ebp;
@@ -1508,7 +1508,7 @@ static int rt_get_caller_pc(unsigned long *paddr,
     int i;
 
     if (level == 0) {
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
         *paddr = uc->uc_mcontext.mc_rip;
         /* XXX: only support linux */
 #else
@@ -1516,7 +1516,7 @@ static int rt_get_caller_pc(unsigned long *paddr,
 #endif
         return 0;
     } else {
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
         fp = uc->uc_mcontext.mc_rbp;
 #else
         fp = uc->uc_mcontext.gregs[REG_RBP];
@@ -1820,6 +1820,9 @@ TCCState *tcc_new(void)
     tcc_define_symbol(s, "__FreeBSD__", str( __FreeBSD__));
     tcc_define_symbol(s, "__INTEL_COMPILER", NULL);
 #undef str
+#endif
+#if defined(__FreeBSD_kernel__)
+    tcc_define_symbol(s, "__FreeBSD_kernel__", NULL);
 #endif
 #if defined(__linux)
     tcc_define_symbol(s, "__linux__", NULL);
