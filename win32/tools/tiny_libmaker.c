@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <io.h> /* for mktemp */
+#endif
 
 /* #include "ar-elf.h" */
 /*  "ar-elf.h" */
@@ -177,25 +180,13 @@ int main(int argc, char **argv)
         }
     }
 
-    //tfile[0] = '.'; tfile[1] = '/';
-    //if (tmpnam(&tfile[2])) {
     strcpy(tfile, "./XXXXXX");
-    if (mktemp(tfile))
+    if (!mktemp(tfile) || (fo = fopen(tfile, "wb+")) == NULL)
     {
-        if ((fo = fopen(tfile, "wb+")) == NULL)
-        {
-            fprintf(stderr, "Can't open  file %s \n", tfile);
-            return 2;
-        }
-    }
-
-/*
-    if ((fo = tmpfile()) == NULL)
-    {
-        fprintf(stderr, "Can't open temporary file \n");
+        fprintf(stderr, "Can't open temporary file %s\n", tfile);
         return 2;
     }
-*/
+
     if ((fh = fopen(afile, "wb")) == NULL)
     {
         fprintf(stderr, "Can't open file %s \n", afile);
@@ -203,8 +194,8 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    funcmax = 1000;
-    afpos = realloc(NULL, funcmax); // 250 func
+    funcmax = 250;
+    afpos = realloc(NULL, funcmax * sizeof *afpos); // 250 func
     memcpy(&arhdro.ar_mode, "100666", 6);
 
     //iarg = 1;
@@ -264,11 +255,11 @@ int main(int argc, char **argv)
                     anames = realloc(anames, strpos+istrlen);
                     strcpy(anames + strpos, strtab + sym->st_name);
                     strpos += istrlen;
-                    if (funccnt >= funcmax) {
-                        afpos = realloc(NULL, funcmax+1000);    // 250 func more
-                        funcmax += 1000;
+                    if (++funccnt >= funcmax) {
+                        funcmax += 250;
+                        afpos = realloc(afpos, funcmax * sizeof *afpos); // 250 func more
                     }
-                    afpos[++funccnt] = fpos;
+                    afpos[funccnt] = fpos;
                 }
             }
         }

@@ -1,11 +1,11 @@
 /* ---------------------------------------------- */
 /* alloca86.S */
 
-#include "config.h"
+#include "../config.h"
 
-.globl _alloca
+.globl alloca
 
-_alloca:
+alloca:
     pop     %edx
     pop     %eax
     add     $3,%eax

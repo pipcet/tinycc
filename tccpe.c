@@ -343,10 +343,10 @@ enum {
     sec_data ,
     sec_bss ,
     sec_idata ,
+    sec_other ,
     sec_rsrc ,
     sec_stab ,
     sec_reloc ,
-
     sec_last
 };
 
@@ -355,6 +355,7 @@ ST_DATA DWORD pe_sec_flags[] = {
     0xC0000040, /* ".data"     , */
     0xC0000080, /* ".bss"      , */
     0x40000040, /* ".idata"    , */
+    0xE0000060, /* < other >   , */
     0x40000040, /* ".rsrc"     , */
     0x42000802, /* ".stab"     , */
     0x42000040, /* ".reloc"    , */
@@ -465,6 +466,8 @@ ST_FN int pe_find_import(TCCState * s1, const char *symbol)
 # include <dlfcn.h>
 # define LoadLibrary(s) dlopen(s, RTLD_NOW)
 # define GetProcAddress(h,s) dlsym(h, s)
+#else
+# define dlclose(h) FreeLibrary(h)
 #endif
 
 /* for the -run option: dynamically load symbol from dll */
@@ -472,16 +475,21 @@ void *resolve_sym(struct TCCState *s1, const char *symbol, int type)
 {
     char buffer[100];
     int sym_index, dll_index;
-    void *hModule, *addr, **m;
+    void *addr, **m;
+    DLLReference *dllref;
 
     sym_index = pe_find_import(s1, symbol);
     if (0 == sym_index)
         return NULL;
     dll_index = ((Elf32_Sym *)s1->dynsymtab_section->data + sym_index)->st_value;
-    hModule = LoadLibrary(s1->loaded_dlls[dll_index-1]->name);
-    addr = GetProcAddress(hModule, symbol);
+    dllref = s1->loaded_dlls[dll_index-1];
+    if ( !dllref->handle )
+    {
+        dllref->handle = LoadLibrary(dllref->name);
+    }
+    addr = GetProcAddress(dllref->handle, symbol);
     if (NULL == addr)
-        addr = GetProcAddress(hModule, get_alt_symbol(buffer, symbol));
+        addr = GetProcAddress(dllref->handle, get_alt_symbol(buffer, symbol));
 
     if (addr && STT_OBJECT == type) {
         /* need to return a pointer to the address for data objects */
@@ -569,7 +577,7 @@ ST_FN int pe_write(struct pe_info *pe)
     file_offset = pe->sizeofheaders;
     pe_fpad(op, file_offset);
 
-    if (2 == verbose)
+    if (2 == pe->s1->verbose)
         printf("-------------------------------"
                "\n  virt   file   size  section" "\n");
 
@@ -580,7 +588,7 @@ ST_FN int pe_write(struct pe_info *pe)
         unsigned long size = si->sh_size;
         IMAGE_SECTION_HEADER *psh = &si->ish;
 
-        if (2 == verbose)
+        if (2 == pe->s1->verbose)
             printf("%6lx %6lx %6lx  %s\n",
                 addr, file_offset, size, sh_name);
 
@@ -654,9 +662,9 @@ ST_FN int pe_write(struct pe_info *pe)
         fwrite(&pe->sec_info[i].ish, 1, sizeof(IMAGE_SECTION_HEADER), op);
     fclose (op);
 
-    if (2 == verbose)
+    if (2 == pe->s1->verbose)
         printf("-------------------------------\n");
-    if (verbose)
+    if (pe->s1->verbose)
         printf("<- %s (%lu bytes)\n", pe->filename, file_offset);
 
     return 0;
@@ -851,7 +859,7 @@ ST_FN void pe_build_exports(struct pe_info *pe)
         error_noabort("could not create '%s': %s", buf, strerror(errno));
     } else {
         fprintf(op, "LIBRARY %s\n\nEXPORTS\n", dllname);
-        if (verbose)
+        if (pe->s1->verbose)
             printf("<- %s (%d symbols)\n", buf, sym_count);
     }
 #endif
@@ -953,6 +961,7 @@ ST_FN int pe_section_class(Section *s)
                 return sec_rsrc;
             if (0 == strcmp(name, ".iedat"))
                 return sec_idata;
+            return sec_other;
         } else if (type == SHT_NOBITS) {
             if (flags & SHF_WRITE)
                 return sec_bss;
@@ -1056,7 +1065,7 @@ ST_FN int pe_assign_addresses (struct pe_info *pe)
             flags & SHF_EXECINSTR ? "exec" : ""
             );
     }
-    verbose = 2;
+    pe->s1->verbose = 2;
 #endif
 
     tcc_free(section_order);
@@ -1413,9 +1422,8 @@ PUB_FN int pe_load_def_file(TCCState *s1, int fd)
             continue;
 
         case 2:
-            dllref = tcc_malloc(sizeof(DLLReference) + strlen(dllname));
+            dllref = tcc_mallocz(sizeof(DLLReference) + strlen(dllname));
             strcpy(dllref->name, dllname);
-            dllref->level = 0;
             dynarray_add((void ***) &s1->loaded_dlls, &s1->nb_loaded_dlls, dllref);
             ++state;
 

@@ -84,6 +84,8 @@ int tcc_output_coff(TCCState *s1, FILE *f)
     Section *stext, *sdata, *sbss;
     int i, NSectionsToOutput = 0;
 
+    Coff_str_table = pCoff_str_table = NULL;
+
     stext = FindSection(s1, ".text");
     sdata = FindSection(s1, ".data");
     sbss = FindSection(s1, ".bss");
@@ -183,7 +185,7 @@ int tcc_output_coff(TCCState *s1, FILE *f)
 	coff_sec->s_nlnno = 0;
 	coff_sec->s_lnnoptr = 0;
 
-	if (do_debug && tcc_sect == stext) {
+	if (s1->do_debug && tcc_sect == stext) {
 	    // count how many line nos data
 
 	    // also find association between source file name and function
@@ -311,7 +313,7 @@ int tcc_output_coff(TCCState *s1, FILE *f)
 
     file_hdr.f_symptr = file_pointer;	/* file pointer to symtab */
 
-    if (do_debug)
+    if (s1->do_debug)
 	file_hdr.f_nsyms = coff_nb_syms;	/* number of symtab entries */
     else
 	file_hdr.f_nsyms = 0;
@@ -362,7 +364,7 @@ int tcc_output_coff(TCCState *s1, FILE *f)
     // group the symbols in order of filename, func1, func2, etc
     // finally global symbols
 
-    if (do_debug)
+    if (s1->do_debug)
 	SortSymbolTable();
 
     // write line no data
@@ -371,7 +373,7 @@ int tcc_output_coff(TCCState *s1, FILE *f)
 	coff_sec = &section_header[i];
 	tcc_sect = s1->sections[i];
 
-	if (do_debug && tcc_sect == stext) {
+	if (s1->do_debug && tcc_sect == stext) {
 	    // count how many line nos data
 
 
@@ -499,7 +501,7 @@ int tcc_output_coff(TCCState *s1, FILE *f)
     }
 
     // write symbol table
-    if (do_debug) {
+    if (s1->do_debug) {
 	int k;
 	struct syment csym;
 	AUXFUNC auxfunc;
@@ -670,7 +672,7 @@ int tcc_output_coff(TCCState *s1, FILE *f)
 	}
     }
 
-    if (do_debug) {
+    if (s1->do_debug) {
 	// write string table
 
 	// first write the size
@@ -940,7 +942,7 @@ int tcc_load_coff(TCCState * s1, int fd)
 	    if (name[0] == '_' && strcmp(name, "_main") != 0)
 		name++;
 
-	    tcc_add_symbol(s1, name, csym.n_value);
+	    tcc_add_symbol(s1, name, (void*)csym.n_value);
 	}
 	// skip any aux records
 
