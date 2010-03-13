@@ -1,7 +1,7 @@
 /*
  * TCC auto test program
  */
-#include "config.h"
+#include "../config.h"
 
 #if GCC_MAJOR >= 3
 
@@ -70,10 +70,12 @@ void bitfield_test(void);
 void c99_bool_test(void);
 void float_test(void);
 void longlong_test(void);
+void manyarg_test(void);
 void stdarg_test(void);
 void whitespace_test(void);
 void relocation_test(void);
 void old_style_function(void);
+void alloca_test(void);
 void sizeof_test(void);
 void typeof_test(void);
 void local_label_test(void);
@@ -311,7 +313,7 @@ test\14\
 
 void string_test()
 {
-    int b;
+    unsigned int b;
     printf("string:\n");
     printf("\141\1423\143\n");/* dezdez test */
     printf("\x41\x42\x43\x3a\n");
@@ -523,10 +525,12 @@ int main(int argc, char **argv)
     c99_bool_test();
     float_test();
     longlong_test();
+    manyarg_test();
     stdarg_test();
     whitespace_test();
     relocation_test();
     old_style_function();
+    alloca_test();
     sizeof_test();
     typeof_test();
     statement_expr_test();
@@ -695,6 +699,7 @@ int tab4[10];
 void expr_ptr_test()
 {
     int *p, *q;
+    int i = -1;
 
     printf("expr_ptr:\n");
     p = tab4;
@@ -710,6 +715,37 @@ void expr_ptr_test()
     printf("dec=%d\n", p - tab4);
     printf("add=%d\n", p + 3 - tab4);
     printf("add=%d\n", 3 + p - tab4);
+
+    /* check if 64bit support is ok */
+    q = p = 0;
+    q += i;
+    printf("%p %p %ld\n", q, p, p-q);
+    printf("%d %d %d %d %d %d\n",
+           p == q, p != q, p < q, p <= q, p >= q, p > q);
+    i = 0xf0000000;
+    p += i;
+    printf("%p %p %ld\n", q, p, p-q);
+    printf("%d %d %d %d %d %d\n",
+           p == q, p != q, p < q, p <= q, p >= q, p > q);
+    p = (int *)((char *)p + 0xf0000000);
+    printf("%p %p %ld\n", q, p, p-q);
+    printf("%d %d %d %d %d %d\n",
+           p == q, p != q, p < q, p <= q, p >= q, p > q);
+    p += 0xf0000000;
+    printf("%p %p %ld\n", q, p, p-q);
+    printf("%d %d %d %d %d %d\n",
+           p == q, p != q, p < q, p <= q, p >= q, p > q);
+    {
+        struct size12 {
+            int i, j, k;
+        };
+        struct size12 s[2], *sp = s;
+        int i, j;
+        sp->i = 42;
+        sp++;
+        j = -1;
+        printf("%d\n", sp[j].i);
+    }
 }
 
 void expr_cmp_test()
@@ -1075,6 +1111,8 @@ void cast_test()
     char tab[10];
     unsigned b,d;
     short s;
+    char *p = NULL;
+    p -= 0x700000000042;
 
     printf("cast_test:\n");
     a = 0xfffff;
@@ -1116,6 +1154,16 @@ void cast_test()
     printf("sizeof(+(char)'a') = %d\n", sizeof(+(char)'a'));
     printf("sizeof(-(char)'a') = %d\n", sizeof(-(char)'a'));
     printf("sizeof(~(char)'a') = %d\n", sizeof(-(char)'a'));
+
+    /* from pointer to integer types */
+    printf("%d %d %ld %ld %lld %lld\n",
+           (int)p, (unsigned int)p,
+           (long)p, (unsigned long)p,
+           (long long)p, (unsigned long long)p);
+
+    /* from integers to pointers */
+    printf("%p %p %p %p\n",
+           (void *)a, (void *)b, (void *)c, (void *)d);
 }
 
 /* initializers tests */
@@ -1341,7 +1389,34 @@ void bitfield_test(void)
         printf("st1.f2 == -1\n");
     else 
         printf("st1.f2 != -1\n");
+
+    /* bit sizes below must be bigger than 32 since GCC doesn't allow
+       long-long bitfields whose size is not bigger than int */
+    struct sbf2 {
+        long long f1 : 45;
+        long long : 2;
+        long long f2 : 35;
+        unsigned long long f3 : 38;
+    } st2;
+    st2.f1 = 0x123456789ULL;
+    a = 120;
+    st2.f2 = (long long)a << 25;
+    st2.f3 = a;
+    st2.f2++;
+    printf("%lld %lld %lld\n", st2.f1, st2.f2, st2.f3);
 }
+
+#ifdef __x86_64__
+#define FLOAT_FMT "%f\n"
+#else
+/* x86's float isn't compatible with GCC */
+#define FLOAT_FMT "%.5f\n"
+#endif
+
+/* declare strto* functions as they are C99 */
+double strtod(const char *nptr, char **endptr);
+float strtof(const char *nptr, char **endptr);
+long double strtold(const char *nptr, char **endptr);
 
 #define FTEST(prefix, type, fmt)\
 void prefix ## cmp(type a, type b)\
@@ -1364,6 +1439,8 @@ void prefix ## cmp(type a, type b)\
     printf(fmt "\n", ++a);\
     printf(fmt "\n", a++);\
     printf(fmt "\n", a);\
+    b = 0;\
+    printf("%d %d\n", !a, !b);\
 }\
 void prefix ## fcast(type a)\
 {\
@@ -1388,6 +1465,18 @@ void prefix ## fcast(type a)\
     printf("utof: " fmt "\n", b);\
 }\
 \
+float prefix ## retf(type a) { return a; }\
+double prefix ## retd(type a) { return a; }\
+long double prefix ## retld(type a) { return a; }\
+\
+void prefix ## call(void)\
+{\
+    printf("float: " FLOAT_FMT, prefix ## retf(42.123456789));\
+    printf("double: %f\n", prefix ## retd(42.123456789));\
+    printf("long double: %Lf\n", prefix ## retld(42.123456789));\
+    printf("strto%s: %f\n", #prefix, (double)strto ## prefix("1.2", NULL));\
+}\
+\
 void prefix ## test(void)\
 {\
     printf("testing '%s'\n", #type);\
@@ -1396,6 +1485,7 @@ void prefix ## test(void)\
     prefix ## cmp(1, 1);\
     prefix ## fcast(234.6);\
     prefix ## fcast(-2334.6);\
+    prefix ## call();\
 }
 
 FTEST(f, float, "%f")
@@ -1515,6 +1605,8 @@ void lloptest(long long a, long long b)
     printf("arith2: %Ld %Ld\n", a++, b++);
     printf("arith2: %Ld %Ld\n", --a, --b);
     printf("arith2: %Ld %Ld\n", a, b);
+    b = ub = 0;
+    printf("not: %d %d %d %d\n", !a, !ua, !b, !ub);
 }
 
 void llshift(long long a, int b)
@@ -1636,6 +1728,50 @@ void longlong_test(void)
         p[0]++;
         printf("%lld\n", *p);
     }
+
+    a = 68719476720LL;
+    b = 4294967295LL;
+    printf("%d %d %d %d\n", a > b, a < b, a >= b, a <= b);
+
+    printf("%Ld\n", 0x123456789LLU);
+}
+
+void manyarg_test(void)
+{
+    long double ld = 1234567891234LL;
+    printf("manyarg_test:\n");
+    printf("%d %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f %f %f\n",
+           1, 2, 3, 4, 5, 6, 7, 8,
+           0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.0);
+    printf("%d %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f %f %f "
+           "%Ld %Ld %f %f\n",
+           1, 2, 3, 4, 5, 6, 7, 8,
+           0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.0,
+           1234567891234LL, 987654321986LL,
+           42.0, 43.0);
+    printf("%Lf %d %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f %f %f "
+           "%Ld %Ld %f %f\n",
+           ld, 1, 2, 3, 4, 5, 6, 7, 8,
+           0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.0,
+           1234567891234LL, 987654321986LL,
+           42.0, 43.0);
+    /* XXX: known bug of x86-64 */
+#ifndef __x86_64__
+    printf("%d %d %d %d %d %d %d %d %Lf\n",
+           1, 2, 3, 4, 5, 6, 7, 8, ld);
+    printf("%d %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f %f %f "
+           "%Ld %Ld %f %f %Lf\n",
+           1, 2, 3, 4, 5, 6, 7, 8,
+           0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.0,
+           1234567891234LL, 987654321986LL,
+           42.0, 43.0, ld);
+    printf("%d %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f %f %f "
+           "%Lf %Ld %Ld %f %f %Lf\n",
+           1, 2, 3, 4, 5, 6, 7, 8,
+           0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.0,
+           ld, 1234567891234LL, 987654321986LL,
+           42.0, 43.0, ld);
+#endif
 }
 
 void vprintf1(const char *fmt, ...)
@@ -1645,6 +1781,7 @@ void vprintf1(const char *fmt, ...)
     int c, i;
     double d;
     long long ll;
+    long double ld;
 
     va_start(ap, fmt);
     
@@ -1671,6 +1808,10 @@ void vprintf1(const char *fmt, ...)
                 ll = va_arg(ap, long long);
                 printf("%Ld", ll);
                 break;
+            case 'F':
+                ld = va_arg(ap, long double);
+                printf("%Lf", ld);
+                break;
             }
             p++;
         } else {
@@ -1684,9 +1825,48 @@ void vprintf1(const char *fmt, ...)
 
 void stdarg_test(void)
 {
+    long double ld = 1234567891234LL;
     vprintf1("%d %d %d\n", 1, 2, 3);
     vprintf1("%f %d %f\n", 1.0, 2, 3.0);
     vprintf1("%l %l %d %f\n", 1234567891234LL, 987654321986LL, 3, 1234.0);
+    vprintf1("%F %F %F\n", 1.2L, 2.3L, 3.4L);
+#ifdef __x86_64__
+    /* a bug of x86's TCC */
+    vprintf1("%d %f %l %F %d %f %l %F\n",
+             1, 1.2, 3L, 4.5L, 6, 7.8, 9L, 0.1L);
+#endif
+    vprintf1("%d %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f\n",
+             1, 2, 3, 4, 5, 6, 7, 8,
+             0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8);
+    vprintf1("%d %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f %f %f\n",
+             1, 2, 3, 4, 5, 6, 7, 8,
+             0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.0);
+    vprintf1("%d %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f %f %f "
+             "%l %l %f %f\n",
+             1, 2, 3, 4, 5, 6, 7, 8,
+             0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.0,
+             1234567891234LL, 987654321986LL,
+             42.0, 43.0);
+    vprintf1("%F %d %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f %f %f "
+             "%l %l %f %f\n",
+             ld, 1, 2, 3, 4, 5, 6, 7, 8,
+             0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.0,
+             1234567891234LL, 987654321986LL,
+             42.0, 43.0);
+    vprintf1("%d %d %d %d %d %d %d %d %F\n",
+             1, 2, 3, 4, 5, 6, 7, 8, ld);
+    vprintf1("%d %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f %f %f "
+             "%l %l %f %f %F\n",
+             1, 2, 3, 4, 5, 6, 7, 8,
+             0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.0,
+             1234567891234LL, 987654321986LL,
+             42.0, 43.0, ld);
+    vprintf1("%d %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f %f %f "
+             "%F %l %l %f %f %F\n",
+             1, 2, 3, 4, 5, 6, 7, 8,
+             0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.0,
+             ld, 1234567891234LL, 987654321986LL,
+             42.0, 43.0, ld);
 }
 
 void whitespace_test(void)
@@ -1757,6 +1937,18 @@ void old_style_function(void)
     decl_func2(NULL);
 }
 
+void alloca_test()
+{
+#if defined __i386__ || defined __x86_64__
+    char *p = alloca(16);
+    strcpy(p,"123456789012345");
+    printf("alloca: p is %s\n", p);
+    char *demo = "This is only a test.\n";
+    /* Test alloca embedded in a larger expression */
+    printf("alloca: %s\n", strcpy(alloca(strlen(demo)+1),demo) );
+#endif
+}
+
 void sizeof_test(void)
 {
     int a;
@@ -1764,6 +1956,8 @@ void sizeof_test(void)
 
     printf("sizeof(int) = %d\n", sizeof(int));
     printf("sizeof(unsigned int) = %d\n", sizeof(unsigned int));
+    printf("sizeof(long) = %d\n", sizeof(long));
+    printf("sizeof(unsigned long) = %d\n", sizeof(unsigned long));
     printf("sizeof(short) = %d\n", sizeof(short));
     printf("sizeof(unsigned short) = %d\n", sizeof(unsigned short));
     printf("sizeof(char) = %d\n", sizeof(char));
@@ -1949,6 +2143,9 @@ void asm_test(void)
     goto label1;
  label2:
     __asm__("btsl %1,%0" : "=m"(set) : "Ir"(20) : "cc");
+#ifdef __GNUC__ // works strange with GCC 4.3
+    set=0x1080fd;
+#endif
     printf("set=0x%x\n", set);
     val = 0x01020304;
     printf("swab32(0x%08x) = 0x%0x\n", val, swab32(val));

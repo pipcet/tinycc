@@ -89,13 +89,13 @@ union double_long {
     double d;
 #if 1
     struct {
-        unsigned long lower;
-        long upper;
+        unsigned int lower;
+        int upper;
     } l;
 #else
     struct {
-        long upper;
-        unsigned long lower;
+        int upper;
+        unsigned int lower;
     } l;
 #endif
     long long ll;
@@ -105,6 +105,9 @@ union float_long {
     float f;
     long l;
 };
+
+/* XXX: we don't support several builtin supports for now */
+#ifndef __x86_64__
 
 /* XXX: use gcc/tcc intrinsic ? */
 #if defined(__i386__)
@@ -419,7 +422,7 @@ unsigned long long __umoddi3(unsigned long long u, unsigned long long v)
 }
 
 /* XXX: fix tcc's code generator to do this instead */
-long long __sardi3(long long a, int b)
+long long __ashrdi3(long long a, int b)
 {
 #ifdef __TINYC__
     DWunion u;
@@ -438,7 +441,7 @@ long long __sardi3(long long a, int b)
 }
 
 /* XXX: fix tcc's code generator to do this instead */
-unsigned long long __shrdi3(unsigned long long a, int b)
+unsigned long long __lshrdi3(unsigned long long a, int b)
 {
 #ifdef __TINYC__
     DWunion u;
@@ -457,7 +460,7 @@ unsigned long long __shrdi3(unsigned long long a, int b)
 }
 
 /* XXX: fix tcc's code generator to do this instead */
-long long __shldi3(long long a, int b)
+long long __ashldi3(long long a, int b)
 {
 #ifdef __TINYC__
     DWunion u;
@@ -482,8 +485,10 @@ unsigned short __tcc_fpu_control = 0x137f;
 unsigned short __tcc_int_fpu_control = 0x137f | 0x0c00;
 #endif
 
+#endif /* !__x86_64__ */
+
 /* XXX: fix tcc's code generator to do this instead */
-float __ulltof(unsigned long long a)
+float __floatundisf(unsigned long long a)
 {
     DWunion uu; 
     XFtype r;
@@ -498,7 +503,7 @@ float __ulltof(unsigned long long a)
     }
 }
 
-double __ulltod(unsigned long long a)
+double __floatundidf(unsigned long long a)
 {
     DWunion uu; 
     XFtype r;
@@ -513,7 +518,7 @@ double __ulltod(unsigned long long a)
     }
 }
 
-long double __ulltold(unsigned long long a)
+long double __floatundixf(unsigned long long a)
 {
     DWunion uu; 
     XFtype r;

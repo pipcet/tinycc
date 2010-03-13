@@ -471,7 +471,7 @@ void gfunc_prolog(CType *func_type)
             addr += size;
         }
         sym_push(sym->v & ~SYM_FIELD, type,
-                 VT_LOCAL | VT_LVAL, param_addr);
+                 VT_LOCAL | lvalue_type(type->t), param_addr);
         param_index++;
     }
     func_ret_sub = 0;
@@ -480,7 +480,7 @@ void gfunc_prolog(CType *func_type)
         func_ret_sub = addr - 8;
 
     /* leave some room for bound checking code */
-    if (do_bounds_check) {
+    if (tcc_state->do_bounds_check) {
         oad(0xb8, 0); /* lbound section pointer */
         oad(0xb8, 0); /* call to function */
         func_bound_offset = lbounds_section->data_offset;
@@ -493,7 +493,8 @@ void gfunc_epilog(void)
     int v, saved_ind;
 
 #ifdef CONFIG_TCC_BCHECK
-    if (do_bounds_check && func_bound_offset != lbounds_section->data_offset) {
+    if (tcc_state->do_bounds_check
+     && func_bound_offset != lbounds_section->data_offset) {
         int saved_ind;
         int *bounds_ptr;
         Sym *sym, *sym_data;
