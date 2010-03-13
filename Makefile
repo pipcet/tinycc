@@ -202,7 +202,7 @@ INSTALL=install
 ifndef CONFIG_WIN32
 install: $(PROGS) $(LIBTCC1) $(BCHECK_O) libtcc.a tcc.1 tcc-doc.html
 	mkdir -p "$(bindir)"
-	$(INSTALL) -s -m755 $(PROGS) "$(bindir)"
+	$(INSTALL) -m755 $(PROGS) "$(bindir)"
 	mkdir -p "$(mandir)/man1"
 	$(INSTALL) tcc.1 "$(mandir)/man1"
 	mkdir -p "$(tccdir)"
