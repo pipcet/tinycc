@@ -39,6 +39,8 @@ install: build
 	dh_installdirs
 	$(MAKE) install bindir=$(CURDIR)/debian/tcc/usr/bin                   \
 			mandir=$(CURDIR)/debian/tcc/usr/share/man             \
+			libdir=$(CURDIR)/debian/libtcc-dev/usr/lib            \
+			includedir=$(CURDIR)/debian/libtcc-dev/usr/include    \
 			libdir=$(CURDIR)/debian/tcc/usr/lib                   \
 			includedir=$(CURDIR)/debian/tcc/usr/lib/tcc/include   \
 			docdir=$(CURDIR)/debian/tcc/usr/share/doc/tcc         \

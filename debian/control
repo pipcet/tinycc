@@ -25,3 +25,11 @@ Description: the smallest ANSI C compiler
  production use.  The code it generates is much less optimized than what
  GCC produces, and compiler bugs can have serious security consequences
  for your program.
+
+Package: libtcc-dev
+Section: libdevel
+Architecture: i386 kfreebsd-i386 hurd-i386 amd64
+Depends: ${misc:Depends}
+Description: the smallest ANSI C compiler (static library)
+ This package contains the static library and header file for TCC (Tiny 
+ C Compiler).
