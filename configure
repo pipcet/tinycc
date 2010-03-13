@@ -135,7 +135,7 @@ done
 
 # Checking for CFLAGS
 if test -z "$CFLAGS"; then
-    CFLAGS="-O2"
+    CFLAGS="-g -O2"
 fi
 
 cc="${cross_prefix}${cc}"

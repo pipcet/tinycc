@@ -5,7 +5,7 @@
 TOP ?= .
 include $(TOP)/config.mak
 
-CFLAGS+=-g -Wall
+CFLAGS+=-Wall
 CFLAGS_P=$(CFLAGS) -pg -static -DCONFIG_TCC_STATIC
 LIBS_P=
 
@@ -184,7 +184,7 @@ endif
 endif
 
 %.o: %.c
-	$(LIBTCC1_CC) -o $@ -c $< -O2 -Wall
+	$(LIBTCC1_CC) -o $@ -c $< $(CFLAGS)
 
 %.o: %.S
 	$(LIBTCC1_CC) -o $@ -c $<
@@ -193,7 +193,7 @@ libtcc1.a: $(LIBTCC1_OBJS)
 	$(AR) rcs $@ $^
 
 bcheck.o: bcheck.c
-	$(CC) -o $@ -c $< -O2 -Wall
+	$(CC) -o $@ -c $< $(CFLAGS)
 
 # install
 TCC_INCLUDES = stdarg.h stddef.h stdbool.h float.h varargs.h tcclib.h
@@ -236,7 +236,7 @@ install: $(PROGS) $(LIBTCC1) libtcc.a tcc-doc.html
 	mkdir -p "$(tccdir)/examples"
 	mkdir -p "$(tccdir)/doc"
 	mkdir -p "$(tccdir)/libtcc"
-	$(INSTALL) -s -m755 $(PROGS) "$(tccdir)"
+	$(INSTALL) -m755 $(PROGS) "$(tccdir)"
 	$(INSTALL) -m644 $(LIBTCC1) win32/lib/*.def "$(tccdir)/lib"
 	cp -r win32/include/. "$(tccdir)/include"
 	cp -r win32/examples/. "$(tccdir)/examples"
