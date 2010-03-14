@@ -28,11 +28,13 @@ clean:
 		rm -f tcc-doc.html tcc.1;	\
 	fi
 	dh_clean
+	dh_prep
 
 install: build
 	dh_testdir
 	dh_testroot
-	dh_clean -k
+	dh_clean
+	dh_prep
 	dh_installdirs
 	$(MAKE) install bindir=$(CURDIR)/debian/tcc/usr/bin                   \
 			mandir=$(CURDIR)/debian/tcc/usr/share/man             \
