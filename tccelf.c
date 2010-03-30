@@ -1276,6 +1276,8 @@ static void tcc_add_linker_symbols(TCCState *s1)
 static char elf_interp[] = "/libexec/ld-elf.so.1";
 #elif defined __FreeBSD_kernel__
 static char elf_interp[] = "/lib/ld.so.1";
+#elif defined __gnu_hurd__
+static char elf_interp[] = "/lib/ld.so";
 #elif defined TCC_ARM_EABI
 static char elf_interp[] = "/lib/ld-linux.so.3";
 #elif defined(TCC_TARGET_X86_64)
@@ -2724,9 +2726,76 @@ static int ld_next(TCCState *s1, char *name, int name_size)
     return c;
 }
 
+char *tcc_strcpy_part(char *out, const char *in, size_t num)
+{
+    memcpy(out, in, num);
+    out[num] = '\0';
+    return out;
+}
+
+/*
+ * Extract the library name from the file name
+ * Return 0 if the file isn't a library
+ *
+ * /!\ No test on filename capacity, be careful
+ */
+static int filename_to_libname(TCCState *s1, const char filename[], char libname[])
+{
+    char *ext;
+    int libprefix;
+
+    /* already converted to library name */
+    if (libname[0] != '\0')
+        return 1;
+    ext = tcc_fileextension(filename);
+    if (*ext == '\0')
+        return 0;
+    libprefix = !strncmp(filename, "lib", 3);
+    if (!s1->static_link) {
+#ifdef TCC_TARGET_PE
+        if (!strcmp(ext, ".def")) {
+            size_t len = ext - filename;
+            tcc_strcpy_part(libname, filename, len);
+            return 1;
+        }
+#else
+        if (libprefix && (!strcmp(ext, ".so"))) {
+            size_t len = ext - filename - 3;
+            tcc_strcpy_part(libname, filename + 3, len);
+            return 1;
+        }
+#endif
+    } else {
+        if (libprefix && (!strcmp(ext, ".a"))) {
+            size_t len = ext - filename - 3;
+            tcc_strcpy_part(libname, filename + 3, len);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Extract the file name from the library name
+ *
+ * /!\ No test on filename capacity, be careful
+ */
+static void libname_to_filename(TCCState *s1, const char libname[], char filename[])
+{
+    if (!s1->static_link) {
+#ifdef TCC_TARGET_PE
+        sprintf(filename, "%s.def", libname);
+#else
+        sprintf(filename, "lib%s.so", libname);
+#endif
+    } else {
+        sprintf(filename, "lib%s.a", libname);
+    }
+}
+
 static int ld_add_file_list(TCCState *s1, int as_needed)
 {
-    char filename[1024];
+    char filename[1024], libname[1024];
     int t, ret;
 
     t = ld_next(s1, filename, sizeof(filename));
@@ -2734,11 +2803,20 @@ static int ld_add_file_list(TCCState *s1, int as_needed)
         expect("(");
     t = ld_next(s1, filename, sizeof(filename));
     for(;;) {
+        libname[0] = '\0';
         if (t == LD_TOK_EOF) {
             error_noabort("unexpected end of file");
             return -1;
         } else if (t == ')') {
             break;
+        } else if (t == '-') {
+            t = ld_next(s1, filename, sizeof(filename));
+            if ((t != LD_TOK_NAME) || (filename[0] != 'l')) {
+                error_noabort("library name expected");
+                return -1;
+            }
+            strcpy(libname, &filename[1]);
+            libname_to_filename(s1, libname, filename);
         } else if (t != LD_TOK_NAME) {
             error_noabort("filename expected");
             return -1;
@@ -2749,8 +2827,15 @@ static int ld_add_file_list(TCCState *s1, int as_needed)
                 return ret;
         } else {
             /* TODO: Implement AS_NEEDED support. Ignore it for now */
-            if (!as_needed)
-                tcc_add_file(s1, filename);
+            if (!as_needed) {
+                ret = tcc_add_file_internal(s1, filename, 0);
+                if (ret) {
+                    if (filename_to_libname(s1, filename, libname))
+                        ret = tcc_add_library(s1, libname);
+                    if (ret)
+                        return ret;
+                }
+            }
         }
         t = ld_next(s1, filename, sizeof(filename));
         if (t == ',') {
