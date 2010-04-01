@@ -3,7 +3,7 @@ Section: devel
 Priority: optional
 Maintainer: Aurélien GÉRÔME <ag@debian.org>
 Uploaders: Thomas Preud'homme <robotux@celest.fr>, Arthur Loiret <arthur.loiret@gmail.com>
-Build-Depends: debhelper (>= 7), texi2html, texinfo, perl
+Build-Depends: debhelper (>= 7.0.50), texi2html, texinfo, perl
 Standards-Version: 3.8.4
 Homepage: http://www.tinycc.org/
 DM-Upload-Allowed: yes

@@ -1,69 +1,29 @@
 #!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper.
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
 
-configure: configure-stamp
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
 
-configure-stamp:
-	dh_testdir
-	./configure --prefix=/usr                     \
-		    --mandir=/usr/share/man           \
-		    --docdir=/usr/share/doc
-	touch configure-stamp
+DH_OVERRIDEN := dh_installcatalogs dh_installcron dh_installdebconf \
+	       dh_installemacsen dh_installifupdown dh_pysupport \
+	       dh_installinit dh_installmenu dh_installmime \
+	       dh_installmodules dh_installlogcheck \
+	       dh_installlogrotate dh_installpam dh_installppp \
+	       dh_installudev dh_installwm dh_installxfonts \
+	       dh_lintian dh_gconf dh_icons dh_perl
 
-build: build-stamp
+ifneq ($(shell which dh_bugfiles), "")
+DH_OVERRIDEN := $(DH_OVERRIDEN) dh_bugfiles
+endif
 
-build-stamp: configure-stamp 
-	dh_testdir
-	$(MAKE)
-	$(MAKE) test
-	makeinfo tcc-doc.texi
-	touch build-stamp
+RULE_OVERRIDE := $(patsubst %,override_%,$(DH_OVERRIDEN))
 
-clean:
-	dh_testdir
-	dh_testroot
-	rm -f build-stamp configure-stamp
-	if [ -f config.mak ]; then    \
-		$(MAKE) clean;        \
-		rm -f tcc-doc.info config.mak config.h config.texi libtcc1.a; \
-		rm -f tcc-doc.html tcc.1;	\
-	fi
-	dh_clean
-	dh_prep
+$(RULE_OVERRIDE):
 
-install: build
-	dh_testdir
-	dh_testroot
-	dh_clean
-	dh_prep
-	dh_installdirs
-	$(MAKE) install bindir=$(CURDIR)/debian/tcc/usr/bin                   \
-			mandir=$(CURDIR)/debian/tcc/usr/share/man             \
-			libdir=$(CURDIR)/debian/libtcc-dev/usr/lib            \
-			includedir=$(CURDIR)/debian/libtcc-dev/usr/include    \
-			libdir=$(CURDIR)/debian/tcc/usr/lib                   \
-			includedir=$(CURDIR)/debian/tcc/usr/lib/tcc/include   \
-			docdir=$(CURDIR)/debian/tcc/usr/share/doc/tcc         \
-			tccdir=$(CURDIR)/debian/tcc/usr/lib/tcc
-
-binary-indep: build install;
-binary-arch: build install
-	dh_testdir
-	dh_testroot
-	dh_install --sourcedir=debian/tmp
-	dh_installdocs
-	dh_installexamples
-#	dh_installman debian/tcc.1
-	dh_installinfo tcc-doc.info
-	dh_installchangelogs Changelog
-	dh_link
-	dh_strip
-	dh_compress
-	dh_fixperms
-	dh_installdeb
-	dh_shlibdeps
-	dh_gencontrol
-	dh_md5sums
-	dh_builddeb
-
-binary: binary-indep binary-arch
-.PHONY: build clean binary-indep binary-arch binary install configure
+%:
+	dh $@

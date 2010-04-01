@@ -1,5 +1,1 @@
-examples/ex1.c
-examples/ex2.c
-examples/ex3.c
-examples/ex4.c
-examples/ex5.c
+examples/*
