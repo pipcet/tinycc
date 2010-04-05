@@ -2759,9 +2759,37 @@ static void post_type(CType *type, AttributeDef *ad)
             next();
         n = -1;
         if (tok != ']') {
-            n = expr_const();
-            if (n < 0)
-                error("invalid array size");    
+            /* varray */
+            if (expr_check_const()) {
+                n = vtop->c.i;
+                vpop();
+                if (n < 0)
+                    error("invalid array size");
+            } else {
+                put_user_tok_start();
+                put_user_tok('=');
+#ifdef CONFIG_TCC_BCHECK
+                put_user_tok(TOK_alloca);
+#else
+		put_user_tok(tok_alloc("alloca", 6)->tok);
+#endif
+                put_user_tok('(');
+                while(tok != ']') {
+                    put_user_tok(tok);
+                    next();
+                }
+                put_user_tok(')');
+                skip(']');
+                if (tok != ';')
+                    error("not support varray type");
+                put_user_tok(tok);
+                put_user_tok_end();
+                next();
+                s = sym_push(SYM_FIELD, type, 0, -1);
+                type->t = (VT_PTR | VT_CONSTANT);
+                type->ref = s;
+                return;
+            }
         }
         skip(']');
         /* parse next post type */
@@ -3779,6 +3807,19 @@ static int expr_const(void)
     vpop();
     return c;
 }
+
+/* varray */
+static int expr_check_const(void)
+{
+    int last_tok = tok;
+    expr_const1();
+    if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) != VT_CONST) {
+        unget_tok(last_tok);
+        return(FALSE);
+    }
+    return(TRUE);
+}
+/* ~varray */
 
 /* return the label token if current token is a label, otherwise
    return zero */

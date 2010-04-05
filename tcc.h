@@ -140,7 +140,7 @@ typedef int BOOL;
 
 #define TOK_HASH_SIZE       8192 /* must be a power of two */
 #define TOK_ALLOC_INCR      512  /* must be a power of two */
-#define TOK_MAX_SIZE        4 /* token max size in int unit when stored in string */
+#define TOK_MAX_SIZE        31 /* token max size in int unit when stored in string */
 
 /* token symbol management */
 typedef struct TokenSym {
