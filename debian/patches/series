@@ -9,3 +9,4 @@ hurd.diff
 528902_texi_direntry.diff
 create_info_file.diff
 add_DESTDIR_support_in_configure.diff
+532503_fix_hurd_FTBFS.diff
