@@ -40,6 +40,8 @@ static int tok_flags;
 #define TOK_FLAG_EOF   0x0008 /* end of file */
 
 static int *macro_ptr, *macro_ptr_allocated;
+static int *user_macro_ptr;
+static int user_saved_buffer[TOK_MAX_SIZE + 1];
 static int *unget_saved_macro_ptr;
 static int unget_saved_buffer[TOK_MAX_SIZE + 1];
 static int unget_buffer_enabled;
@@ -129,6 +131,8 @@ static void unary_type(CType *type);
 static void block(int *bsym, int *csym, int *case_sym, int *def_sym, 
                   int case_reg, int is_expr);
 static int expr_const(void);
+/* varray */
+static int expr_check_const(void);
 static void expr_eq(void);
 static void gexpr(void);
 static void gen_inline_functions(void);
