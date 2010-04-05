@@ -1,0 +1,111 @@
+From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
+Date: Mon, 5 Apr 2010 01:54:00 +0200
+Subject: [PATCH] search_lib_in_GROUP_ld_scripts_cmd_repeatedly.diff
+
+Archives specified in the GROUP command in ld scripts are now searched
+repeatdly until no new references are created, as required.
+---
+ tcc.h    |    2 ++
+ tccelf.c |   28 +++++++++++++++++++++++++++-
+ tccpp.c  |   21 +++++++++++++++++++++
+ 3 files changed, 50 insertions(+), 1 deletions(-)
+
+diff --git a/tcc.h b/tcc.h
+index 4eccd23..d59b559 100644
+--- a/tcc.h
++++ b/tcc.h
+@@ -209,6 +209,8 @@ typedef struct Sym {
+     struct Sym *prev_tok; /* previous symbol for this token */
+ } Sym;
+ 
++static int new_undef_sym = 0; /* Is there a new undefined sym since last new_undef_sym() */
++
+ /* section definition */
+ /* XXX: use directly ELF structure for parameters ? */
+ /* special flag to indicate that the section should not be linked to
+diff --git a/tccelf.c b/tccelf.c
+index 8549057..88480c5 100644
+--- a/tccelf.c
++++ b/tccelf.c
+@@ -250,6 +250,7 @@ static int add_elf_sym(Section *s, unsigned long value, unsigned long size,
+         do_patch:
+             esym->st_info = ELFW(ST_INFO)(sym_bind, sym_type);
+             esym->st_shndx = sh_num;
++            new_undef_sym = 1;
+             esym->st_value = value;
+             esym->st_size = size;
+             esym->st_other = other;
+@@ -2774,6 +2775,14 @@ static int ld_add_file_list(TCCState *s1, int as_needed)
+     return 0;
+ }
+ 
++static int new_undef_syms(void)
++{
++    int ret = 0;
++    ret = new_undef_sym;
++    new_undef_sym = 0;
++    return ret;
++}
++
+ /* interpret a subset of GNU ldscripts to handle the dummy libc.so
+    files */
+ static int tcc_load_ldscript(TCCState *s1)
+@@ -2792,7 +2801,24 @@ static int tcc_load_ldscript(TCCState *s1)
+             return -1;
+         if (!strcmp(cmd, "INPUT") ||
+             !strcmp(cmd, "GROUP")) {
+-            ret = ld_add_file_list(s1, 0);
++            if (!strcmp(cmd, "GROUP")) {
++                BufferedFile *buf_state;
++                int off;
++
++                buf_state = tcc_save_buffer_state(&off);
++                new_undef_syms();
++                ret = ld_add_file_list(s1, 0);
++                if (ret)
++                    goto free_bufstate;
++                while (!ret && new_undef_syms()) {
++                    tcc_load_buffer_state(buf_state, off);
++                    ret = ld_add_file_list(s1, 0);
++                }
++                free_bufstate:
++                tcc_free_buffer_state(buf_state);
++            } else {
++                ret = ld_add_file_list(s1, 0);
++            }
+             if (ret)
+                 return ret;
+         } else if (!strcmp(cmd, "OUTPUT_FORMAT") ||
+diff --git a/tccpp.c b/tccpp.c
+index ff17d8b..684e677 100644
+--- a/tccpp.c
++++ b/tccpp.c
+@@ -236,6 +236,27 @@ static int tcc_peekc_slow(BufferedFile *bf)
+     }
+ }
+ 
++BufferedFile *tcc_save_buffer_state(int *offset)
++{
++    BufferedFile *state;
++
++    state = tcc_malloc(sizeof(BufferedFile));
++    memcpy(state, file, sizeof(BufferedFile));
++    *offset = lseek(file->fd, 0, SEEK_CUR);
++    return state;
++}
++
++void tcc_load_buffer_state(BufferedFile *buf_state, int offset)
++{
++    memcpy(file, buf_state, sizeof(BufferedFile));
++    lseek(file->fd, offset, SEEK_SET);
++}
++
++void tcc_free_buffer_state(BufferedFile *buf_state)
++{
++    tcc_free(buf_state);
++}
++
+ /* return the current character, handling end of block if necessary
+    (but not stray) */
+ static int handle_eob(void)
+-- 
