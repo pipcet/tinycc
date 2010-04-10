@@ -1,87 +1,80 @@
-From: Thomas Preud'homme <robotux@celest.fr>
-Date: Sat, 13 Mar 2010 18:10:17 +0100
+From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
+Date: Sun, 11 Apr 2010 01:53:40 +0200
 Subject: [PATCH] 419203_fix_sizeof_parse_error.diff
 
 ---
- tccgen.c        |   43 +++++++++++++++++++++++++++++++++++++++++++
- tests/tcctest.c |    4 ++++
- 2 files changed, 47 insertions(+), 0 deletions(-)
+ tccgen.c |   25 +++++++++++++++++++------
+ 1 files changed, 19 insertions(+), 6 deletions(-)
 
 diff --git a/tccgen.c b/tccgen.c
-index b4b5d59..266fb51 100644
+index b4b5d59..e04297b 100644
 --- a/tccgen.c
 +++ b/tccgen.c
-@@ -3115,7 +3115,50 @@ static void unary(void)
+@@ -47,6 +47,13 @@ void vsetc(CType *type, int r, CValue *vc)
+     vtop->c = *vc;
+ }
+ 
++/* push constant of type "type" with useless value */
++void vpush(CType *type)
++{
++    CValue cval;
++    vsetc(type, VT_CONST, &cval);
++}
++
+ /* push integer constant */
+ void vpushi(int v)
+ {
+@@ -2944,11 +2951,14 @@ static void vpush_tokc(int t)
+ 
+ static void unary(void)
+ {
+-    int n, t, align, size, r;
++    int n, t, align, size, r, sizeof_caller;
+     CType type;
+     Sym *s;
+     AttributeDef ad;
++    static int in_sizeof = 0;
+ 
++    sizeof_caller = in_sizeof;
++    in_sizeof = 0;
+     /* XXX: GCC 2.95.3 does not generate a table although it should be
+        better here */
+  tok_next:
+@@ -3045,6 +3055,10 @@ static void unary(void)
+                 memset(&ad, 0, sizeof(AttributeDef));
+                 decl_initializer_alloc(&type, &ad, r, 1, 0, 0);
+             } else {
++                if (sizeof_caller) {
++                    vpush(&type);
++                    return;
++                }
+                 unary();
+                 gen_cast(&type);
+             }
+@@ -3114,11 +3128,8 @@ static void unary(void)
+     case TOK_ALIGNOF2:
          t = tok;
          next();
-         if (tok == '(') {
-+/* Beginning of sizeof parsing error correction */
-+            int tbis = tok;
-+            uint8_t *p = file->buf_ptr;
-             parse_expr_type(&type);
-+/* if we met sizeof (*fct)(param) or sizeof (identifier)[index] */
-+            if (((type.t & VT_BTYPE) == VT_FUNC) && (tok == '(')) {
-+                    file->buf_ptr = p;
-+                    tok = tbis;
-+                    tbis = '(';
-+                    skip('(');
-+                    file->buf_ptr -= 2;
-+/* Add of parenthesis to frame (*fct)(param) : could partially erase sizeof */
-+                    *(file->buf_ptr-1) = '(';
-+                    while (*file->buf_ptr != ')') {
-+                        *file->buf_ptr = *(file->buf_ptr+1);
-+                        file->buf_ptr++;
-+                    }
-+                    do {
-+                        *file->buf_ptr = *(file->buf_ptr+1);
-+                        file->buf_ptr++;
-+                    } while (*file->buf_ptr != ')');
-+/* Make like nothing happen and launch parsing again */
-+                    file->buf_ptr = p-2;
-+                    type.t = VT_PTR | VT_ARRAY;
-+                    tok = '(';
-+                    expr_type(&type);
-+            } else if (((type.t & VT_BTYPE) == VT_PTR) && (tok == '[')) {
-+                    file->buf_ptr = p;
-+                    tok = tbis;
-+                    tbis = '[';
-+                    skip('(');
-+                    p = file->buf_ptr;
-+/* Moving parenthesis from (identifier)[index] to (indentifier[index]) */
-+                    while (*file->buf_ptr != ']') {
-+                        *file->buf_ptr = *(file->buf_ptr+1);
-+                        file->buf_ptr++;
-+                    }
-+/* Make like nothing happen and launch parsing again */
-+                    *file->buf_ptr = ')';
-+                    file->buf_ptr = p;
-+                    expr_type(&type);
-+                    skip(')');
-+                }
-+/* End of sizeof parsing error correction */
-         } else {
-             unary_type(&type);
-         }
-diff --git a/tests/tcctest.c b/tests/tcctest.c
-index a2d481a..9deef62 100644
---- a/tests/tcctest.c
-+++ b/tests/tcctest.c
-@@ -1953,6 +1953,8 @@ void sizeof_test(void)
+-        if (tok == '(') {
+-            parse_expr_type(&type);
+-        } else {
+-            unary_type(&type);
+-        }
++        in_sizeof++;
++        unary_type(&type); // Perform a in_sizeof = 0;
+         size = type_size(&type, &align);
+         if (t == TOK_SIZEOF) {
+             if (size < 0)
+@@ -3735,9 +3746,11 @@ static void expr_type(CType *type)
+ static void unary_type(CType *type)
  {
      int a;
-     int **ptr;
-+    int array[2];
-+    int (*func)(int) = fib;
++    void *vtop_saved;
  
-     printf("sizeof(int) = %d\n", sizeof(int));
-     printf("sizeof(unsigned int) = %d\n", sizeof(unsigned int));
-@@ -1968,6 +1970,8 @@ void sizeof_test(void)
-     printf("a=%d\n", a);
-     ptr = NULL;
-     printf("sizeof(**ptr) = %d\n", sizeof (**ptr));
-+    printf("sizeof(array)[0] = %d\n", sizeof(array)[0]);
-+    printf("sizeof(*func)(4) = %d\n", sizeof(*func)(4));
- 
-     /* some alignof tests */
-     printf("__alignof__(int) = %d\n", __alignof__(int));
+     a = nocode_wanted;
+     nocode_wanted = 1;
++    vtop_saved = vtop;
+     unary();
+     *type = vtop->type;
+     vpop();
 -- 
