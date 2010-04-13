@@ -4998,6 +4998,9 @@ static void decl(int l)
             }
 #endif
             if ((type.t & VT_BTYPE) == VT_FUNC) {
+                if ((type.t & VT_STATIC) && (l == VT_LOCAL)) {
+                    error("function without file scope cannot be static");
+                }
                 /* if old style function prototype, we accept a
                    declaration list */
                 sym = type.ref;
