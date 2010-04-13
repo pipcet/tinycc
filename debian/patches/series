@@ -11,3 +11,4 @@ create_info_file.diff
 add_DESTDIR_support_in_configure.diff
 532503_fix_hurd_FTBFS.diff
 search_lib_in_GROUP_ld_scripts_cmd_repeatedly.diff
+170105_complain_static_fct_without_file_scope.diff

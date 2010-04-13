@@ -1,0 +1,23 @@
+From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
+Date: Tue, 13 Apr 2010 21:08:37 +0200
+Subject: [PATCH] 170105_complain_static_fct_without_file_scope.diff
+
+---
+ tccgen.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/tccgen.c b/tccgen.c
+index e04297b..04c39f2 100644
+--- a/tccgen.c
++++ b/tccgen.c
+@@ -2688,6 +2688,9 @@ static void post_type(CType *type, AttributeDef *ad)
+ 
+     if (tok == '(') {
+         /* function declaration */
++        if ((type->t & VT_STATIC) && local_stack) {
++            error("Function without file scope cannot be static");
++        }
+         next();
+         l = 0;
+         first = NULL;
+-- 
