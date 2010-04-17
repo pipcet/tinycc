@@ -25,5 +25,9 @@ RULE_OVERRIDE := $(patsubst %,override_%,$(DH_OVERRIDEN))
 
 $(RULE_OVERRIDE):
 
+build:
+	dh build
+	touch build
+
 %:
 	dh $@
