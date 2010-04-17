@@ -8,7 +8,7 @@ Subject: [PATCH] create_info_file.diff
  2 files changed, 17 insertions(+), 3 deletions(-)
 
 diff --git a/Makefile b/Makefile
-index 5956e21..b8a852a 100644
+index 53afb0b..f79e298 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -111,7 +111,7 @@ ifdef CONFIG_CROSS
@@ -54,7 +54,7 @@ index 5956e21..b8a852a 100644
  
  endif # ifeq ($(TOP),.)
 diff --git a/configure b/configure
-index 3c37e7e..147d98e 100755
+index 89c7ead..6559395 100755
 --- a/configure
 +++ b/configure
 @@ -27,6 +27,7 @@ libdir=""

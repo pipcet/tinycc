@@ -16,7 +16,7 @@ Content-Transfer-Encoding: 8bit
  2 files changed, 89 insertions(+), 3 deletions(-)
 
 diff --git a/configure b/configure
-index f7d7ac1..2010f1b 100755
+index c6bf357..d8ad4a2 100755
 --- a/configure
 +++ b/configure
 @@ -35,7 +35,7 @@ host_cc="gcc"

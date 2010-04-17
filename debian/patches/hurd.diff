@@ -8,7 +8,7 @@ Subject: [PATCH] hurd.diff
  2 files changed, 5 insertions(+), 1 deletions(-)
 
 diff --git a/configure b/configure
-index 5b38f28..2045770 100755
+index c2d0666..7be7760 100755
 --- a/configure
 +++ b/configure
 @@ -35,7 +35,7 @@ ar="ar"

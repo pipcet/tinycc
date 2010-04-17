@@ -8,7 +8,7 @@ Subject: [PATCH] 438097_configure_allow_nostrip.diff
  2 files changed, 1 insertions(+), 4 deletions(-)
 
 diff --git a/Makefile b/Makefile
-index 17d3e98..5956e21 100644
+index 5af111e..53afb0b 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -202,7 +202,7 @@ INSTALL=install
@@ -21,7 +21,7 @@ index 17d3e98..5956e21 100644
  	$(INSTALL) tcc.1 "$(mandir)/man1"
  	mkdir -p "$(tccdir)"
 diff --git a/configure b/configure
-index 2045770..3c37e7e 100755
+index 7be7760..89c7ead 100755
 --- a/configure
 +++ b/configure
 @@ -32,7 +32,6 @@ cross_prefix=""

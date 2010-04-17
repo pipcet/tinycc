@@ -2,12 +2,20 @@ From: Romain Francoise <rfrancoise@debian.org>
 Date: Sat, 13 Mar 2010 18:07:11 +0100
 Subject: [PATCH] buildsys.diff
 
+* Use CFLAGS in compilation rules
+* Delete -g from CFLAGS as dpkg-buildpackage define CFLAGS with -g -O2
+  or -g -O0 depending on the content of DEB_BUILD_OPTIONS
+* Add -g in CFLAGS in configure script to keep the same compilation
+  behavior as upstream when hand-compiling (without dpkg-buildpackge)
+* Delete -s from install rule as dh_strip does the stripping if
+  necessary according to DEB_BUILD_OPTIONS
 ---
- Makefile |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ Makefile  |    8 ++++----
+ configure |    2 +-
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/Makefile b/Makefile
-index 730b817..17d3e98 100644
+index 730b817..5af111e 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -5,7 +5,7 @@
@@ -15,7 +23,7 @@ index 730b817..17d3e98 100644
  include $(TOP)/config.mak
  
 -CFLAGS+=-g -Wall
-+CFLAGS+=-O2 -g -Wall
++CFLAGS+=-Wall
  CFLAGS_P=$(CFLAGS) -pg -static -DCONFIG_TCC_STATIC
  LIBS_P=
  
@@ -37,4 +45,26 @@ index 730b817..17d3e98 100644
  
  # install
  TCC_INCLUDES = stdarg.h stddef.h stdbool.h float.h varargs.h tcclib.h
+@@ -236,7 +236,7 @@ install: $(PROGS) $(LIBTCC1) libtcc.a tcc-doc.html
+ 	mkdir -p "$(tccdir)/examples"
+ 	mkdir -p "$(tccdir)/doc"
+ 	mkdir -p "$(tccdir)/libtcc"
+-	$(INSTALL) -s -m755 $(PROGS) "$(tccdir)"
++	$(INSTALL) -m755 $(PROGS) "$(tccdir)"
+ 	$(INSTALL) -m644 $(LIBTCC1) win32/lib/*.def "$(tccdir)/lib"
+ 	cp -r win32/include/. "$(tccdir)/include"
+ 	cp -r win32/examples/. "$(tccdir)/examples"
+diff --git a/configure b/configure
+index 5b38f28..c2d0666 100755
+--- a/configure
++++ b/configure
+@@ -135,7 +135,7 @@ done
+ 
+ # Checking for CFLAGS
+ if test -z "$CFLAGS"; then
+-    CFLAGS="-O2"
++    CFLAGS="-g -O2"
+ fi
+ 
+ cc="${cross_prefix}${cc}"
 -- 
