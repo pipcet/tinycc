@@ -29,19 +29,19 @@ index c6bf357..d8ad4a2 100755
    ;;
    x86_64)
 diff --git a/tccelf.c b/tccelf.c
-index 4020e24..8549057 100644
+index 11ee951..f9ad3c3 100644
 --- a/tccelf.c
 +++ b/tccelf.c
-@@ -1274,6 +1274,8 @@ static void tcc_add_linker_symbols(TCCState *s1)
- /* name of ELF interpreter */
- #if defined __FreeBSD__
- static char elf_interp[] = "/usr/libexec/ld-elf.so.1";
+@@ -1276,6 +1276,8 @@ static void tcc_add_linker_symbols(TCCState *s1)
+ static char elf_interp[] = "/libexec/ld-elf.so.1";
+ #elif defined __FreeBSD_kernel__
+ static char elf_interp[] = "/lib/ld.so.1";
 +#elif defined __gnu_hurd__
 +static char elf_interp[] = "/lib/ld.so";
  #elif defined TCC_ARM_EABI
  static char elf_interp[] = "/lib/ld-linux.so.3";
  #elif defined(TCC_TARGET_X86_64)
-@@ -2652,9 +2654,77 @@ static int ld_next(TCCState *s1, char *name, int name_size)
+@@ -2724,9 +2726,77 @@ static int ld_next(TCCState *s1, char *name, int name_size)
      return c;
  }
  
@@ -119,7 +119,7 @@ index 4020e24..8549057 100644
      int t, ret;
  
      t = ld_next(s1, filename, sizeof(filename));
-@@ -2662,11 +2732,20 @@ static int ld_add_file_list(TCCState *s1, int as_needed)
+@@ -2734,11 +2804,20 @@ static int ld_add_file_list(TCCState *s1, int as_needed)
          expect("(");
      t = ld_next(s1, filename, sizeof(filename));
      for(;;) {
@@ -140,7 +140,7 @@ index 4020e24..8549057 100644
          } else if (t != LD_TOK_NAME) {
              error_noabort("filename expected");
              return -1;
-@@ -2677,8 +2756,15 @@ static int ld_add_file_list(TCCState *s1, int as_needed)
+@@ -2749,8 +2828,15 @@ static int ld_add_file_list(TCCState *s1, int as_needed)
                  return ret;
          } else {
              /* TODO: Implement AS_NEEDED support. Ignore it for now */

@@ -24,7 +24,7 @@ index 4eccd23..d59b559 100644
  /* XXX: use directly ELF structure for parameters ? */
  /* special flag to indicate that the section should not be linked to
 diff --git a/tccelf.c b/tccelf.c
-index 8549057..88480c5 100644
+index f9ad3c3..e2e2a61 100644
 --- a/tccelf.c
 +++ b/tccelf.c
 @@ -250,6 +250,7 @@ static int add_elf_sym(Section *s, unsigned long value, unsigned long size,
@@ -35,7 +35,7 @@ index 8549057..88480c5 100644
              esym->st_value = value;
              esym->st_size = size;
              esym->st_other = other;
-@@ -2774,6 +2775,14 @@ static int ld_add_file_list(TCCState *s1, int as_needed)
+@@ -2846,6 +2847,14 @@ static int ld_add_file_list(TCCState *s1, int as_needed)
      return 0;
  }
  
@@ -50,7 +50,7 @@ index 8549057..88480c5 100644
  /* interpret a subset of GNU ldscripts to handle the dummy libc.so
     files */
  static int tcc_load_ldscript(TCCState *s1)
-@@ -2792,7 +2801,24 @@ static int tcc_load_ldscript(TCCState *s1)
+@@ -2864,7 +2873,24 @@ static int tcc_load_ldscript(TCCState *s1)
              return -1;
          if (!strcmp(cmd, "INPUT") ||
              !strcmp(cmd, "GROUP")) {
