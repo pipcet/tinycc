@@ -1,0 +1,26 @@
+From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
+Date: Sun, 18 Apr 2010 19:29:11 +0200
+Subject: [PATCH] add_several_arm_archs_in_configure.diff
+
+Add support for:
+  - armv5tel
+  - armv6j
+  - armv7a
+---
+ configure |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/configure b/configure
+index d8ad4a2..bf1bd67 100755
+--- a/configure
++++ b/configure
+@@ -41,7 +41,7 @@ case "$cpu" in
+   x86_64)
+     cpu="x86-64"
+   ;;
+-  armv4l)
++  armv4l|armv5tel|armv6j|armv7a)
+     cpu="armv4l"
+   ;;
+   alpha)
+-- 
