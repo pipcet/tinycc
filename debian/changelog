@@ -2,7 +2,7 @@ tcc (0.9.25-1) unstable; urgency=low
 
   * New upstream release (Closes: #549100, LP: #500296).
     - Supports amd64 architecture.
-  * Fix Hurd FTBS (Closes: #532503).
+  * Fix Hurd FTBFS (Closes: #532503).
   * Improve tcc handling of ld scripts: libs in GROUP command are
     searched repeatedly, as required.
   * Add support for kfreebsd-amd64.
