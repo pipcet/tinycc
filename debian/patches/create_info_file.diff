@@ -59,7 +59,7 @@ index 53afb0b..f79e298 100644
  
  endif # ifeq ($(TOP),.)
 diff --git a/configure b/configure
-index 89c7ead..6559395 100755
+index 7be7760..1521228 100755
 --- a/configure
 +++ b/configure
 @@ -27,6 +27,7 @@ libdir=""
@@ -70,7 +70,7 @@ index 89c7ead..6559395 100755
  sysroot=""
  cross_prefix=""
  cc="gcc"
-@@ -105,6 +106,8 @@ for opt do
+@@ -106,6 +107,8 @@ for opt do
    ;;
    --mandir=*) mandir=`echo $opt | cut -d '=' -f 2`
    ;;
@@ -79,7 +79,7 @@ index 89c7ead..6559395 100755
    --sysroot=*) sysroot=`echo $opt | cut -d '=' -f 2`
    ;;
    --source-path=*) source_path=`echo $opt | cut -d '=' -f 2`
-@@ -217,6 +220,7 @@ echo "  --bindir=DIR             user executables in DIR [EPREFIX/bin]"
+@@ -219,6 +222,7 @@ echo "  --bindir=DIR             user executables in DIR [EPREFIX/bin]"
  echo "  --libdir=DIR             object code libraries in DIR [EPREFIX/lib]"
  echo "  --includedir=DIR         C header files in DIR [PREFIX/include]"
  echo "  --mandir=DIR             man documentation in DIR [PREFIX/man]"
@@ -87,7 +87,7 @@ index 89c7ead..6559395 100755
  echo "  --enable-cross           build cross compilers"
  echo ""
  echo "Advanced options (experts only):"
-@@ -262,6 +266,9 @@ fi
+@@ -264,6 +268,9 @@ fi
  if test x"$mandir" = x""; then
  mandir="${prefix}/man"
  fi
@@ -97,7 +97,7 @@ index 89c7ead..6559395 100755
  if test x"$includedir" = x""; then
  includedir="${prefix}/include"
  fi
-@@ -271,6 +278,7 @@ echo "TinyCC directory    $tccdir"
+@@ -273,6 +280,7 @@ echo "TinyCC directory    $tccdir"
  echo "Library directory   $libdir"
  echo "Include directory   $includedir"
  echo "Manual directory    $mandir"
@@ -105,7 +105,7 @@ index 89c7ead..6559395 100755
  echo "Doc directory       $docdir"
  echo "Target root prefix  $sysroot"
  echo "Source path      $source_path"
-@@ -292,6 +300,7 @@ echo "tccdir=$tccdir" >> config.mak
+@@ -294,6 +302,7 @@ echo "tccdir=$tccdir" >> config.mak
  echo "libdir=$libdir" >> config.mak
  echo "includedir=$includedir" >> config.mak
  echo "mandir=$mandir" >> config.mak

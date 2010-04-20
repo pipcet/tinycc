@@ -9,9 +9,8 @@ Bug-Debian: http://bugs.debian.org/438097
 Forwarded: not-needed
 Last-Update: 2010-04-20
 ---
- Makefile  |    2 +-
- configure |    3 ---
- 2 files changed, 1 insertions(+), 4 deletions(-)
+ Makefile |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/Makefile b/Makefile
 index 5af111e..53afb0b 100644
@@ -26,32 +25,4 @@ index 5af111e..53afb0b 100644
  	mkdir -p "$(mandir)/man1"
  	$(INSTALL) tcc.1 "$(mandir)/man1"
  	mkdir -p "$(tccdir)"
-diff --git a/configure b/configure
-index 7be7760..89c7ead 100755
---- a/configure
-+++ b/configure
-@@ -32,7 +32,6 @@ cross_prefix=""
- cc="gcc"
- host_cc="gcc"
- ar="ar"
--strip="strip"
- cpu=`uname -m`
- case "$cpu" in
-   i386|i486|i586|i686|i86pc|BePC|i686-AT386)
-@@ -140,7 +139,6 @@ fi
- 
- cc="${cross_prefix}${cc}"
- ar="${cross_prefix}${ar}"
--strip="${cross_prefix}${strip}"
- 
- if test "$mingw32" = "yes" ; then
-     LIBSUF=".lib"
-@@ -302,7 +300,6 @@ echo "GCC_MAJOR=$gcc_major" >> config.mak
- echo "#define GCC_MAJOR $gcc_major" >> $TMPH
- echo "HOST_CC=$host_cc" >> config.mak
- echo "AR=$ar" >> config.mak
--echo "STRIP=$strip -s -R .comment -R .note" >> config.mak
- echo "CFLAGS=$CFLAGS" >> config.mak
- echo "LDFLAGS=$LDFLAGS" >> config.mak
- echo "LIBSUF=$LIBSUF" >> config.mak
 -- 

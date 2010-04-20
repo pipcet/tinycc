@@ -20,11 +20,11 @@ Applied-Upstream: commit: 3ad3168125ecb1910e6e241dc9056bccb57e9d0a
  2 files changed, 89 insertions(+), 4 deletions(-)
 
 diff --git a/configure b/configure
-index c6bf357..d8ad4a2 100755
+index 557693f..743f52a 100755
 --- a/configure
 +++ b/configure
-@@ -35,7 +35,7 @@ host_cc="gcc"
- ar="ar"
+@@ -36,7 +36,7 @@ ar="ar"
+ strip="strip"
  cpu=`uname -m`
  case "$cpu" in
 -  i386|i486|i586|i686|i86pc|BePC|i686-AT386)

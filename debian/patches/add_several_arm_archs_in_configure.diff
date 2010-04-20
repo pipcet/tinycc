@@ -16,10 +16,10 @@ Applied-Upstream: commit: e4ed4e7f4f6659c35d5e84b03451a4f135caff0c
  1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/configure b/configure
-index d8ad4a2..bf1bd67 100755
+index 743f52a..d026c25 100755
 --- a/configure
 +++ b/configure
-@@ -41,7 +41,7 @@ case "$cpu" in
+@@ -42,7 +42,7 @@ case "$cpu" in
    x86_64)
      cpu="x86-64"
    ;;
