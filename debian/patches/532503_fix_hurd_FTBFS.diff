@@ -29,7 +29,7 @@ index c6bf357..d8ad4a2 100755
    ;;
    x86_64)
 diff --git a/tccelf.c b/tccelf.c
-index 11ee951..a877d56 100644
+index 11ee951..c5e5046 100644
 --- a/tccelf.c
 +++ b/tccelf.c
 @@ -1276,6 +1276,8 @@ static void tcc_add_linker_symbols(TCCState *s1)
@@ -74,20 +74,20 @@ index 11ee951..a877d56 100644
 +#ifdef TCC_TARGET_PE
 +        if (!strcmp(ext, ".def")) {
 +            size_t len = ext - filename;
-+            tcc_strcpy_part(libnamme, filename, len);
++            tcc_strcpy_part(libname, filename, len);
 +            return 1;
 +        }
 +#else
 +        if (libprefix && (!strcmp(ext, ".so"))) {
 +            size_t len = ext - filename - 3;
-+            tcc_strcpy_part(libnamme, filename + 3, len);
++            tcc_strcpy_part(libname, filename + 3, len);
 +            return 1;
 +        }
 +#endif
 +    } else {
 +        if (libprefix && (!strcmp(ext, ".a"))) {
 +            size_t len = ext - filename - 3;
-+            tcc_strcpy_part(libnamme, filename + 3, len);
++            tcc_strcpy_part(libname, filename + 3, len);
 +            return 1;
 +        }
 +    }

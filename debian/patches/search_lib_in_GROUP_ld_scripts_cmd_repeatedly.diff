@@ -9,7 +9,7 @@ repeatdly until no new references are created, as required.
  1 files changed, 62 insertions(+), 15 deletions(-)
 
 diff --git a/tccelf.c b/tccelf.c
-index a877d56..5943117 100644
+index c5e5046..8a26318 100644
 --- a/tccelf.c
 +++ b/tccelf.c
 @@ -30,6 +30,8 @@
