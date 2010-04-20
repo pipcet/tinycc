@@ -1,7 +1,11 @@
-From: grischka <grischka>
+From: grischka <grishka@gmx.de>
 Date: Tue, 30 Jun 2009 18:02:00 +0200
-Subject: [PATCH] add_DESTDIR_support_in_configure.diff
+Subject: Add DESTDIR support in configure
 
+Origin: http://repo.or.cz/w/tinycc.git/commit/c93ddac9aa466f11750be3f230e097c207104349
+Bug: http://savannah.nongnu.org/bugs/?23851
+Last-Update: 2010-04-20
+Applied-Upstream: c93ddac9aa466f11750be3f230e097c207104349
 ---
  configure |   15 ++++++++-------
  1 files changed, 8 insertions(+), 7 deletions(-)

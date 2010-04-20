@@ -1,6 +1,6 @@
 From: Romain Francoise <rfrancoise@debian.org>
 Date: Sat, 13 Mar 2010 18:07:11 +0100
-Subject: [PATCH] buildsys.diff
+Subject: Adapt tcc to debian build system
 
 * Use CFLAGS in compilation rules
 * Delete -g from CFLAGS as dpkg-buildpackage define CFLAGS with -g -O2
@@ -9,6 +9,10 @@ Subject: [PATCH] buildsys.diff
   behavior as upstream when hand-compiling (without dpkg-buildpackge)
 * Delete -s from install rule as dh_strip does the stripping if
   necessary according to DEB_BUILD_OPTIONS
+
+Origin: vendor
+Forwarded: not-needed
+Last-Update: 2010-04-20
 ---
  Makefile  |    8 ++++----
  configure |    2 +-

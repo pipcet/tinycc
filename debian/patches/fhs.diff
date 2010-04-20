@@ -1,7 +1,15 @@
-From: Romain Francoise <rfrancoise@debian.org>
+From: Marco Bodrato <bodrato@gulp.linux.it>
 Date: Sat, 13 Mar 2010 18:07:21 +0100
-Subject: [PATCH] fhs.diff
+Subject: Respect FHS in documentation and examples
 
+Replace /usr/local/bin/tcc by /usr/bin/tcc as the command to put in the shebang
+to run C code like a script with tcc, as requested by FHS.
+
+Origin: vendor
+Bug-Debian: http://bugs.debian.org/155234
+Forwarded: not-needed
+Reviewed-by: Cyril Bouthors <cyril@bouthors.org>
+Last-Update: 2010-04-20
 ---
  examples/ex1.c |    2 +-
  examples/ex4.c |    2 +-

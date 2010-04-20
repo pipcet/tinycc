@@ -1,11 +1,16 @@
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Sun, 18 Apr 2010 19:29:11 +0200
-Subject: [PATCH] add_several_arm_archs_in_configure.diff
+Subject: Add several ARM archs in configure
 
 Add support for:
   - armv5tel
   - armv6j
   - armv7a
+
+Origin: vendor
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00047.html
+Last-Update: 2010-04-20
+Applied-Upstream: commit: e4ed4e7f4f6659c35d5e84b03451a4f135caff0c
 ---
  configure |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)

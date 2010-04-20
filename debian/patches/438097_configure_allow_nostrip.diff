@@ -1,7 +1,13 @@
 From: Arthur Loiret <arthur.loiret@gmail.com>
 Date: Sat, 13 Mar 2010 18:11:06 +0100
-Subject: [PATCH] 438097_configure_allow_nostrip.diff
+Subject: Package support nostrip flag at build
 
+Make the build process support the nostrip flag in DEB_BUILD_OPTIONS.
+
+Origin: vendor
+Bug-Debian: http://bugs.debian.org/438097
+Forwarded: not-needed
+Last-Update: 2010-04-20
 ---
  Makefile  |    2 +-
  configure |    3 ---

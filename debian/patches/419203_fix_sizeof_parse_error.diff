@@ -1,7 +1,20 @@
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Sun, 11 Apr 2010 01:53:40 +0200
-Subject: [PATCH] 419203_fix_sizeof_parse_error.diff
+Subject: Fix sizeof parse error
 
+sizeof operator exists in two form:
+1. sizeof unary-expression
+2. sizeof (type-name)
+The two forms are currently distinguished by the presence of parenthesis. It's
+an improper test as (int) { 'a' } is a valid unary-expression. This patch make
+tcc try both forms in order.
+
+Origin: vendor
+Bug-Debian: http://bugs.debian.org/419203
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00041.html
+Reviewed-by: grischka <grishka@gmx.de>
+Last-Update: 2010-04-20
+Applied-Upstream: 8de9b7a6314a4e93e88518b0b2f0e084cbc448b0
 ---
  tccgen.c |   23 +++++++++++++++++------
  1 files changed, 17 insertions(+), 6 deletions(-)

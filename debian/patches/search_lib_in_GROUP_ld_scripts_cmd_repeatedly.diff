@@ -1,9 +1,15 @@
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Mon, 5 Apr 2010 01:54:00 +0200
-Subject: [PATCH] search_lib_in_GROUP_ld_scripts_cmd_repeatedly.diff
+Subject: Search lib in GROUP ld scripts command repeatedly
 
-Archives specified in the GROUP command in ld scripts are now searched
-repeatdly until no new references are created, as required.
+Archives specified in the GROUP command in ld scripts are now searched repeatdly
+until no new references are created, as required.
+
+Origin: vendor
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00041.html
+Reviewed-by: grischka <grishka@gmx.de>
+Last-Update: 2010-04-20
+Applied-Upstream: 3ad3168125ecb1910e6e241dc9056bccb57e9d0a
 ---
  tccelf.c |   77 +++++++++++++++++++++++++++++++++++++++++++++++++------------
  1 files changed, 62 insertions(+), 15 deletions(-)

@@ -1,15 +1,19 @@
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Tue, 30 Mar 2010 09:45:31 +0200
-Subject: [PATCH] 532503_fix_hurd_FTBFS.diff
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+Subject: Fix Debian GNU/Hurd FTBFS
 
 * Configure handle both i386-AT386 and i686-AT386 arch
 * Better handle ld scripts:
-    - search file from INPUT and GROUP command in current directory and
+    - search file from INPUT and GROUP command in current directory and
       in the library path
     - handle libraries specified by -lfoo options
+
+Origin: vendor
+Bug-Debian: http://bugs.debian.org/532503
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00041.html
+Reviewed-by: grischka <grishka@gmx.de>
+Last-Update: 2010-04-20
+Applied-Upstream: commit: 3ad3168125ecb1910e6e241dc9056bccb57e9d0a
 ---
  configure |    2 +-
  tccelf.c  |   91 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--

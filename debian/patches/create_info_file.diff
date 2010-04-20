@@ -1,7 +1,12 @@
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Thu, 8 Apr 2010 13:35:50 +0200
-Subject: [PATCH] create_info_file.diff
+Subject: Add info file creation into tcc build process
 
+Add info file creation in tcc Makefile
+
+Origin: vendor
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00041.html
+Last-Update: 2010-04-20
 ---
  Makefile  |   11 ++++++++---
  configure |    9 +++++++++

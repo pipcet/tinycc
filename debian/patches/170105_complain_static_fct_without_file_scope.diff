@@ -1,7 +1,16 @@
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Tue, 13 Apr 2010 21:08:37 +0200
-Subject: [PATCH] 170105_complain_static_fct_without_file_scope.diff
+Subject: Error out when declaring a static function without file scope
 
+Error out when declaring a static function in another scope than file scope, as
+required by C99 6.2.2:21
+
+Origin: vendor
+Bug-Debian: http://bugs.debian.org/170105
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00041.html
+Reviewed-by: grischka <grishka@gmx.de>
+Last-Update: 2010-04-20
+Applied-Upstream: commit: e9406c09a3212ab3f120412a6bbdacb0cdd25deb
 ---
  tccgen.c |    3 +++
  1 files changed, 3 insertions(+), 0 deletions(-)

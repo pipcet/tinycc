@@ -1,10 +1,12 @@
 From: Shinichiro Hamaji <shinichiro.hamaji _at_ gmail.com>
 Date: Sat, 13 Mar 2010 23:43:46 +0100
-Subject: [PATCH] x86_64_alloca.diff
+Subject: Add alloca on x86_64
 
-x86-64: Add alloca.
-x86-64: Align return value of alloca by 16.
-Author: Shinichiro Hamaji <shinichiro.hamaji _at_ gmail.com>
+Add alloca on x86-64 and align return value by 16.
+
+Origin: upstream, http://repo.or.cz/w/tinycc.git/commit/dca2b15df42c1341794dd412917708416da25594
+Last-Update: 2010-04-20
+Applied-Upstream: commit: dca2b15df42c1341794dd412917708416da25594
 ---
  Makefile          |    4 ++++
  lib/alloca86_64.S |   33 +++++++++++++++++++++++++++++++++
