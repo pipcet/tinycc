@@ -47,6 +47,7 @@ BCHECK_O=bcheck.o
 else
 ifeq ($(ARCH),arm)
 NATIVE_TARGET=-DTCC_TARGET_ARM
+NATIVE_TARGET+=-DWITHOUT_LIBTCC
 NATIVE_TARGET+=$(if $(wildcard /lib/ld-linux.so.3),-DTCC_ARM_EABI)
 NATIVE_TARGET+=$(if $(shell grep -l "^Features.* \(vfp\|iwmmxt\) " /proc/cpuinfo),-DTCC_ARM_VFP)
 else
