@@ -1204,8 +1204,10 @@ static void tcc_add_runtime(TCCState *s1)
 #ifdef CONFIG_USE_LIBGCC
         tcc_add_file(s1, CONFIG_SYSROOT "/lib/libgcc_s.so.1");
 #else
+#ifndef WITHOUT_LIBTCC
         snprintf(buf, sizeof(buf), "%s/%s", s1->tcc_lib_path, "libtcc1.a");
         tcc_add_file(s1, buf);
+#endif
 #endif
     }
     /* add crt end if not memory output */
