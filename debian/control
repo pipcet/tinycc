@@ -7,8 +7,8 @@ Build-Depends: debhelper (>= 7.0.50), texi2html, texinfo, perl
 Standards-Version: 3.8.4
 Homepage: http://www.tinycc.org/
 DM-Upload-Allowed: yes
-Vcs-Browser: http://git.celest.fr/?p=tcc.git;a=summary
-Vcs-Git: git://git.celest.fr/tcc.git
+Vcs-Browser: http://git.debian.org/?p=collab-maint/tcc.git;a=summary
+Vcs-Git: git://git.debian.org/collab-maint/tcc.git
 
 Package: tcc
 Architecture: i386 kfreebsd-i386 hurd-i386 amd64 kfreebsd-amd64 armel
