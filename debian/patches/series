@@ -14,3 +14,4 @@ add_DESTDIR_support_in_configure.diff
 search_lib_in_GROUP_ld_scripts_cmd_repeatedly.diff
 170105_complain_static_fct_without_file_scope.diff
 add_several_arm_archs_in_configure.diff
+load_libtcc1_if_available.diff
