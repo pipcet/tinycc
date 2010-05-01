@@ -16,3 +16,4 @@ search_lib_in_GROUP_ld_scripts_cmd_repeatedly.diff
 add_several_arm_archs_in_configure.diff
 load_libtcc1_if_available.diff
 452876_link_alias_symbols_together.diff
+439135_support_c99_VLA.diff
