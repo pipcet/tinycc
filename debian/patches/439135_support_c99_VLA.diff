@@ -11,9 +11,9 @@ Last-Update: 2010-05-01
 ---
  libtcc.c |    4 ++++
  tcc.h    |    2 +-
- tccgen.c |   45 ++++++++++++++++++++++++++++++++++++++++++---
+ tccgen.c |   43 ++++++++++++++++++++++++++++++++++++++++---
  tccpp.c  |   31 +++++++++++++++++++++++++++++++
- 4 files changed, 78 insertions(+), 4 deletions(-)
+ 4 files changed, 76 insertions(+), 4 deletions(-)
 
 diff --git a/libtcc.c b/libtcc.c
 index 31914f7..add58ac 100644
@@ -51,19 +51,10 @@ index 4eccd23..6ffd161 100644
  /* token symbol management */
  typedef struct TokenSym {
 diff --git a/tccgen.c b/tccgen.c
-index 94d9c11..b4243a4 100644
+index 94d9c11..2583bc4 100644
 --- a/tccgen.c
 +++ b/tccgen.c
-@@ -18,6 +18,8 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
- 
-+#include "tcctok.h"
-+
- void swap(int *p, int *q)
- {
-     int t;
-@@ -2759,9 +2761,33 @@ static void post_type(CType *type, AttributeDef *ad)
+@@ -2759,9 +2759,33 @@ static void post_type(CType *type, AttributeDef *ad)
              next();
          n = -1;
          if (tok != ']') {
@@ -100,7 +91,7 @@ index 94d9c11..b4243a4 100644
          }
          skip(']');
          /* parse next post type */
-@@ -3780,6 +3806,19 @@ static int expr_const(void)
+@@ -3780,6 +3804,19 @@ static int expr_const(void)
      return c;
  }
  
