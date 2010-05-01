@@ -1,3 +1,12 @@
+tcc (0.9.25-3) unstable; urgency=low
+
+  * Change Vcs fields to reference Alioth.
+  * Don't load libtcc1.a if not available (fix a FTBFS on armel).
+  * Link alias symbols together. (Closes: #452876)
+  * Support C99 Variable-Length Arrays. (Closes: #439135)
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Sat, 01 May 2010 23:44:46 +0200
+
 tcc (0.9.25-2) unstable; urgency=low
 
   * Make tcc build on armv5tel, armv6j and armv7a architectures.
