@@ -7,13 +7,13 @@ Add support for C99 Variable-Length Arrays
 Origin: http://savannah.nongnu.org/bugs/?13213#comment1
 Bug: http://savannah.nongnu.org/bugs/?13213
 Bug-Debian: http://bugs.debian.org/439135
-Last-Update: 2010-05-01
+Last-Update: 2010-05-04
 ---
  libtcc.c |    4 ++++
  tcc.h    |    2 +-
- tccgen.c |   43 ++++++++++++++++++++++++++++++++++++++++---
+ tccgen.c |   47 ++++++++++++++++++++++++++++++++++++++++++++---
  tccpp.c  |   31 +++++++++++++++++++++++++++++++
- 4 files changed, 76 insertions(+), 4 deletions(-)
+ 4 files changed, 80 insertions(+), 4 deletions(-)
 
 diff --git a/libtcc.c b/libtcc.c
 index 31914f7..add58ac 100644
@@ -51,10 +51,10 @@ index 4eccd23..6ffd161 100644
  /* token symbol management */
  typedef struct TokenSym {
 diff --git a/tccgen.c b/tccgen.c
-index 94d9c11..2583bc4 100644
+index 94d9c11..186b38a 100644
 --- a/tccgen.c
 +++ b/tccgen.c
-@@ -2759,9 +2759,33 @@ static void post_type(CType *type, AttributeDef *ad)
+@@ -2759,9 +2759,37 @@ static void post_type(CType *type, AttributeDef *ad)
              next();
          n = -1;
          if (tok != ']') {
@@ -70,7 +70,11 @@ index 94d9c11..2583bc4 100644
 +            } else {
 +                put_user_tok_start();
 +                put_user_tok('=');
++#ifdef CONFIG_TCC_BCHECK
 +                put_user_tok(TOK_alloca);
++#else
++		put_user_tok(tok_alloc("alloca", 6)->tok);
++#endif
 +                put_user_tok('(');
 +                while(tok != ']') {
 +                    put_user_tok(tok);
@@ -91,7 +95,7 @@ index 94d9c11..2583bc4 100644
          }
          skip(']');
          /* parse next post type */
-@@ -3780,6 +3804,19 @@ static int expr_const(void)
+@@ -3780,6 +3808,19 @@ static int expr_const(void)
      return c;
  }
  
