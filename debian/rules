@@ -25,6 +25,10 @@ RULE_OVERRIDE := $(patsubst %,override_%,$(DH_OVERRIDEN))
 
 $(RULE_OVERRIDE):
 
+override_dh_auto_clean:
+	touch config.mak
+	dh_auto_clean
+
 build:
 	dh build
 	touch build
