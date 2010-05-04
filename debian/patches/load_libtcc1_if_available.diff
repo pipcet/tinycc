@@ -3,7 +3,7 @@ Date: Tue, 27 Apr 2010 20:13:19 +0200
 Subject: Don't load libtcc1 on arch where it doesn't exist
 
 ARM architecture doesn't have any libtcc1 implementation but tcc load
-libtcc1.a in all case. This patch add a conditional preprocessor
+libtcc1.a in either case. This patch adds a conditional preprocessor
 instruction to load libtcc1.a only when there is an implementation for
 the target architecture.
 

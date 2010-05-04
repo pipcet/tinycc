@@ -3,9 +3,9 @@ Date: Mon, 26 Apr 2010 00:46:39 +0200
 Subject: Link alias symbols together
 
 Make sure alias symbols resolve to the same address in program .bss or .data
-section. This ensure for example that if a program reference environ (via an
-extern char **environ declaration) and the libc change its value via the
-__environ alias after the R_ARCH_COPY relocation have been performed, then
+section. This ensures for example that if a program references environ (via an
+extern char **environ declaration) and libc changes its value via the
+__environ alias after the R_ARCH_COPY relocation has been performed, then
 the program will see the new value.
 
 Origin: vendor
