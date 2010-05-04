@@ -10,7 +10,7 @@ the target architecture.
 Origin: vendor
 Bug-Debian: https://buildd.debian.org/fetch.cgi?pkg=tcc;ver=0.9.25-2;arch=armel;stamp=1272363068
 Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-05/msg00005.html
-Last-Update: 2010-05-01
+Last-Update: 2010-05-04
 Applied-Upstream: commit: 2220467fcf27dbdf6b0d6d8cc56eb65bc35a78ab
 ---
  Makefile |    1 +
@@ -18,14 +18,14 @@ Applied-Upstream: commit: 2220467fcf27dbdf6b0d6d8cc56eb65bc35a78ab
  2 files changed, 3 insertions(+), 0 deletions(-)
 
 diff --git a/Makefile b/Makefile
-index f79e298..4778a0c 100644
+index f79e298..cf38acc 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -47,6 +47,7 @@ BCHECK_O=bcheck.o
  else
  ifeq ($(ARCH),arm)
  NATIVE_TARGET=-DTCC_TARGET_ARM
-+NATIVE_TARGET=-DWITHOUT_LIBTCC
++NATIVE_TARGET+=-DWITHOUT_LIBTCC
  NATIVE_TARGET+=$(if $(wildcard /lib/ld-linux.so.3),-DTCC_ARM_EABI)
  NATIVE_TARGET+=$(if $(shell grep -l "^Features.* \(vfp\|iwmmxt\) " /proc/cpuinfo),-DTCC_ARM_VFP)
  else
