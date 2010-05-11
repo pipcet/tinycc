@@ -9,25 +9,13 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-DH_OVERRIDEN := dh_installcatalogs dh_installcron dh_installdebconf \
-	       dh_installemacsen dh_installifupdown dh_pysupport \
-	       dh_installinit dh_installmenu dh_installmime \
-	       dh_installmodules dh_installlogcheck \
-	       dh_installlogrotate dh_installpam dh_installppp \
-	       dh_installudev dh_installwm dh_installxfonts \
-	       dh_lintian dh_gconf dh_icons dh_perl
-
-ifneq ($(shell which dh_bugfiles), "")
-DH_OVERRIDEN := $(DH_OVERRIDEN) dh_bugfiles
-endif
-
-RULE_OVERRIDE := $(patsubst %,override_%,$(DH_OVERRIDEN))
-
-$(RULE_OVERRIDE):
+clean:
+	rm -f build
+	dh clean
 
 build:
 	dh build
-	touch build
+	touch build # As recommended by policy 3.8.4 section 4.9
 
 %:
 	dh $@
