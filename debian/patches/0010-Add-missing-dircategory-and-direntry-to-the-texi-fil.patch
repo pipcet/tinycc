@@ -1,3 +1,4 @@
+From 4144e184396aa1fc5cf1605e5010e039942c382d Mon Sep 17 00:00:00 2001
 From: Anders Kaseorg <andersk@MIT.EDU>
 Date: Sat, 13 Mar 2010 23:44:15 +0100
 Subject: Add missing dircategory and direntry to the texi file
@@ -29,3 +30,5 @@ index e5fb51c..e47c917 100644
  
  @include config.texi
 -- 
+1.7.1
+

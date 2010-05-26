@@ -1,3 +1,4 @@
+From 7af1ab756cbb3330c94718fef97f7bd9218c8b03 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Sun, 11 Apr 2010 01:53:40 +0200
 Subject: Fix sizeof parse error
@@ -79,3 +80,5 @@ index b4b5d59..5fa9f43 100644
          if (t == TOK_SIZEOF) {
              if (size < 0)
 -- 
+1.7.1
+

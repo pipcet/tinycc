@@ -1,3 +1,4 @@
+From ec723807307c9cb4ea3eefbaf2b9c75be1b43db4 Mon Sep 17 00:00:00 2001
 From: Romain Francoise <rfrancoise@debian.org>
 Date: Sat, 13 Mar 2010 18:07:11 +0100
 Subject: Adapt tcc to debian build system
@@ -72,3 +73,5 @@ index 5b38f28..c2d0666 100755
  
  cc="${cross_prefix}${cc}"
 -- 
+1.7.1
+

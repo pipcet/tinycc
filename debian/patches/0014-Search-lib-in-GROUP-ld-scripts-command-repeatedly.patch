@@ -1,3 +1,4 @@
+From a4a622eaef983c5c28ad9cdd2f022593d2979018 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Mon, 5 Apr 2010 01:54:00 +0200
 Subject: Search lib in GROUP ld scripts command repeatedly
@@ -152,3 +153,5 @@ index c5e5046..9d66512 100644
                  return ret;
          } else if (!strcmp(cmd, "OUTPUT_FORMAT") ||
 -- 
+1.7.1
+

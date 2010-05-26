@@ -1,3 +1,4 @@
+From 6128b9ada1727aa61f618a55237c43da41a48719 Mon Sep 17 00:00:00 2001
 From: Romain Francoise <rfrancoise@debian.org>
 Date: Sat, 13 Mar 2010 18:07:28 +0100
 Subject: Support HURD in Debian
@@ -42,3 +43,5 @@ index be9c4cc..4986d26 100644
  
  /* parser debug */
 -- 
+1.7.1
+

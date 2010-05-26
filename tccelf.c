@@ -30,6 +30,8 @@
 #define REL_SECTION_FMT ".rel%s"
 #endif
 
+static int new_undef_sym = 0; /* Is there a new undefined sym since last new_undef_sym() */
+
 /* XXX: DLL with PLT would only work with x86-64 for now */
 //#define TCC_OUTPUT_DLL_WITH_PLT
 
@@ -250,6 +252,7 @@ static int add_elf_sym(Section *s, unsigned long value, unsigned long size,
         do_patch:
             esym->st_info = ELFW(ST_INFO)(sym_bind, sym_type);
             esym->st_shndx = sh_num;
+            new_undef_sym = 1;
             esym->st_value = value;
             esym->st_size = size;
             esym->st_other = other;
@@ -1201,8 +1204,10 @@ static void tcc_add_runtime(TCCState *s1)
 #ifdef CONFIG_USE_LIBGCC
         tcc_add_file(s1, CONFIG_SYSROOT "/lib/libgcc_s.so.1");
 #else
+#ifndef WITHOUT_LIBTCC
         snprintf(buf, sizeof(buf), "%s/%s", s1->tcc_lib_path, "libtcc1.a");
         tcc_add_file(s1, buf);
+#endif
 #endif
     }
     /* add crt end if not memory output */
@@ -1273,7 +1278,11 @@ static void tcc_add_linker_symbols(TCCState *s1)
 
 /* name of ELF interpreter */
 #if defined __FreeBSD__
-static char elf_interp[] = "/usr/libexec/ld-elf.so.1";
+static char elf_interp[] = "/libexec/ld-elf.so.1";
+#elif defined __FreeBSD_kernel__
+static char elf_interp[] = "/lib/ld.so.1";
+#elif defined __gnu_hurd__
+static char elf_interp[] = "/lib/ld.so";
 #elif defined TCC_ARM_EABI
 static char elf_interp[] = "/lib/ld-linux.so.3";
 #elif defined(TCC_TARGET_X86_64)
@@ -1306,6 +1315,31 @@ static void tcc_output_binary(TCCState *s1, FILE *f,
     }
 }
 
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+#define	HAVE_PHDR	1
+#define	EXTRA_RELITEMS	14
+
+/* move the relocation value from .dynsym to .got */
+void patch_dynsym_undef(TCCState *s1, Section *s)
+{
+    uint32_t *gotd = (void *)s1->got->data;
+    ElfW(Sym) *sym, *sym_end;
+
+    gotd += 3;	// dummy entries in .got
+    /* relocate symbols in .dynsym */
+    sym_end = (ElfW(Sym) *)(s->data + s->data_offset);
+    for (sym = (ElfW(Sym) *)s->data + 1; sym < sym_end; sym++) {
+	if (sym->st_shndx == SHN_UNDEF) {
+	    *gotd++ = sym->st_value + 6; // XXX 6 is magic ?
+	    sym->st_value = 0;
+	}
+    }
+}
+#else
+#define	HAVE_PHDR	0
+#define	EXTRA_RELITEMS	9
+#endif
+
 /* output an ELF file */
 /* XXX: suppress unneeded sections */
 int elf_output_file(TCCState *s1, const char *filename)
@@ -1324,7 +1358,8 @@ int elf_output_file(TCCState *s1, const char *filename)
     ElfW(Sym) *sym;
     int type, file_type;
     unsigned long rel_addr, rel_size;
-    
+    unsigned long bss_addr, bss_size;
+
     file_type = s1->output_type;
     s1->nb_errors = 0;
 
@@ -1348,16 +1383,20 @@ int elf_output_file(TCCState *s1, const char *filename)
             const char *name;
             int sym_index, index;
             ElfW(Sym) *esym, *sym_end;
-            
+
             if (file_type == TCC_OUTPUT_EXE) {
                 char *ptr;
+		/* allow override the dynamic loader */
+		const char *elfint = getenv("LD_SO");
+		if (elfint == NULL)
+		    elfint = elf_interp;
                 /* add interpreter section only if executable */
                 interp = new_section(s1, ".interp", SHT_PROGBITS, SHF_ALLOC);
                 interp->sh_addralign = 1;
-                ptr = section_ptr_add(interp, sizeof(elf_interp));
-                strcpy(ptr, elf_interp);
+                ptr = section_ptr_add(interp, 1+strlen(elfint));
+                strcpy(ptr, elfint);
             }
-        
+
             /* add dynamic symbol table */
             s1->dynsym = new_symtab(s1, ".dynsym", SHT_DYNSYM, SHF_ALLOC,
                                     ".dynstr", 
@@ -1399,12 +1438,32 @@ int elf_output_file(TCCState *s1, const char *filename)
                                               sym - (ElfW(Sym) *)symtab_section->data);
                             } else if (type == STT_OBJECT) {
                                 unsigned long offset;
+                                ElfW(Sym) *dynsym, *dynsym_end;
                                 offset = bss_section->data_offset;
                                 /* XXX: which alignment ? */
                                 offset = (offset + 16 - 1) & -16;
                                 index = put_elf_sym(s1->dynsym, offset, esym->st_size, 
                                                     esym->st_info, 0, 
                                                     bss_section->sh_num, name);
+                                /* Ensure symbol aliases (that is, symbols with
+                                   the same st_value) resolve to the same
+                                   address in program .bss or .data section. */
+                                dynsym_end = (ElfW(Sym) *)
+                                             (s1->dynsymtab_section->data +
+                                              s1->dynsymtab_section->data_offset);
+                                for(dynsym = (ElfW(Sym) *)s1->dynsymtab_section->data + 1;
+                                    dynsym < dynsym_end; dynsym++) {
+                                    if (dynsym->st_value == esym->st_value) {
+                                        char *dynname;
+                                        dynname = s1->dynsymtab_section->link->data
+                                                  + dynsym->st_name;
+                                        put_elf_sym(s1->dynsym, offset,
+                                                    dynsym->st_size,
+                                                    dynsym->st_info, 0,
+                                                    bss_section->sh_num,
+                                                    dynname);
+                                    }
+                                }
                                 put_elf_reloc(s1->dynsym, bss_section, 
                                               offset, R_COPY, index);
                                 offset += esym->st_size;
@@ -1514,7 +1573,7 @@ int elf_output_file(TCCState *s1, const char *filename)
 
             /* add necessary space for other entries */
             saved_dynamic_data_offset = dynamic->data_offset;
-            dynamic->data_offset += sizeof(ElfW(Dyn)) * 9;
+            dynamic->data_offset += sizeof(ElfW(Dyn)) * EXTRA_RELITEMS;
         } else {
             /* still need to build got entries in case of static link */
             build_got_entries(s1);
@@ -1543,7 +1602,7 @@ int elf_output_file(TCCState *s1, const char *filename)
         break;
     case TCC_OUTPUT_EXE:
         if (!s1->static_link)
-            phnum = 4;
+            phnum = 4 + HAVE_PHDR;
         else
             phnum = 2;
         break;
@@ -1620,10 +1679,11 @@ int elf_output_file(TCCState *s1, const char *filename)
         rel_size = 0;
         rel_addr = 0;
 
+	bss_addr = bss_size = 0;
         /* leave one program header for the program interpreter */
         ph = &phdr[0];
         if (interp)
-            ph++;
+            ph += 1 + HAVE_PHDR;
 
         for(j = 0; j < 2; j++) {
             ph->p_type = PT_LOAD;
@@ -1685,9 +1745,20 @@ int elf_output_file(TCCState *s1, const char *filename)
                     }
                     /* update dynamic relocation infos */
                     if (s->sh_type == SHT_RELX) {
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+                        if (!strcmp(strsec->data + s->sh_name, ".rel.got")) { // rel_size == 0) {
+                            rel_addr = addr;
+			    rel_size += s->sh_size;	// XXX only first rel.
+			}
+                        if (!strcmp(strsec->data + s->sh_name, ".rel.bss")) { // rel_size == 0) {
+                            bss_addr = addr;
+			    bss_size = s->sh_size;	// XXX only first rel.
+			}
+#else
                         if (rel_size == 0)
                             rel_addr = addr;
                         rel_size += s->sh_size;
+#endif
                     }
                     addr += s->sh_size;
                     if (s->sh_type != SHT_NOBITS)
@@ -1714,7 +1785,22 @@ int elf_output_file(TCCState *s1, const char *filename)
         /* if interpreter, then add corresponing program header */
         if (interp) {
             ph = &phdr[0];
-            
+
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+	    {
+		int len = phnum * sizeof(ElfW(Phdr));
+
+		ph->p_type = PT_PHDR;
+		ph->p_offset = sizeof(ElfW(Ehdr));
+		ph->p_vaddr = interp->sh_addr - len;
+		ph->p_paddr = ph->p_vaddr;
+		ph->p_filesz = ph->p_memsz = len;
+		ph->p_flags = PF_R | PF_X;
+		ph->p_align = 4; // interp->sh_addralign;
+		ph++;
+	    }
+#endif
+
             ph->p_type = PT_INTERP;
             ph->p_offset = interp->sh_offset;
             ph->p_vaddr = interp->sh_addr;
@@ -1815,9 +1901,18 @@ int elf_output_file(TCCState *s1, const char *filename)
             put_dt(dynamic, DT_RELASZ, rel_size);
             put_dt(dynamic, DT_RELAENT, sizeof(ElfW_Rel));
 #else
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+            put_dt(dynamic, DT_PLTGOT, s1->got->sh_addr);
+            put_dt(dynamic, DT_PLTRELSZ, rel_size);
+            put_dt(dynamic, DT_JMPREL, rel_addr);
+            put_dt(dynamic, DT_PLTREL, DT_REL);
+            put_dt(dynamic, DT_REL, bss_addr);
+            put_dt(dynamic, DT_RELSZ, bss_size);
+#else
             put_dt(dynamic, DT_REL, rel_addr);
             put_dt(dynamic, DT_RELSZ, rel_size);
             put_dt(dynamic, DT_RELENT, sizeof(ElfW_Rel));
+#endif
 #endif
             if (s1->do_debug)
                 put_dt(dynamic, DT_DEBUG, 0);
@@ -1912,7 +2007,7 @@ int elf_output_file(TCCState *s1, const char *filename)
         ehdr.e_ident[4] = TCC_ELFCLASS;
         ehdr.e_ident[5] = ELFDATA2LSB;
         ehdr.e_ident[6] = EV_CURRENT;
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
         ehdr.e_ident[EI_OSABI] = ELFOSABI_FREEBSD;
 #endif
 #ifdef TCC_TARGET_ARM
@@ -1950,6 +2045,10 @@ int elf_output_file(TCCState *s1, const char *filename)
         for(i=1;i<s1->nb_sections;i++) {
             s = s1->sections[section_order[i]];
             if (s->sh_type != SHT_NOBITS) {
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+		if (s->sh_type == SHT_DYNSYM)
+		    patch_dynsym_undef(s1, s);
+#endif
                 while (offset < s->sh_offset) {
                     fputc(0, f);
                     offset++;
@@ -2652,40 +2751,161 @@ static int ld_next(TCCState *s1, char *name, int name_size)
     return c;
 }
 
-static int ld_add_file_list(TCCState *s1, int as_needed)
+char *tcc_strcpy_part(char *out, const char *in, size_t num)
 {
-    char filename[1024];
-    int t, ret;
+    memcpy(out, in, num);
+    out[num] = '\0';
+    return out;
+}
 
+/*
+ * Extract the library name from the file name
+ * Return 0 if the file isn't a library
+ *
+ * /!\ No test on filename capacity, be careful
+ */
+static int filename_to_libname(TCCState *s1, const char filename[], char libname[])
+{
+    char *ext;
+    int libprefix;
+
+    /* already converted to library name */
+    if (libname[0] != '\0')
+        return 1;
+    ext = tcc_fileextension(filename);
+    if (*ext == '\0')
+        return 0;
+    libprefix = !strncmp(filename, "lib", 3);
+    if (!s1->static_link) {
+#ifdef TCC_TARGET_PE
+        if (!strcmp(ext, ".def")) {
+            size_t len = ext - filename;
+            tcc_strcpy_part(libname, filename, len);
+            return 1;
+        }
+#else
+        if (libprefix && (!strcmp(ext, ".so"))) {
+            size_t len = ext - filename - 3;
+            tcc_strcpy_part(libname, filename + 3, len);
+            return 1;
+        }
+#endif
+    } else {
+        if (libprefix && (!strcmp(ext, ".a"))) {
+            size_t len = ext - filename - 3;
+            tcc_strcpy_part(libname, filename + 3, len);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Extract the file name from the library name
+ *
+ * /!\ No test on filename capacity, be careful
+ */
+static void libname_to_filename(TCCState *s1, const char libname[], char filename[])
+{
+    if (!s1->static_link) {
+#ifdef TCC_TARGET_PE
+        sprintf(filename, "%s.def", libname);
+#else
+        sprintf(filename, "lib%s.so", libname);
+#endif
+    } else {
+        sprintf(filename, "lib%s.a", libname);
+    }
+}
+
+static int ld_add_file(TCCState *s1, const char filename[], char libname[])
+{
+    int ret;
+
+    ret = tcc_add_file_internal(s1, filename, 0);
+    if (ret) {
+        if (filename_to_libname(s1, filename, libname))
+            ret = tcc_add_library(s1, libname);
+    }
+    return ret;
+}
+
+static inline int new_undef_syms(void)
+{
+    int ret = 0;
+    ret = new_undef_sym;
+    new_undef_sym = 0;
+    return ret;
+}
+
+static int ld_add_file_list(TCCState *s1, const char *cmd, int as_needed)
+{
+    char filename[1024], libname[1024];
+    int t, group, nblibs = 0, ret = 0;
+    char **libs = NULL;
+
+    group = !strcmp(cmd, "GROUP");
+    if (!as_needed)
+        new_undef_syms();
     t = ld_next(s1, filename, sizeof(filename));
     if (t != '(')
         expect("(");
     t = ld_next(s1, filename, sizeof(filename));
     for(;;) {
+        libname[0] = '\0';
         if (t == LD_TOK_EOF) {
             error_noabort("unexpected end of file");
-            return -1;
+            ret = -1;
+            goto lib_parse_error;
         } else if (t == ')') {
             break;
+        } else if (t == '-') {
+            t = ld_next(s1, filename, sizeof(filename));
+            if ((t != LD_TOK_NAME) || (filename[0] != 'l')) {
+                error_noabort("library name expected");
+                ret = -1;
+                goto lib_parse_error;
+            }
+            strcpy(libname, &filename[1]);
+            libname_to_filename(s1, libname, filename);
         } else if (t != LD_TOK_NAME) {
             error_noabort("filename expected");
-            return -1;
+            ret = -1;
+            goto lib_parse_error;
         } 
         if (!strcmp(filename, "AS_NEEDED")) {
-            ret = ld_add_file_list(s1, 1);
+            ret = ld_add_file_list(s1, cmd, 1);
             if (ret)
-                return ret;
+                goto lib_parse_error;
         } else {
             /* TODO: Implement AS_NEEDED support. Ignore it for now */
-            if (!as_needed)
-                tcc_add_file(s1, filename);
+            if (!as_needed) {
+                ret = ld_add_file(s1, filename, libname);
+                if (ret)
+                    goto lib_parse_error;
+                if (group) {
+                    /* Add the filename *and* the libname to avoid future conversions */
+                    dynarray_add((void ***) &libs, &nblibs, tcc_strdup(filename));
+                    dynarray_add((void ***) &libs, &nblibs, tcc_strdup(libname));
+                }
+            }
         }
         t = ld_next(s1, filename, sizeof(filename));
         if (t == ',') {
             t = ld_next(s1, filename, sizeof(filename));
         }
     }
-    return 0;
+    if (group && !as_needed) {
+        while (new_undef_syms()) {
+            int i;
+
+            for (i = 0; i < nblibs; i += 2)
+                ld_add_file(s1, libs[i], libs[i+1]);
+        }
+    }
+lib_parse_error:
+    dynarray_reset(&libs, &nblibs);
+    return ret;
 }
 
 /* interpret a subset of GNU ldscripts to handle the dummy libc.so
@@ -2706,7 +2926,7 @@ static int tcc_load_ldscript(TCCState *s1)
             return -1;
         if (!strcmp(cmd, "INPUT") ||
             !strcmp(cmd, "GROUP")) {
-            ret = ld_add_file_list(s1, 0);
+            ret = ld_add_file_list(s1, cmd, 0);
             if (ret)
                 return ret;
         } else if (!strcmp(cmd, "OUTPUT_FORMAT") ||

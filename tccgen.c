@@ -47,6 +47,13 @@ void vsetc(CType *type, int r, CValue *vc)
     vtop->c = *vc;
 }
 
+/* push constant of type "type" with useless value */
+void vpush(CType *type)
+{
+    CValue cval;
+    vsetc(type, VT_CONST, &cval);
+}
+
 /* push integer constant */
 void vpushi(int v)
 {
@@ -2681,6 +2688,9 @@ static void post_type(CType *type, AttributeDef *ad)
 
     if (tok == '(') {
         /* function declaration */
+        if ((type->t & VT_STATIC) && local_stack) {
+            error("Function without file scope cannot be static");
+        }
         next();
         l = 0;
         first = NULL;
@@ -2749,9 +2759,37 @@ static void post_type(CType *type, AttributeDef *ad)
             next();
         n = -1;
         if (tok != ']') {
-            n = expr_const();
-            if (n < 0)
-                error("invalid array size");    
+            /* varray */
+            if (expr_check_const()) {
+                n = vtop->c.i;
+                vpop();
+                if (n < 0)
+                    error("invalid array size");
+            } else {
+                put_user_tok_start();
+                put_user_tok('=');
+#ifdef CONFIG_TCC_BCHECK
+                put_user_tok(TOK_alloca);
+#else
+		put_user_tok(tok_alloc("alloca", 6)->tok);
+#endif
+                put_user_tok('(');
+                while(tok != ']') {
+                    put_user_tok(tok);
+                    next();
+                }
+                put_user_tok(')');
+                skip(']');
+                if (tok != ';')
+                    error("not support varray type");
+                put_user_tok(tok);
+                put_user_tok_end();
+                next();
+                s = sym_push(SYM_FIELD, type, 0, -1);
+                type->t = (VT_PTR | VT_CONSTANT);
+                type->ref = s;
+                return;
+            }
         }
         skip(']');
         /* parse next post type */
@@ -2944,11 +2982,14 @@ static void vpush_tokc(int t)
 
 static void unary(void)
 {
-    int n, t, align, size, r;
+    int n, t, align, size, r, sizeof_caller;
     CType type;
     Sym *s;
     AttributeDef ad;
+    static int in_sizeof = 0;
 
+    sizeof_caller = in_sizeof;
+    in_sizeof = 0;
     /* XXX: GCC 2.95.3 does not generate a table although it should be
        better here */
  tok_next:
@@ -3045,6 +3086,10 @@ static void unary(void)
                 memset(&ad, 0, sizeof(AttributeDef));
                 decl_initializer_alloc(&type, &ad, r, 1, 0, 0);
             } else {
+                if (sizeof_caller) {
+                    vpush(&type);
+                    return;
+                }
                 unary();
                 gen_cast(&type);
             }
@@ -3114,11 +3159,8 @@ static void unary(void)
     case TOK_ALIGNOF2:
         t = tok;
         next();
-        if (tok == '(') {
-            parse_expr_type(&type);
-        } else {
-            unary_type(&type);
-        }
+        in_sizeof++;
+        unary_type(&type); // Perform a in_sizeof = 0;
         size = type_size(&type, &align);
         if (t == TOK_SIZEOF) {
             if (size < 0)
@@ -3766,6 +3808,19 @@ static int expr_const(void)
     return c;
 }
 
+/* varray */
+static int expr_check_const(void)
+{
+    int last_tok = tok;
+    expr_const1();
+    if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) != VT_CONST) {
+        unget_tok(last_tok);
+        return(FALSE);
+    }
+    return(TRUE);
+}
+/* ~varray */
+
 /* return the label token if current token is a label, otherwise
    return zero */
 static int is_label(void)
@@ -4385,6 +4440,9 @@ static void decl_initializer(CType *type, Section *sec, unsigned long c,
         no_oblock = 1;
         if ((first && tok != TOK_LSTR && tok != TOK_STR) || 
             tok == '{') {
+            if (tok != '{')
+                error("character array initializer must be a literal,"
+                    " optionally enclosed in braces");
             skip('{');
             no_oblock = 0;
         }

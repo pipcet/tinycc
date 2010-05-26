@@ -1,3 +1,4 @@
+From cb6bd5f5b5fb6bc33cf04fcaa3e8be336feb9670 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Tue, 13 Apr 2010 21:08:37 +0200
 Subject: Error out when declaring a static function without file scope
@@ -30,3 +31,5 @@ index 5fa9f43..94d9c11 100644
          l = 0;
          first = NULL;
 -- 
+1.7.1
+

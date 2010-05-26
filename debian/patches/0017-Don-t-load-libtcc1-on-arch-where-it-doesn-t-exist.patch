@@ -1,3 +1,4 @@
+From 5d4bb7c626ae673514ce2ea7ab5df066c598a160 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Tue, 27 Apr 2010 20:13:19 +0200
 Subject: Don't load libtcc1 on arch where it doesn't exist
@@ -46,3 +47,5 @@ index 9d66512..f256575 100644
      /* add crt end if not memory output */
      if (s1->output_type != TCC_OUTPUT_MEMORY && !s1->nostdlib) {
 -- 
+1.7.1
+

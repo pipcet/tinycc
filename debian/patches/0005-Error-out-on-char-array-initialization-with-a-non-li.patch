@@ -1,3 +1,4 @@
+From f84f616c7e94669ff3b6f452b687b352b9d93b50 Mon Sep 17 00:00:00 2001
 From: Romain Francoise <rfrancoise@debian.org>
 Date: Sat, 13 Mar 2010 18:07:57 +0100
 Subject: Error out on char array initialization with a non literal
@@ -30,3 +31,5 @@ index 942c503..b4b5d59 100644
              no_oblock = 0;
          }
 -- 
+1.7.1
+

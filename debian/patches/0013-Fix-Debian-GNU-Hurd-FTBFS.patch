@@ -1,3 +1,4 @@
+From 492fef49d8ea6501dbe997e98fce53df642e2ba1 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Tue, 30 Mar 2010 09:45:31 +0200
 Subject: Fix Debian GNU/Hurd FTBFS
@@ -163,3 +164,5 @@ index 11ee951..c5e5046 100644
          t = ld_next(s1, filename, sizeof(filename));
          if (t == ',') {
 -- 
+1.7.1
+

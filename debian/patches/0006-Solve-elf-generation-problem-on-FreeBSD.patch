@@ -1,3 +1,4 @@
+From 04d96a8de326da7f17829afc2f6c647cd7ac0eed Mon Sep 17 00:00:00 2001
 From: Luigi Rizzo <rizzo@iet.unipi.it>
 Date: Sun, 29 Nov 2009 03:25:29 +0100
 Subject: Solve elf generation problem on FreeBSD
@@ -273,3 +274,5 @@ index 4020e24..5463c5f 100644
                      fputc(0, f);
                      offset++;
 -- 
+1.7.1
+

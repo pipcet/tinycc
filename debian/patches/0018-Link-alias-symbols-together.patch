@@ -1,3 +1,4 @@
+From 8e34b9f1f90886887abf90ce4e1377db01972a5e Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Mon, 26 Apr 2010 00:46:39 +0200
 Subject: Link alias symbols together
@@ -55,3 +56,5 @@ index f256575..e7e2541 100644
                                                offset, R_COPY, index);
                                  offset += esym->st_size;
 -- 
+1.7.1
+

@@ -5,7 +5,7 @@
 TOP ?= .
 include $(TOP)/config.mak
 
-CFLAGS+=-g -Wall
+CFLAGS+=-Wall
 CFLAGS_P=$(CFLAGS) -pg -static -DCONFIG_TCC_STATIC
 LIBS_P=
 
@@ -47,6 +47,7 @@ BCHECK_O=bcheck.o
 else
 ifeq ($(ARCH),arm)
 NATIVE_TARGET=-DTCC_TARGET_ARM
+NATIVE_TARGET+=-DWITHOUT_LIBTCC
 NATIVE_TARGET+=$(if $(wildcard /lib/ld-linux.so.3),-DTCC_ARM_EABI)
 NATIVE_TARGET+=$(if $(shell grep -l "^Features.* \(vfp\|iwmmxt\) " /proc/cpuinfo),-DTCC_ARM_VFP)
 else
@@ -111,7 +112,7 @@ ifdef CONFIG_CROSS
 PROGS+=$(PROGS_CROSS)
 endif
 
-all: $(PROGS) $(LIBTCC1) $(BCHECK_O) libtcc.a tcc-doc.html tcc.1 libtcc_test$(EXESUF)
+all: $(PROGS) $(LIBTCC1) $(BCHECK_O) libtcc.a tcc-doc.html tcc.1 tcc-doc.info libtcc_test$(EXESUF)
 
 # Host Tiny C Compiler
 tcc$(EXESUF): $(NATIVE_FILES)
@@ -177,10 +178,14 @@ VPATH+=win32/lib
 endif
 ifeq ($(ARCH),i386)
 LIBTCC1_OBJS+=alloca86.o alloca86-bt.o
+else
+ifeq ($(ARCH),x86-64)
+LIBTCC1_OBJS+=alloca86_64.o
+endif
 endif
 
 %.o: %.c
-	$(LIBTCC1_CC) -o $@ -c $< -O2 -Wall
+	$(LIBTCC1_CC) -o $@ -c $< $(CFLAGS)
 
 %.o: %.S
 	$(LIBTCC1_CC) -o $@ -c $<
@@ -189,18 +194,20 @@ libtcc1.a: $(LIBTCC1_OBJS)
 	$(AR) rcs $@ $^
 
 bcheck.o: bcheck.c
-	$(CC) -o $@ -c $< -O2 -Wall
+	$(CC) -o $@ -c $< $(CFLAGS)
 
 # install
 TCC_INCLUDES = stdarg.h stddef.h stdbool.h float.h varargs.h tcclib.h
 INSTALL=install
 
 ifndef CONFIG_WIN32
-install: $(PROGS) $(LIBTCC1) $(BCHECK_O) libtcc.a tcc.1 tcc-doc.html
+install: $(PROGS) $(LIBTCC1) $(BCHECK_O) libtcc.a tcc.1 tcc-doc.info tcc-doc.html
 	mkdir -p "$(bindir)"
-	$(INSTALL) -s -m755 $(PROGS) "$(bindir)"
+	$(INSTALL) -m755 $(PROGS) "$(bindir)"
 	mkdir -p "$(mandir)/man1"
 	$(INSTALL) tcc.1 "$(mandir)/man1"
+	mkdir -p $(infodir)
+	$(INSTALL)  tcc-doc.info "$(infodir)"
 	mkdir -p "$(tccdir)"
 	mkdir -p "$(tccdir)/include"
 ifneq ($(LIBTCC1),)
@@ -232,7 +239,7 @@ install: $(PROGS) $(LIBTCC1) libtcc.a tcc-doc.html
 	mkdir -p "$(tccdir)/examples"
 	mkdir -p "$(tccdir)/doc"
 	mkdir -p "$(tccdir)/libtcc"
-	$(INSTALL) -s -m755 $(PROGS) "$(tccdir)"
+	$(INSTALL) -m755 $(PROGS) "$(tccdir)"
 	$(INSTALL) -m644 $(LIBTCC1) win32/lib/*.def "$(tccdir)/lib"
 	cp -r win32/include/. "$(tccdir)/include"
 	cp -r win32/examples/. "$(tccdir)/examples"
@@ -248,6 +255,9 @@ tcc-doc.html: tcc-doc.texi
 tcc.1: tcc-doc.texi
 	-./texi2pod.pl $< tcc.pod
 	-pod2man --section=1 --center=" " --release=" " tcc.pod > $@
+
+tcc-doc.info: tcc-doc.texi
+	makeinfo tcc-doc.texi
 
 # tar release (use 'make -k tar' on a checkouted tree)
 TCC-VERSION=tcc-$(shell cat VERSION)
@@ -267,6 +277,6 @@ local_clean:
 	rm -vf $(PROGS) tcc_p$(EXESUF) tcc.pod *~ *.o *.a *.out libtcc_test$(EXESUF)
 
 distclean: clean
-	rm -vf config.h config.mak config.texi tcc.1 tcc-doc.html
+	rm -vf config.h config.mak config.texi tcc.1 tcc-doc.info tcc-doc.html
 
 endif # ifeq ($(TOP),.)

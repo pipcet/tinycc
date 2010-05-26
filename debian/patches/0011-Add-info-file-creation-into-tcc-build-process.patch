@@ -1,3 +1,4 @@
+From 62cbe0340d91a69518d63ff93c1cfcf2190b13ef Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Thu, 8 Apr 2010 13:35:50 +0200
 Subject: Add info file creation into tcc build process
@@ -114,3 +115,5 @@ index 7be7760..1521228 100755
  echo "#define CONFIG_SYSROOT \"$sysroot\"" >> $TMPH
  echo "#define CONFIG_TCCDIR \"$tccdir\"" >> $TMPH
 -- 
+1.7.1
+

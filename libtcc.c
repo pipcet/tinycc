@@ -40,6 +40,8 @@ static int tok_flags;
 #define TOK_FLAG_EOF   0x0008 /* end of file */
 
 static int *macro_ptr, *macro_ptr_allocated;
+static int *user_macro_ptr;
+static int user_saved_buffer[TOK_MAX_SIZE + 1];
 static int *unget_saved_macro_ptr;
 static int unget_saved_buffer[TOK_MAX_SIZE + 1];
 static int unget_buffer_enabled;
@@ -129,6 +131,8 @@ static void unary_type(CType *type);
 static void block(int *bsym, int *csym, int *case_sym, int *def_sym, 
                   int case_reg, int is_expr);
 static int expr_const(void);
+/* varray */
+static int expr_check_const(void);
 static void expr_eq(void);
 static void gexpr(void);
 static void gen_inline_functions(void);
@@ -1473,7 +1477,7 @@ static int rt_get_caller_pc(unsigned long *paddr,
     int i;
 
     if (level == 0) {
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
         *paddr = uc->uc_mcontext.mc_eip;
 #elif defined(__dietlibc__)
         *paddr = uc->uc_mcontext.eip;
@@ -1482,7 +1486,7 @@ static int rt_get_caller_pc(unsigned long *paddr,
 #endif
         return 0;
     } else {
-#if defined(__FreeBSD__) 
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
         fp = uc->uc_mcontext.mc_ebp;
 #elif defined(__dietlibc__)
         fp = uc->uc_mcontext.ebp;
@@ -1508,11 +1512,19 @@ static int rt_get_caller_pc(unsigned long *paddr,
     int i;
 
     if (level == 0) {
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+        *paddr = uc->uc_mcontext.mc_rip;
         /* XXX: only support linux */
+#else
         *paddr = uc->uc_mcontext.gregs[REG_RIP];
+#endif
         return 0;
     } else {
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+        fp = uc->uc_mcontext.mc_rbp;
+#else
         fp = uc->uc_mcontext.gregs[REG_RBP];
+#endif
         for(i=1;i<level;i++) {
             /* XXX: check address validity with program info */
             if (fp <= 0x1000)
@@ -1785,6 +1797,8 @@ TCCState *tcc_new(void)
     tcc_define_symbol(s, "__STDC_VERSION__", "199901L");
 #if defined(TCC_TARGET_I386)
     tcc_define_symbol(s, "__i386__", NULL);
+    tcc_define_symbol(s, "__i386", NULL);
+    tcc_define_symbol(s, "i386", NULL);
 #endif
 #if defined(TCC_TARGET_X86_64)
     tcc_define_symbol(s, "__x86_64__", NULL);
@@ -1804,6 +1818,16 @@ TCCState *tcc_new(void)
 #else
     tcc_define_symbol(s, "__unix__", NULL);
     tcc_define_symbol(s, "__unix", NULL);
+    tcc_define_symbol(s, "unix", NULL);
+#if defined(__FreeBSD__)
+#define str(s) #s
+    tcc_define_symbol(s, "__FreeBSD__", str( __FreeBSD__));
+    tcc_define_symbol(s, "__INTEL_COMPILER", NULL);
+#undef str
+#endif
+#if defined(__FreeBSD_kernel__)
+    tcc_define_symbol(s, "__FreeBSD_kernel__", NULL);
+#endif
 #if defined(__linux)
     tcc_define_symbol(s, "__linux__", NULL);
     tcc_define_symbol(s, "__linux", NULL);

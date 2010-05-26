@@ -1,3 +1,4 @@
+From 5e7c30afe2537d1af1590accf6c8e25ffbfcf12d Mon Sep 17 00:00:00 2001
 From: grischka <grishka@gmx.de>
 Date: Tue, 30 Jun 2009 18:02:00 +0200
 Subject: Add DESTDIR support in configure
@@ -37,3 +38,5 @@ index 1521228..557693f 100755
  echo "#define CONFIG_TCCDIR \"$tccdir\"" >> $TMPH
  echo "CC=$cc" >> config.mak
 -- 
+1.7.1
+
