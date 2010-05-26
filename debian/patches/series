@@ -17,3 +17,4 @@
 0017-Don-t-load-libtcc1-on-arch-where-it-doesn-t-exist.patch
 0018-Link-alias-symbols-together.patch
 0019-Add-support-for-C99-VLA.patch
+0020-Fix-bashims-in-configure-and-gcctestsuite.sh.patch
