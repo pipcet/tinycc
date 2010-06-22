@@ -1338,6 +1338,17 @@ void patch_dynsym_undef(TCCState *s1, Section *s)
 #else
 #define	HAVE_PHDR	0
 #define	EXTRA_RELITEMS	9
+
+/* zero plt offsets of weak symbols in .dynsym */
+void patch_dynsym_undef(TCCState *s1, Section *s)
+{
+    ElfW(Sym) *sym, *sym_end;
+
+    sym_end = (ElfW(Sym) *)(s->data + s->data_offset);
+    for (sym = (ElfW(Sym) *)s->data + 1; sym < sym_end; sym++)
+        if (sym->st_shndx == SHN_UNDEF && ELFW(ST_BIND)(sym->st_info) == STB_WEAK)
+            sym->st_value = 0;
+}
 #endif
 
 /* output an ELF file */
@@ -1434,7 +1445,7 @@ int elf_output_file(TCCState *s1, const char *filename)
                             type = ELFW(ST_TYPE)(esym->st_info);
                             if (type == STT_FUNC) {
                                 put_got_entry(s1, R_JMP_SLOT, esym->st_size, 
-                                              esym->st_info, 
+                                              ELFW(ST_INFO)(STB_GLOBAL,type), 
                                               sym - (ElfW(Sym) *)symtab_section->data);
                             } else if (type == STT_OBJECT) {
                                 unsigned long offset;
@@ -2045,10 +2056,8 @@ int elf_output_file(TCCState *s1, const char *filename)
         for(i=1;i<s1->nb_sections;i++) {
             s = s1->sections[section_order[i]];
             if (s->sh_type != SHT_NOBITS) {
-#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
 		if (s->sh_type == SHT_DYNSYM)
 		    patch_dynsym_undef(s1, s);
-#endif
                 while (offset < s->sh_offset) {
                     fputc(0, f);
                     offset++;
