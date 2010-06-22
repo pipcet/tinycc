@@ -1,29 +1,29 @@
-From 07df7f506ad353077bae832bdc847fb3bc6cbd5f Mon Sep 17 00:00:00 2001
+From 670a510015c49369ca6e0ccf2ca8f126c2bbed41 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Wed, 26 May 2010 13:45:16 +0200
 Subject: Fix bashims in configure and gcctestsuite.sh.
 
 configure and gcctestsuite.sh shell scripts contains bashisms although being
 bourne shell script. This patch fixes the following bashisms:
-* Use of $RANDOM variable (replaced by reading in /dev/urandom)
+* Use of $RANDOM variable (replaced by mktemp)
 * Use == in tests instead of just =
 * Use $[] for arithmetic computation istead of $(())
 
 Origin: vendor
 Bug-Debian: http://lists.debian.org/debian-devel/2010/05/msg00892.html
 Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-05/msg00045.html
-Last-Update: 2010-05-26
+Last-Update: 2010-06-22
 Applied-Upstrean: commit:dc265feb63c70a1a76fb566a6c05fe62246b65a0
 ---
- configure             |   20 +++++++++++++++-----
+ configure             |   10 +++++-----
  tests/gcctestsuite.sh |    8 ++++----
- 2 files changed, 19 insertions(+), 9 deletions(-)
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/configure b/configure
-index d026c25..f496cdb 100755
+index d026c25..2dad1e6 100755
 --- a/configure
 +++ b/configure
-@@ -11,11 +11,21 @@ else
+@@ -11,11 +11,11 @@ else
      TMPDIR1="/tmp"
  fi
  
@@ -32,21 +32,11 @@ index d026c25..f496cdb 100755
 -TMPE="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}"
 -TMPS="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}.S"
 -TMPH="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}.h"
-+RDM1="$(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -f1 -d" " )"
-+RDM2="$(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -f1 -d" " )"
-+TMPC="${TMPDIR1}/tcc-conf-${RDM1}-$$-${RDM2}.c"
-+RDM1="$(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -f1 -d" " )"
-+RDM2="$(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -f1 -d" " )"
-+TMPO="${TMPDIR1}/tcc-conf-${RDM1}-$$-${RDM2}.o"
-+RDM1="$(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -f1 -d" " )"
-+RDM2="$(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -f1 -d" " )"
-+TMPE="${TMPDIR1}/tcc-conf-${RDM1}-$$-${RDM2}"
-+RDM1="$(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -f1 -d" " )"
-+RDM2="$(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -f1 -d" " )"
-+TMPS="${TMPDIR1}/tcc-conf-${RDM1}-$$-${RDM2}.S"
-+RDM1="$(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -f1 -d" " )"
-+RDM2="$(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -f1 -d" " )"
-+TMPH="${TMPDIR1}/tcc-conf-${RDM1}-$$-${RDM2}.h"
++TMPC="$(mktemp --tmpdir=${TMPDIR1} tcc-conf-XXXXXXXXXX-$$-XXXXXXXXXX.c)"
++TMPO="$(mktemp --tmpdir=${TMPDIR1} tcc-conf-XXXXXXXXXX-$$-XXXXXXXXXX.o)"
++TMPE="$(mktemp --tmpdir=${TMPDIR1} tcc-conf-XXXXXXXXXX-$$-XXXXXXXXXX)"
++TMPS="$(mktemp --tmpdir=${TMPDIR1} tcc-conf-XXXXXXXXXX-$$-XXXXXXXXXX.S)"
++TMPH="$(mktemp --tmpdir=${TMPDIR1} tcc-conf-XXXXXXXXXX-$$-XXXXXXXXXX.h)"
  
  # default parameters
  build_cross="no"
