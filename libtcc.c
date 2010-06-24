@@ -1441,7 +1441,7 @@ static void rt_printline(unsigned long wanted_pc)
             sym < sym_end;
             sym++) {
             type = ELFW(ST_TYPE)(sym->st_info);
-            if (type == STT_FUNC) {
+            if ((type == STT_FUNC) || (type == STT_GNU_IFUNC)) {
                 if (wanted_pc >= sym->st_value &&
                     wanted_pc < sym->st_value + sym->st_size) {
                     pstrcpy(last_func_name, sizeof(last_func_name),
