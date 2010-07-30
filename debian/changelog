@@ -2,7 +2,8 @@ tcc (0.9.25-4) unstable; urgency=low
 
   * Fix bashims in configure and gcctestsuite.sh.
   * Attempt to solve test suite failure on armel.
-  * Update debian/copyright file
+  * debian/copyright:
+    - Update and convert to DEP5 format.
 
  -- Thomas Preud'homme <robotux@celest.fr>  Wed, 26 May 2010 16:22:09 +0200
 
