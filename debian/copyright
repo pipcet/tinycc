@@ -8,21 +8,45 @@ It is now maintained by:
     Thomas Preud'homme <robotux@celest.fr>,
     Arthur Loiret <arthur.loiret@gmail.com>
 
-It was downloaded from
-<http://fabrice.bellard.free.fr/tcc/tcc-0.9.23.tar.gz>
-and later checked out from its CVS repository at
-<http://cvs.savannah.nongnu.org/viewcvs/tinycc/?root=tinycc>.
+It was downloaded from:
+http://download.savannah.nongnu.org/releases/tinycc/tcc-0.9.25.tar.bz2
 
 Upstream Author: Fabrice Bellard <fabrice.bellard@free.fr>
 
 TCC itself is under the LGPL, but please note that some of the files in
 the source package come from the GCC distribution, and are under the GNU
-GPL.  The complete text of the GNU GPL can be found in
-`/usr/share/common-licenses/GPL'.
+GPL.  The complete text of the GNU General Public License and GNU Lesser
+General Public License licenses can be found in
+`/usr/share/common-licenses/GPL' and `/usr/share/common-licenses/LGPL'
+respectively.
 
 Copyright:
 
-     Copyright (c) 2001, 2002, 2003 Fabrice Bellard
+    Copyright (c) 2001-2006 Fabrice Bellard
+
+
+    Following copyrights replace the above one for listed files.
+
+    lib/libtcc1.c:
+      Copyright (c) 1987, 1988, 1992, 1994, 1995 Free Software Foundation, Inc.
+    stab.def:
+      Copyright (c) 1988, 1997 Free Software Foundation, Inc.
+    texi2pod.pl:
+      Copyright (c) 1999, 2000, 2001 Free Software Foundation, Inc.
+    arm-gen.c:
+      Copyright (c) 2003 Daniel Glöckner
+    tcccoff.c:
+      Copyright (c) 2003, 2004 TK
+      Copyright (c) 2004 Fabrice Bellard
+    win32/tools/tiny_impdef.c:
+      Copyright (c) 2005-2007 grischka
+    tccpe.c:
+      Copyright (c) 2005-2007 grischka
+    win32/tools/tiny_libmaker.c:
+      Copyright (c) 2007 Timppa
+    x86_64-gen.c:
+      Copyright (c) 2008 Shinichiro Hamaji
+
     
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -38,6 +62,3 @@ Copyright:
     License along with this library; if not, write to the Free Software
     Foundation, Inc.  51 Franklin St, Fifth Floor, Boston, MA 02110-1301
     USA.
-
-On Debian GNU/Linux systems, the complete text of the GNU Lesser General
-Public License can be found in `/usr/share/common-licenses/LGPL'.
