@@ -2,6 +2,7 @@ tcc (0.9.25-4) unstable; urgency=low
 
   * Fix bashims in configure and gcctestsuite.sh.
   * Attempt to solve test suite failure on armel.
+  * Register documentation with doc-base.
   * debian/copyright:
     - Update and convert to DEP5 format.
   * debian/control:
