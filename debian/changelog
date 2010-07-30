@@ -4,6 +4,8 @@ tcc (0.9.25-4) unstable; urgency=low
   * Attempt to solve test suite failure on armel.
   * debian/copyright:
     - Update and convert to DEP5 format.
+  * debian/control:
+    - Improve package description for libtcc-dev.
 
  -- Thomas Preud'homme <robotux@celest.fr>  Wed, 26 May 2010 16:22:09 +0200
 
