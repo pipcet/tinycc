@@ -1,6 +1,8 @@
 tcc (0.9.25-4) unstable; urgency=low
 
   * Fix bashims in configure and gcctestsuite.sh.
+  * debian/control:
+    - Improve package description for libtcc-dev.
 
  -- Thomas Preud'homme <robotux@celest.fr>  Tue, 10 Aug 2010 00:10:30 +0200
 
