@@ -33,11 +33,12 @@ Section: libdevel
 Architecture: i386 kfreebsd-i386 hurd-i386 amd64 kfreebsd-amd64 armel
 Depends: ${misc:Depends}
 Description: Fast library for dynamic code generation
- Libtcc is a library that uses tcc to perform dynamic code generation.
- It exposes in its API all operations tcc performs to generate a binary
- from sources: setting header and library paths, compiling program from
- a source file, manipulating its symbols and handling relocation of its
- code among other things. Libtcc is also able to compile from a buffer.
+ Libtcc is a library that uses tcc, a compiler several times faster than
+ 'gcc -O0' to perform dynamic code generation. It exposes in its API all
+ operations tcc performs to generate a binary from sources: setting
+ header and library paths, compiling program from a source file,
+ manipulating its symbols and handling relocation of its code among
+ other things. Libtcc is also able to compile from a buffer.
  .
  This package contains the static library and header file for TCC (Tiny
  C Compiler).
