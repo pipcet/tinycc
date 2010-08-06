@@ -12,7 +12,7 @@ Vcs-Git: git://git.debian.org/collab-maint/tcc.git
 
 Package: tcc
 Architecture: i386 kfreebsd-i386 hurd-i386 amd64 kfreebsd-amd64 armel
-Depends: ${shlibs:Depends}, ${misc:Depends}, doc-base
+Depends: ${shlibs:Depends}, ${misc:Depends}
 Recommends: libc6-dev | libc-dev
 Provides: c-compiler
 Description: the smallest ANSI C compiler
