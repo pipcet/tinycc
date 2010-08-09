@@ -1,3 +1,9 @@
+tcc (0.9.25-4) unstable; urgency=low
+
+  * Fix bashims in configure and gcctestsuite.sh.
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Tue, 10 Aug 2010 00:10:30 +0200
+
 tcc (0.9.25-3) unstable; urgency=low
 
   * Change Vcs fields to reference Alioth.
