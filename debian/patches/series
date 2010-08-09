@@ -18,3 +18,4 @@ load_libtcc1_if_available.diff
 452876_link_alias_symbols_together.diff
 439135_support_c99_VLA.diff
 Fix-bashims-in-configure-and-gcctestsuite.sh.patch
+Add-support-for-indirect-functions-as-externals.patch
