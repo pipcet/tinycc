@@ -11,11 +11,11 @@ else
     TMPDIR1="/tmp"
 fi
 
-TMPC="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}.c"
-TMPO="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}.o"
-TMPE="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}"
-TMPS="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}.S"
-TMPH="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}.h"
+TMPC="$(mktemp --tmpdir=${TMPDIR1} tcc-conf-XXXXXXXXXX-$$-XXXXXXXXXX.c)"
+TMPO="$(mktemp --tmpdir=${TMPDIR1} tcc-conf-XXXXXXXXXX-$$-XXXXXXXXXX.o)"
+TMPE="$(mktemp --tmpdir=${TMPDIR1} tcc-conf-XXXXXXXXXX-$$-XXXXXXXXXX)"
+TMPS="$(mktemp --tmpdir=${TMPDIR1} tcc-conf-XXXXXXXXXX-$$-XXXXXXXXXX.S)"
+TMPH="$(mktemp --tmpdir=${TMPDIR1} tcc-conf-XXXXXXXXXX-$$-XXXXXXXXXX.h)"
 
 # default parameters
 build_cross="no"
