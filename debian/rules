@@ -25,6 +25,10 @@ RULE_OVERRIDE := $(patsubst %,override_%,$(DH_OVERRIDEN))
 
 $(RULE_OVERRIDE):
 
+clean:
+	rm -f build
+	dh clean
+
 build:
 	dh build
 	touch build
