@@ -19,3 +19,4 @@
 0019-Add-support-for-C99-VLA.patch
 0020-Fix-bashims-in-configure-and-gcctestsuite.sh.patch
 0021-Resolve-FTBFS-on-armel.patch
+0022-Add-support-for-indirect-functions-as-externals.patch
