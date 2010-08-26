@@ -68,6 +68,10 @@
 #define O_BINARY 0
 #endif
 
+#ifndef SA_SIGINFO
+#define SA_SIGINFO 0x00000004u
+#endif
+
 #include "libtcc.h"
 
 /* parser debug */
@@ -136,7 +140,7 @@ typedef int BOOL;
 
 #define TOK_HASH_SIZE       8192 /* must be a power of two */
 #define TOK_ALLOC_INCR      512  /* must be a power of two */
-#define TOK_MAX_SIZE        4 /* token max size in int unit when stored in string */
+#define TOK_MAX_SIZE        31 /* token max size in int unit when stored in string */
 
 /* token symbol management */
 typedef struct TokenSym {
@@ -697,8 +701,8 @@ enum tcc_token {
   #define strtof (float)strtod
   #define strtoll (long long)strtol
 #endif
-#elif defined(TCC_UCLIBC) || defined(__FreeBSD__) || defined(__DragonFly__) \
-    || defined(__OpenBSD__)
+#elif defined(TCC_UCLIBC) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) \
+    || defined(__DragonFly__) || defined(__OpenBSD__)
 /* currently incorrect */
 long double strtold(const char *nptr, char **endptr)
 {

@@ -2,6 +2,10 @@
 @c %**start of header
 @setfilename tcc-doc.info
 @settitle Tiny C Compiler Reference Documentation
+@dircategory Software development
+@direntry
+* TCC: (tcc-doc).               The Tiny C Compiler.
+@end direntry
 @c %**end of header
 
 @include config.texi
@@ -126,10 +130,10 @@ Compile @file{a.c} and @file{b.c}, link them together and generate the object fi
 Scripting:
 
 TCC can be invoked from @emph{scripts}, just as shell scripts. You just
-need to add @code{#!/usr/local/bin/tcc -run} at the start of your C source:
+need to add @code{#!/usr/bin/tcc -run} at the start of your C source:
 
 @example
-#!/usr/local/bin/tcc -run
+#!/usr/bin/tcc -run
 #include <stdio.h>
 
 int main() 
@@ -182,7 +186,7 @@ tcc "-run -L/usr/X11R6/lib -lX11" ex4.c
 In a script, it gives the following header:
 
 @example
-#!/usr/local/bin/tcc -run -L/usr/X11R6/lib -lX11
+#!/usr/bin/tcc -run -L/usr/X11R6/lib -lX11
 #include <stdlib.h>
 int main(int argc, char **argv)
 @{
