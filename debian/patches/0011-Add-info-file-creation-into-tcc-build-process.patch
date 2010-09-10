@@ -6,8 +6,9 @@ Subject: Add info file creation into tcc build process
 Add info file creation in tcc Makefile
 
 Origin: vendor
-Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00041.html
-Last-Update: 2010-04-20
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-09/msg00020.html
+Last-Update: 2010-09-11
+Applied-Upstream: commit: 3f829d11ff231980383c384df2ae38e369cd8079
 ---
  Makefile  |   11 ++++++++---
  configure |    9 +++++++++

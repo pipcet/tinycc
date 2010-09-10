@@ -11,7 +11,8 @@ work
 Origin: vendor
 Bug-Debian: http://bugs.debian.org/259619
 Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00041.html
-Last-Update: 2010-04-20
+Last-Update: 2010-09-10
+Applied-Upstream: commit: 6655e06ec851e3541f2f47187f95956e5003c7b8
 ---
  tccgen.c |    3 +++
  1 files changed, 3 insertions(+), 0 deletions(-)
