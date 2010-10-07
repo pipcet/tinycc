@@ -8,10 +8,9 @@ Pierre Chifflier <chifflier@cpe.fr>.
 
 Origin: vendor
 Bug-Debian: http://bugs.debian.org/549100#37
-Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-09/msg00020.html
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00041.html
 Reviewed-by: Romain Francoise <rfrancoise@debian.org>
-Last-Update: 2010-09-11
-Applied-Upstream: commit: 776364f395d786c4c27e1f7a49cbba38951d9820
+Last-Update: 2010-04-20
 ---
  libtcc.c |   11 +++++++----
  tcc.h    |    4 ++--

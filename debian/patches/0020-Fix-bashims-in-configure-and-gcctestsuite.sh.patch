@@ -12,8 +12,8 @@ bourne shell script. This patch fixes the following bashisms:
 Origin: vendor
 Bug-Debian: http://lists.debian.org/debian-devel/2010/05/msg00892.html
 Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-05/msg00045.html
-Last-Update: 2010-09-10
-Applied-Upstream: commit:dc265feb63c70a1a76fb566a6c05fe62246b65a0
+Last-Update: 2010-06-22
+Applied-Upstrean: commit:dc265feb63c70a1a76fb566a6c05fe62246b65a0
 ---
  configure             |   10 +++++-----
  tests/gcctestsuite.sh |    8 ++++----

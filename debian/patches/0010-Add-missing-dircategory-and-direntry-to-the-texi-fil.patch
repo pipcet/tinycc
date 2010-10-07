@@ -8,9 +8,8 @@ patch create those two entries.
 
 Origin: vendor
 Bug-Debian: http://bugs.debian.org/528902
-Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-09/msg00020.html
-Last-Update: 2010-09-11
-Applied-Upstream: commit: 36f74e46b47ac127e6002950f1b74ea4412cc4ea
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00041.html
+Last-Update: 2010-04-20
 ---
  tcc-doc.texi |    4 ++++
  1 files changed, 4 insertions(+), 0 deletions(-)

@@ -20,3 +20,4 @@
 0020-Fix-bashims-in-configure-and-gcctestsuite.sh.patch
 0021-Resolve-FTBFS-on-armel.patch
 0022-Add-support-for-indirect-functions-as-externals.patch
+0023-Explicit-license-in-tiny_libmaker.c.patch

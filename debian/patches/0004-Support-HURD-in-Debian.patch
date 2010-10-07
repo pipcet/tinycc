@@ -7,9 +7,8 @@ Subject: Support HURD in Debian
 * Define SA_SIGINFO is not defined
 
 Origin: vendor
-Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-09/msg00020.html
-Last-Update: 2010-09-11
-Applied-Upstream: commit: 2887f40f760b7d406422258bbdd6e8dc25696c59
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00041.html
+Last-Update: 2010-04-20
 ---
  configure |    2 +-
  tcc.h     |    4 ++++
