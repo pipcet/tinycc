@@ -1,3 +1,8 @@
+tcc (0.9.25-5) unstable; urgency=low
+
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Thu, 07 Oct 2010 10:36:16 +0200
+
 tcc (0.9.25-4) unstable; urgency=low
 
   * Fix bashims in configure and gcctestsuite.sh.
@@ -5,6 +10,7 @@ tcc (0.9.25-4) unstable; urgency=low
   * Attempt to solve test suite failure on armel.
   * Register documentation with doc-base.
   * Bump Standard-Version from 3.8.4 to 3.9.1 (no changes needed).
+  * Fix the license of win32/tools/tiny_libmaker.c with author's agreement
   * debian/copyright:
     - Update and convert to DEP5 format.
     - Update address of FSF.
