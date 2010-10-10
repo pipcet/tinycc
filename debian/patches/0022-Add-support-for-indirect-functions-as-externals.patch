@@ -1,4 +1,4 @@
-From e8b64c67ceaf4f2b9e894644c606b247b194099b Mon Sep 17 00:00:00 2001
+From 2d91ae5b98b15f408a8799175bced99b3d5e5610 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Thu, 24 Jun 2010 20:53:42 +0200
 Subject: Add support for indirect functions as externals.
@@ -7,13 +7,13 @@ Add link support to use indirect functions defined in external modules.
 
 Origin: vendor
 Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-08/msg00013.html
-Last-Update: 2010-08-09
+Last-Update: 2010-10-10
 Applied-Upstream: commit: bcc9137a1004682ac58914c7445427cb23ceba88
 ---
  elf.h    |    1 +
- libtcc.c |    4 ++++
+ libtcc.c |    2 +-
  tccelf.c |   12 +++++++-----
- 3 files changed, 12 insertions(+), 5 deletions(-)
+ 3 files changed, 9 insertions(+), 6 deletions(-)
 
 diff --git a/elf.h b/elf.h
 index 82fd7ed..fe694de 100644
@@ -28,18 +28,15 @@ index 82fd7ed..fe694de 100644
  #define STT_HIOS        12              /* End of OS-specific */
  #define STT_LOPROC      13              /* Start of processor-specific */
 diff --git a/libtcc.c b/libtcc.c
-index add58ac..a9517cf 100644
+index add58ac..1cdb4c8 100644
 --- a/libtcc.c
 +++ b/libtcc.c
-@@ -1435,7 +1435,11 @@ static void rt_printline(unsigned long wanted_pc)
+@@ -1435,7 +1435,7 @@ static void rt_printline(unsigned long wanted_pc)
              sym < sym_end;
              sym++) {
              type = ELFW(ST_TYPE)(sym->st_info);
-+#ifdef STT_IFUNC
+-            if (type == STT_FUNC) {
 +            if ((type == STT_FUNC) || (type == STT_GNU_IFUNC)) {
-+#else
-             if (type == STT_FUNC) {
-+#endif
                  if (wanted_pc >= sym->st_value &&
                      wanted_pc < sym->st_value + sym->st_size) {
                      pstrcpy(last_func_name, sizeof(last_func_name),
