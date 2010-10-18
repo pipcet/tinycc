@@ -1,18 +1,29 @@
-tcc (0.9.25-4) unstable; urgency=low
+tcc (0.9.25-6) unstable; urgency=low
 
-  * Fix bashims in configure and gcctestsuite.sh.
-  * Add support for indirect functions as externals.
   * Attempt to solve test suite failure on armel.
   * Register documentation with doc-base.
-  * Bump Standard-Version from 3.8.4 to 3.9.1 (no changes needed).
   * Fix the license of win32/tools/tiny_libmaker.c with author's agreement
   * debian/copyright:
     - Update and convert to DEP5 format.
     - Update address of FSF.
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Mon, 18 Oct 2010 15:58:01 +0200
+
+tcc (0.9.25-5) unstable; urgency=low
+
+  * Drop support for armel arch.
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Sun, 05 Sep 2010 23:15:47 +0200
+
+tcc (0.9.25-4) unstable; urgency=low
+
+  * Fix bashims in configure and gcctestsuite.sh.
+  * Add support for indirect functions as externals.
+  * Bump Standard-Version from 3.8.4 to 3.9.1 (no changes needed).
   * debian/control:
     - Improve package description for libtcc-dev.
 
- -- Thomas Preud'homme <robotux@celest.fr>  Sat, 31 Jul 2010 19:08:31 +0200
+ -- Thomas Preud'homme <robotux@celest.fr>  Tue, 10 Aug 2010 00:10:30 +0200
 
 tcc (0.9.25-3) unstable; urgency=low
 

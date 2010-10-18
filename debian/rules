@@ -13,6 +13,10 @@ clean:
 	rm -f build
 	dh clean
 
+clean:
+	rm -f build
+	dh clean
+
 build:
 	dh build
 	touch build # As recommended by policy 3.8.4 section 4.9
