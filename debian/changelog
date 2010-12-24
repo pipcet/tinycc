@@ -3,9 +3,11 @@ tcc (0.9.25-6) unstable; urgency=low
   * Attempt to solve test suite failure on armel.
   * Register documentation with doc-base.
   * Fix the license of win32/tools/tiny_libmaker.c with author's agreement
+  * debian/compat:
+    + Bump debhelper compatibility from 7 to 8 (no changes needed).
   * debian/copyright:
-    - Update and convert to DEP5 format.
-    - Update address of FSF.
+    + Update and convert to DEP5 format.
+    + Update address of FSF.
 
  -- Thomas Preud'homme <robotux@celest.fr>  Mon, 18 Oct 2010 15:58:01 +0200
 
