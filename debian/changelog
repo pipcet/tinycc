@@ -6,7 +6,7 @@ tcc (0.9.25-6) unstable; urgency=low
   * debian/compat:
     + Bump debhelper compatibility from 7 to 8 (no changes needed).
   * debian/copyright:
-    + Update and convert to DEP5 format.
+    + Update and convert to DEP5 candidate format.
     + Update address of FSF.
 
  -- Thomas Preud'homme <robotux@celest.fr>  Mon, 18 Oct 2010 15:58:01 +0200

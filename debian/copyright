@@ -1,10 +1,9 @@
-Format-Specification: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?op=file&rev=135
-Name: Tiny C Compiler
-Maintainer: Aurélien GÉRÔME <ag@roxor.cx>,
-            Thomas Preud'homme <robotux@celest.fr>,
-            Arthur Loiret <arthur.loiret@gmail.com>
-Source: http://download.savannah.nongnu.org/releases/tinycc
+Format: http://dep.debian.net/deps/dep5/
+Upstream-Name: Tiny C Compiler
+Upstream-Contact: Fabrice Bellard <fabrice@bellard.org>
+Source: http://www.tinycc.org
 
+Files: *
 Copyright: 2001-2006, Fabrice Bellard
 License: LGPL-2+
 
@@ -14,7 +13,7 @@ Copyright: 2002, Cyril Bouthors <cyril@bouthors.org>
            2007-2010, Aurélien GÉRÔME <ag@roxor.cx>,
            2007-2010, Thomas Preud'homme <robotux@celest.fr>,
            2007-2010, Arthur Loiret <arthur.loiret@gmail.com>
-License: MIT-standard
+License: Expat
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
  in the Software without restriction, including without limitation the rights
