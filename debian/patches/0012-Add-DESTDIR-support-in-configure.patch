@@ -38,5 +38,5 @@ index 1521228..557693f 100755
  echo "#define CONFIG_TCCDIR \"$tccdir\"" >> $TMPH
  echo "CC=$cc" >> config.mak
 -- 
-1.7.1
+1.7.2.3
 

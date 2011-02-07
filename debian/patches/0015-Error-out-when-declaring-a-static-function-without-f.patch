@@ -1,4 +1,4 @@
-From cb6bd5f5b5fb6bc33cf04fcaa3e8be336feb9670 Mon Sep 17 00:00:00 2001
+From e234856d25f92d85860834e409ee325587b9af4a Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Tue, 13 Apr 2010 21:08:37 +0200
 Subject: Error out when declaring a static function without file scope
@@ -8,16 +8,15 @@ required by C99 6.2.2:21
 
 Origin: vendor
 Bug-Debian: http://bugs.debian.org/170105
-Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2010-04/msg00041.html
-Reviewed-by: grischka <grishka@gmx.de>
-Last-Update: 2010-04-20
-Applied-Upstream: commit: e9406c09a3212ab3f120412a6bbdacb0cdd25deb
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2011-02/msg00039.html
+Last-Update: 2011-02-06
+Applied-Upstream: commit: cf36410e30b3c18be6c556158b2d0d0938f5b77d
 ---
- tccgen.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ tccgen.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
 diff --git a/tccgen.c b/tccgen.c
-index 5fa9f43..94d9c11 100644
+index 5fa9f43..6dbd63f 100644
 --- a/tccgen.c
 +++ b/tccgen.c
 @@ -2688,6 +2688,9 @@ static void post_type(CType *type, AttributeDef *ad)
@@ -30,6 +29,17 @@ index 5fa9f43..94d9c11 100644
          next();
          l = 0;
          first = NULL;
+@@ -4990,6 +4993,10 @@ static void decl(int l)
+         while (1) { /* iterate thru each declaration */
+             type = btype;
+             type_decl(&type, &ad, &v, TYPE_DIRECT);
++            if (((type.t & (VT_STATIC|VT_FUNC)) == (VT_STATIC|VT_FUNC))
++                && (l == VT_LOCAL)) {
++                error("Function without file scope cannot be static");
++            }
+ #if 0
+             {
+                 char buf[500];
 -- 
-1.7.1
+1.7.2.3
 

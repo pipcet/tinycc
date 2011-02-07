@@ -2060,10 +2060,6 @@ int elf_output_file(TCCState *s1, const char *filename)
             if (s->sh_type != SHT_NOBITS) {
 		if (s->sh_type == SHT_DYNSYM)
 		    patch_dynsym_undef(s1, s);
-#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
-		if (s->sh_type == SHT_DYNSYM)
-		    patch_dynsym_undef(s1, s);
-#endif
                 while (offset < s->sh_offset) {
                     fputc(0, f);
                     offset++;

@@ -1,4 +1,4 @@
-From 5f2b75a69ce78ec06f41645023c57164a8009771 Mon Sep 17 00:00:00 2001
+From e7e38c3c7288a1c89dc887f2520d8534942bf86c Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Daniel=20Gl=C3=B6ckner?= <daniel-gl@gmx.net>
 Date: Wed, 23 Jun 2010 00:20:32 +0200
 Subject: Resolve FTBFS on armel.
@@ -58,5 +58,5 @@ index e7e2541..956899e 100644
                      fputc(0, f);
                      offset++;
 -- 
-1.7.1
+1.7.2.3
 

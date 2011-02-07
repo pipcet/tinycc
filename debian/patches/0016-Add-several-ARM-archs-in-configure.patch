@@ -1,4 +1,4 @@
-From d4f5017dfab5cc4ab80f690ea10ffe8da41783f6 Mon Sep 17 00:00:00 2001
+From 347b361e0e4017703ee140f906c633a512db9e54 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Sun, 18 Apr 2010 19:29:11 +0200
 Subject: Add several ARM archs in configure
@@ -30,5 +30,5 @@ index 743f52a..d026c25 100755
    ;;
    alpha)
 -- 
-1.7.1
+1.7.2.3
 

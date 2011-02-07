@@ -1,4 +1,4 @@
-From 2d4e3f1f06cc8021fc516f9fec0c785f8fd96786 Mon Sep 17 00:00:00 2001
+From 0c57704d8e853e252a74b35121b743ea581d8f67 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Thu, 7 Oct 2010 10:04:25 +0200
 Subject: Explicit license in tiny_libmaker.c
@@ -38,5 +38,5 @@ index cf9ac67..ab08f78 100644
  #include <stdlib.h>
  #include <string.h>
 -- 
-1.7.1
+1.7.2.3
 

@@ -1,4 +1,4 @@
-From 670a510015c49369ca6e0ccf2ca8f126c2bbed41 Mon Sep 17 00:00:00 2001
+From 809ab040e89d74ea92baa02f2b6de167b1d64d17 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Wed, 26 May 2010 13:45:16 +0200
 Subject: Fix bashims in configure and gcctestsuite.sh.
@@ -73,5 +73,5 @@ index bd9204b..f3cc538 100644
    echo "$result: $src"  >> tcc.sum
  done
 -- 
-1.7.1
+1.7.2.3
 

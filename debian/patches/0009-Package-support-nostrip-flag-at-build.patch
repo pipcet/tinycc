@@ -27,5 +27,5 @@ index 5af111e..53afb0b 100644
  	$(INSTALL) tcc.1 "$(mandir)/man1"
  	mkdir -p "$(tccdir)"
 -- 
-1.7.1
+1.7.2.3
 
