@@ -874,21 +874,6 @@ static void parse_asm_operands(ASMOperand *operands, int *nb_operands_ptr,
     }
 }
 
-static void parse_asm_str(CString *astr)
-{
-    skip('(');
-    /* read the string */
-    if (tok != TOK_STR)
-        expect("string constant");
-    cstr_new(astr);
-    while (tok == TOK_STR) {
-        /* XXX: add \0 handling too ? */
-        cstr_cat(astr, tokc.cstr->data);
-        next();
-    }
-    cstr_ccat(astr, '\0');
-}
-
 /* parse the GCC asm() instruction */
 static void asm_instr(void)
 {

@@ -112,8 +112,10 @@ static Sym *external_global_sym(int v, CType *type, int r)
     return s;
 }
 
-/* define a new external reference to a symbol 'v' of type 'u' */
-static Sym *external_sym(int v, CType *type, int r)
+/* define a new external reference to a symbol 'v' with alternate asm
+   name 'asm_label' of type 'u'. 'asm_label' is equal to NULL if there
+   is no alternate name (most cases) */
+static Sym *external_sym(int v, CType *type, int r, char *asm_label)
 {
     Sym *s;
 
@@ -121,6 +123,7 @@ static Sym *external_sym(int v, CType *type, int r)
     if (!s) {
         /* push forward reference */
         s = sym_push(v, type, r | VT_CONST | VT_SYM, 0);
+        s->asm_label = asm_label;
         s->type.t |= VT_EXTERN;
     } else {
         if (!is_compatible_types(&s->type, type))
@@ -2709,6 +2712,33 @@ static inline void convert_parameter_type(CType *pt)
     }
 }
 
+static void parse_asm_str(CString *astr)
+{
+    skip('(');
+    /* read the string */
+    if (tok != TOK_STR)
+        expect("string constant");
+    cstr_new(astr);
+    while (tok == TOK_STR) {
+        /* XXX: add \0 handling too ? */
+        cstr_cat(astr, tokc.cstr->data);
+        next();
+    }
+    cstr_ccat(astr, '\0');
+}
+
+/* Parse an asm label and return the label
+ * Don't forget to free the CString in the caller! */
+static void asm_label_instr(CString *astr)
+{
+    next();
+    parse_asm_str(astr);
+    skip(')');
+#ifdef ASM_DEBUG
+    printf("asm_alias: \"%s\"\n", (char *)astr->data);
+#endif
+}
+
 static void post_type(CType *type, AttributeDef *ad)
 {
     int n, l, t1, arg_size, align;
@@ -4916,7 +4946,8 @@ static void func_decl_list(Sym *func_sym)
     CType btype, type;
 
     /* parse each declaration */
-    while (tok != '{' && tok != ';' && tok != ',' && tok != TOK_EOF) {
+    while (tok != '{' && tok != ';' && tok != ',' && tok != TOK_EOF &&
+           tok != TOK_ASM1 && tok != TOK_ASM2 && tok != TOK_ASM3) {
         if (!parse_btype(&btype, &ad)) 
             expect("declaration list");
         if (((btype.t & VT_BTYPE) == VT_ENUM ||
@@ -5188,11 +5219,25 @@ static void decl(int l)
                     sym = sym_push(v, &type, 0, 0);
                     sym->type.t |= VT_TYPEDEF;
                 } else if ((type.t & VT_BTYPE) == VT_FUNC) {
+                    char *asm_label; // associated asm label
+                    Sym *fn;
+
+                    asm_label = NULL;
                     /* external function definition */
                     /* specific case for func_call attribute */
                     if (ad.func_attr)
                         type.ref->r = ad.func_attr;
-                    external_sym(v, &type, 0);
+
+                    if (gnu_ext && (tok == TOK_ASM1 || tok == TOK_ASM2 || tok == TOK_ASM3)) {
+                        CString astr;
+
+                        asm_label_instr(&astr);
+                        asm_label = tcc_strdup(astr.data);
+                        cstr_free(&astr);
+                    }
+                    fn = external_sym(v, &type, 0, asm_label);
+                    if (gnu_ext && (tok == TOK_ATTRIBUTE1 || tok == TOK_ATTRIBUTE2))
+                        parse_attribute((AttributeDef *) &fn->type.ref->r);
                 } else {
                     /* not lvalue if array */
                     r = 0;
@@ -5208,7 +5253,7 @@ static void decl(int l)
                         /* NOTE: as GCC, uninitialized global static
                            arrays of null size are considered as
                            extern */
-                        external_sym(v, &type, r);
+                        external_sym(v, &type, r, NULL);
                     } else {
                         type.t |= (btype.t & VT_STATIC); /* Retain "static". */
                         if (type.t & VT_STATIC)
