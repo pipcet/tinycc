@@ -1,4 +1,4 @@
-From e234856d25f92d85860834e409ee325587b9af4a Mon Sep 17 00:00:00 2001
+From e82eb3731d282f137b553c4bd5e52305e967ee5d Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Tue, 13 Apr 2010 21:08:37 +0200
 Subject: Error out when declaring a static function without file scope
@@ -8,38 +8,27 @@ required by C99 6.2.2:21
 
 Origin: vendor
 Bug-Debian: http://bugs.debian.org/170105
-Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2011-02/msg00039.html
-Last-Update: 2011-02-06
-Applied-Upstream: commit: cf36410e30b3c18be6c556158b2d0d0938f5b77d
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2011-02/msg00047.html
+Last-Update: 2011-02-09
+Applied-Upstream: commit: c23400278ad7a1a44cb9b469c4635ea29cb12b25
 ---
- tccgen.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ tccgen.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
 diff --git a/tccgen.c b/tccgen.c
-index 5fa9f43..6dbd63f 100644
+index 5fa9f43..fee07ae 100644
 --- a/tccgen.c
 +++ b/tccgen.c
-@@ -2688,6 +2688,9 @@ static void post_type(CType *type, AttributeDef *ad)
- 
-     if (tok == '(') {
-         /* function declaration */
-+        if ((type->t & VT_STATIC) && local_stack) {
-+            error("Function without file scope cannot be static");
-+        }
-         next();
-         l = 0;
-         first = NULL;
-@@ -4990,6 +4993,10 @@ static void decl(int l)
-         while (1) { /* iterate thru each declaration */
-             type = btype;
-             type_decl(&type, &ad, &v, TYPE_DIRECT);
-+            if (((type.t & (VT_STATIC|VT_FUNC)) == (VT_STATIC|VT_FUNC))
-+                && (l == VT_LOCAL)) {
-+                error("Function without file scope cannot be static");
-+            }
- #if 0
-             {
-                 char buf[500];
+@@ -4998,6 +4998,9 @@ static void decl(int l)
+             }
+ #endif
+             if ((type.t & VT_BTYPE) == VT_FUNC) {
++                if ((type.t & VT_STATIC) && (l == VT_LOCAL)) {
++                    error("function without file scope cannot be static");
++                }
+                 /* if old style function prototype, we accept a
+                    declaration list */
+                 sym = type.ref;
 -- 
 1.7.2.3
 

@@ -1,4 +1,4 @@
-From 09b2ae6a0799105f05f599c2e0d1445e3a2eba6f Mon Sep 17 00:00:00 2001
+From 8353a9f3d8f78c198a464ffedf7272b9ebc06f95 Mon Sep 17 00:00:00 2001
 From: Unknown <unknown>
 Date: Mon, 5 Apr 2010 17:38:00 +0200
 Subject: Add support for C99 VLA
@@ -52,10 +52,10 @@ index 4eccd23..6ffd161 100644
  /* token symbol management */
  typedef struct TokenSym {
 diff --git a/tccgen.c b/tccgen.c
-index 6dbd63f..b775fb2 100644
+index fee07ae..f9568af 100644
 --- a/tccgen.c
 +++ b/tccgen.c
-@@ -2759,9 +2759,37 @@ static void post_type(CType *type, AttributeDef *ad)
+@@ -2756,9 +2756,37 @@ static void post_type(CType *type, AttributeDef *ad)
              next();
          n = -1;
          if (tok != ']') {
@@ -96,7 +96,7 @@ index 6dbd63f..b775fb2 100644
          }
          skip(']');
          /* parse next post type */
-@@ -3780,6 +3808,19 @@ static int expr_const(void)
+@@ -3777,6 +3805,19 @@ static int expr_const(void)
      return c;
  }
  

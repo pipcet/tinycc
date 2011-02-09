@@ -21,3 +21,6 @@
 0021-Resolve-FTBFS-on-armel.patch
 0022-Add-support-for-indirect-functions-as-externals.patch
 0023-Explicit-license-in-tiny_libmaker.c.patch
+0024-Add-support-of-asm-label-for-functions.patch
+0025-Add-support-of-asm-label-for-variables.patch
+0026-Add-support-for-__REDIRECT_NTH-needed-with-eglibc.patch

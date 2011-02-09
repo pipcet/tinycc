@@ -112,8 +112,10 @@ static Sym *external_global_sym(int v, CType *type, int r)
     return s;
 }
 
-/* define a new external reference to a symbol 'v' of type 'u' */
-static Sym *external_sym(int v, CType *type, int r)
+/* define a new external reference to a symbol 'v' with alternate asm
+   name 'asm_label' of type 'u'. 'asm_label' is equal to NULL if there
+   is no alternate name (most cases) */
+static Sym *external_sym(int v, CType *type, int r, char *asm_label)
 {
     Sym *s;
 
@@ -121,6 +123,7 @@ static Sym *external_sym(int v, CType *type, int r)
     if (!s) {
         /* push forward reference */
         s = sym_push(v, type, r | VT_CONST | VT_SYM, 0);
+        s->asm_label = asm_label;
         s->type.t |= VT_EXTERN;
     } else {
         if (!is_compatible_types(&s->type, type))
@@ -2679,6 +2682,33 @@ static inline void convert_parameter_type(CType *pt)
     }
 }
 
+static void parse_asm_str(CString *astr)
+{
+    skip('(');
+    /* read the string */
+    if (tok != TOK_STR)
+        expect("string constant");
+    cstr_new(astr);
+    while (tok == TOK_STR) {
+        /* XXX: add \0 handling too ? */
+        cstr_cat(astr, tokc.cstr->data);
+        next();
+    }
+    cstr_ccat(astr, '\0');
+}
+
+/* Parse an asm label and return the label
+ * Don't forget to free the CString in the caller! */
+static void asm_label_instr(CString *astr)
+{
+    next();
+    parse_asm_str(astr);
+    skip(')');
+#ifdef ASM_DEBUG
+    printf("asm_alias: \"%s\"\n", (char *)astr->data);
+#endif
+}
+
 static void post_type(CType *type, AttributeDef *ad)
 {
     int n, l, t1, arg_size, align;
@@ -2688,9 +2718,6 @@ static void post_type(CType *type, AttributeDef *ad)
 
     if (tok == '(') {
         /* function declaration */
-        if ((type->t & VT_STATIC) && local_stack) {
-            error("Function without file scope cannot be static");
-        }
         next();
         l = 0;
         first = NULL;
@@ -3065,7 +3092,7 @@ static void unary(void)
         mk_pointer(&type);
         type.t |= VT_ARRAY;
         memset(&ad, 0, sizeof(AttributeDef));
-        decl_initializer_alloc(&type, &ad, VT_CONST, 2, 0, 0);
+        decl_initializer_alloc(&type, &ad, VT_CONST, 2, 0, NULL, 0);
         break;
     case '(':
         next();
@@ -3084,7 +3111,7 @@ static void unary(void)
                 if (!(type.t & VT_ARRAY))
                     r |= lvalue_type(type.t);
                 memset(&ad, 0, sizeof(AttributeDef));
-                decl_initializer_alloc(&type, &ad, r, 1, 0, 0);
+                decl_initializer_alloc(&type, &ad, r, 1, 0, NULL, 0);
             } else {
                 if (sizeof_caller) {
                     vpush(&type);
@@ -4631,12 +4658,14 @@ static void decl_initializer(CType *type, Section *sec, unsigned long c,
 /* parse an initializer for type 't' if 'has_init' is non zero, and
    allocate space in local or global data space ('r' is either
    VT_LOCAL or VT_CONST). If 'v' is non zero, then an associated
-   variable 'v' of scope 'scope' is declared before initializers are
-   parsed. If 'v' is zero, then a reference to the new object is put
-   in the value stack. If 'has_init' is 2, a special parsing is done
-   to handle string constants. */
+   variable 'v' with an associated name represented by 'asm_label' of
+   scope 'scope' is declared before initializers are parsed. If 'v' is
+   zero, then a reference to the new object is put in the value stack.
+   If 'has_init' is 2, a special parsing is done to handle string
+   constants. */
 static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r, 
-                                   int has_init, int v, int scope)
+                                   int has_init, int v, char *asm_label,
+                                   int scope)
 {
     int size, align, addr, data_offset;
     int level;
@@ -4797,6 +4826,7 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
         if (v) {
             if (scope != VT_CONST || !sym) {
                 sym = sym_push(v, type, r | VT_SYM, 0);
+                sym->asm_label = asm_label;
             }
             /* update symbol definition */
             if (sec) {
@@ -4868,7 +4898,8 @@ static void func_decl_list(Sym *func_sym)
     CType btype, type;
 
     /* parse each declaration */
-    while (tok != '{' && tok != ';' && tok != ',' && tok != TOK_EOF) {
+    while (tok != '{' && tok != ';' && tok != ',' && tok != TOK_EOF &&
+           tok != TOK_ASM1 && tok != TOK_ASM2 && tok != TOK_ASM3) {
         if (!parse_btype(&btype, &ad)) 
             expect("declaration list");
         if (((btype.t & VT_BTYPE) == VT_ENUM ||
@@ -5034,10 +5065,6 @@ static void decl(int l)
         while (1) { /* iterate thru each declaration */
             type = btype;
             type_decl(&type, &ad, &v, TYPE_DIRECT);
-            if (((type.t & (VT_STATIC|VT_FUNC)) == (VT_STATIC|VT_FUNC))
-                && (l == VT_LOCAL)) {
-                error("Function without file scope cannot be static");
-            }
 #if 0
             {
                 char buf[500];
@@ -5046,6 +5073,9 @@ static void decl(int l)
             }
 #endif
             if ((type.t & VT_BTYPE) == VT_FUNC) {
+                if ((type.t & VT_STATIC) && (l == VT_LOCAL)) {
+                    error("function without file scope cannot be static");
+                }
                 /* if old style function prototype, we accept a
                    declaration list */
                 sym = type.ref;
@@ -5141,16 +5171,40 @@ static void decl(int l)
                     sym = sym_push(v, &type, 0, 0);
                     sym->type.t |= VT_TYPEDEF;
                 } else if ((type.t & VT_BTYPE) == VT_FUNC) {
+                    char *asm_label; // associated asm label
+                    Sym *fn;
+
+                    asm_label = NULL;
                     /* external function definition */
                     /* specific case for func_call attribute */
                     if (ad.func_attr)
                         type.ref->r = ad.func_attr;
-                    external_sym(v, &type, 0);
+
+                    if (gnu_ext && (tok == TOK_ASM1 || tok == TOK_ASM2 || tok == TOK_ASM3)) {
+                        CString astr;
+
+                        asm_label_instr(&astr);
+                        asm_label = tcc_strdup(astr.data);
+                        cstr_free(&astr);
+                    }
+                    fn = external_sym(v, &type, 0, asm_label);
+                    if (gnu_ext && (tok == TOK_ATTRIBUTE1 || tok == TOK_ATTRIBUTE2))
+                        parse_attribute((AttributeDef *) &fn->type.ref->r);
                 } else {
+                    char *asm_label; // associated asm label
+
                     /* not lvalue if array */
                     r = 0;
+                    asm_label = NULL;
                     if (!(type.t & VT_ARRAY))
                         r |= lvalue_type(type.t);
+                    if (tok == TOK_ASM1 || tok == TOK_ASM2 || tok == TOK_ASM3) {
+                        CString astr;
+
+                        asm_label_instr(&astr);
+                        asm_label = tcc_strdup(astr.data);
+                        cstr_free(&astr);
+                    }
                     has_init = (tok == '=');
                     if ((btype.t & VT_EXTERN) || 
                         ((type.t & VT_ARRAY) && (type.t & VT_STATIC) &&
@@ -5159,7 +5213,7 @@ static void decl(int l)
                         /* NOTE: as GCC, uninitialized global static
                            arrays of null size are considered as
                            extern */
-                        external_sym(v, &type, r);
+                        external_sym(v, &type, r, asm_label);
                     } else {
                         type.t |= (btype.t & VT_STATIC); /* Retain "static". */
                         if (type.t & VT_STATIC)
@@ -5169,7 +5223,8 @@ static void decl(int l)
                         if (has_init)
                             next();
                         decl_initializer_alloc(&type, &ad, r, 
-                                               has_init, v, l);
+                                               has_init, v, asm_label,
+                                               l);
                     }
                 }
                 if (tok != ',') {

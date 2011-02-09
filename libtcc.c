@@ -140,7 +140,8 @@ static void decl(int l);
 static void decl_initializer(CType *type, Section *sec, unsigned long c, 
                              int first, int size_only);
 static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r, 
-                                   int has_init, int v, int scope);
+                                   int has_init, int v, char *asm_label,
+                                   int scope);
 int gv(int rc);
 void gv2(int rc1, int rc2);
 void move_reg(int r, int s);
@@ -163,6 +164,7 @@ static Sym *sym_push(int v, CType *type, int r, int c);
 static int type_size(CType *type, int *a);
 static inline CType *pointed_type(CType *type);
 static int pointed_size(CType *type);
+static void parse_asm_str(CString *astr);
 static int lvalue_type(int t);
 static int parse_btype(CType *type, AttributeDef *ad);
 static void type_decl(CType *type, AttributeDef *ad, int *v, int td);
@@ -545,6 +547,7 @@ static inline Sym *sym_malloc(void)
 static inline void sym_free(Sym *sym)
 {
     sym->next = sym_free_first;
+    tcc_free(sym->asm_label);
     sym_free_first = sym;
 }
 
@@ -717,6 +720,9 @@ static void put_extern_sym2(Sym *sym, Section *section,
             buf1[0] = '_';
             pstrcpy(buf1 + 1, sizeof(buf1) - 1, name);
             name = buf1;
+        }
+        if (sym->asm_label) {
+            name = sym->asm_label;
         }
         info = ELFW(ST_INFO)(sym_bind, sym_type);
         sym->c = add_elf_sym(symtab_section, value, size, info, other, sh_num, name);
@@ -979,6 +985,7 @@ static Sym *sym_push2(Sym **ps, int v, int t, long c)
 {
     Sym *s;
     s = sym_malloc();
+    s->asm_label = NULL;
     s->v = v;
     s->type.t = t;
     s->c = c;
@@ -1844,6 +1851,9 @@ TCCState *tcc_new(void)
 #else
     tcc_define_symbol(s, "__WCHAR_TYPE__", "int");
 #endif
+
+    /* glibc defines */
+    tcc_define_symbol(s, "__REDIRECT_NTH(name, proto, alias)", "name proto __asm__ (#alias) __THROW");
     
 #ifndef TCC_TARGET_PE
     /* default library paths */

@@ -1,4 +1,4 @@
-From e7e38c3c7288a1c89dc887f2520d8534942bf86c Mon Sep 17 00:00:00 2001
+From 581d9e4e4986cfc4777377f74856fb261f14f149 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Daniel=20Gl=C3=B6ckner?= <daniel-gl@gmx.net>
 Date: Wed, 23 Jun 2010 00:20:32 +0200
 Subject: Resolve FTBFS on armel.

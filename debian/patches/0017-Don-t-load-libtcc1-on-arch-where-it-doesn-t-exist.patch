@@ -1,4 +1,4 @@
-From fad5c4a0774bb275ac2679adecc058e8b4133bc1 Mon Sep 17 00:00:00 2001
+From d758c71330d1b1c544f0a1e51f78a1c68023acd3 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Tue, 27 Apr 2010 20:13:19 +0200
 Subject: Don't load libtcc1 on arch where it doesn't exist

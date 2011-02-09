@@ -1,4 +1,4 @@
-From dc69b64773f35d29386cfd68192dec5e30463707 Mon Sep 17 00:00:00 2001
+From 339ff40d9ef464bf7ac60dd675c3e3327cbc52cc Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Thu, 24 Jun 2010 20:53:42 +0200
 Subject: Add support for indirect functions as externals.
