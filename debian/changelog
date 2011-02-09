@@ -3,8 +3,10 @@ tcc (0.9.25-6) unstable; urgency=low
   * Attempt to solve test suite failure on armel.
   * Register documentation with doc-base.
   * Fix the license of win32/tools/tiny_libmaker.c with author's agreement
-  * Rewrite patch to error out on static function without file scope:
-    + Make the test stricter
+  * debian/patches:
+    + Stricter test about declaration of static function without file scope in
+      local block to not error out in wrong situations.
+    + Add function and variable assembly labels.
   * debian/compat:
     + Bump debhelper compatibility from 7 to 8 (no changes needed).
   * debian/copyright:
