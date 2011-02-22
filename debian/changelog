@@ -12,6 +12,7 @@ tcc (0.9.25-6) unstable; urgency=low
   * debian/copyright:
     + Update and convert to DEP5 candidate format.
     + Update address of FSF.
+    + Remove duplicate notices and give redistribution license.
   * debian/control:
     + Bump Standards-Version to 3.9.1 (no changes needed).
     + Improve synopsis wording for tcc.
