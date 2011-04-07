@@ -14,6 +14,7 @@ tcc (0.9.25-6) unstable; urgency=low
     + Update address of FSF.
   * debian/control:
     + Bump Standards-Version to 3.9.1 (no changes needed).
+    + Improve synopsis wording for tcc.
   * Remove useless debian/tcc.dirs file
 
  -- Thomas Preud'homme <robotux@celest.fr>  Mon, 18 Oct 2010 15:58:01 +0200
