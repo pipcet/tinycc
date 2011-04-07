@@ -1,2 +1,2 @@
-usr/lib/libtcc.a
+usr/lib/*/libtcc.a
 usr/include
