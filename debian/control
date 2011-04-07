@@ -15,7 +15,7 @@ Architecture: i386 kfreebsd-i386 hurd-i386 amd64 kfreebsd-amd64
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Recommends: libc6-dev | libc-dev
 Provides: c-compiler
-Description: the smallest ANSI C compiler
+Description: Small ANSI C compiler
  TCC (for Tiny C Compiler) is a small and fast ANSI C compiler.  It
  generates optimized x86 code, and can compile, assemble, and link
  several times faster than 'gcc -O0'.  Any C dynamic library can be used
