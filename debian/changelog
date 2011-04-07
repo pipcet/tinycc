@@ -12,6 +12,8 @@ tcc (0.9.25-6) unstable; urgency=low
   * debian/copyright:
     + Update and convert to DEP5 candidate format.
     + Update address of FSF.
+  * debian/control:
+    + Bump Standards-Version to 3.9.1 (no changes needed).
   * Remove useless debian/tcc.dirs file
 
  -- Thomas Preud'homme <robotux@celest.fr>  Mon, 18 Oct 2010 15:58:01 +0200
