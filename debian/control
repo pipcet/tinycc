@@ -11,7 +11,7 @@ Vcs-Browser: http://git.debian.org/?p=collab-maint/tcc.git;a=summary
 Vcs-Git: git://git.debian.org/collab-maint/tcc.git
 
 Package: tcc
-Architecture: i386 kfreebsd-i386 hurd-i386 amd64 kfreebsd-amd64
+Architecture: i386 kfreebsd-i386 hurd-i386 amd64 kfreebsd-amd64 armel
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Recommends: libc6-dev | libc-dev
 Provides: c-compiler
@@ -30,7 +30,7 @@ Description: Small ANSI C compiler
 
 Package: libtcc-dev
 Section: libdevel
-Architecture: i386 kfreebsd-i386 hurd-i386 amd64 kfreebsd-amd64
+Architecture: i386 kfreebsd-i386 hurd-i386 amd64 kfreebsd-amd64 armel
 Depends: ${misc:Depends}
 Description: Fast library for dynamic code generation
  Libtcc is a library that uses tcc, a compiler several times faster than
