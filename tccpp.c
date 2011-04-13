@@ -2846,7 +2846,6 @@ static inline void unget_tok(int last_tok)
     tok = last_tok;
 }
 
-
 /* better than nothing, but needs extension to handle '-E' option
    correctly too */
 static void preprocess_init(TCCState *s1)
