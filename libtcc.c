@@ -40,6 +40,8 @@ static int tok_flags;
 #define TOK_FLAG_EOF   0x0008 /* end of file */
 
 static int *macro_ptr, *macro_ptr_allocated;
+static int *user_macro_ptr;
+static int user_saved_buffer[TOK_MAX_SIZE + 1];
 static int *unget_saved_macro_ptr;
 static int unget_saved_buffer[TOK_MAX_SIZE + 1];
 static int unget_buffer_enabled;
@@ -126,9 +128,12 @@ char *get_tok_str(int v, CValue *cv);
 static void parse_expr_type(CType *type);
 static void expr_type(CType *type);
 static void unary_type(CType *type);
+static void vla_runtime_type_size(CType *type, int *a);
 static void block(int *bsym, int *csym, int *case_sym, int *def_sym, 
                   int case_reg, int is_expr);
 static int expr_const(void);
+/* varray */
+static int expr_check_const(void);
 static void expr_eq(void);
 static void gexpr(void);
 static void gen_inline_functions(void);
@@ -1135,6 +1140,7 @@ void tcc_close(BufferedFile *bf)
 static int tcc_compile(TCCState *s1)
 {
     Sym *define_start;
+    SValue *pvtop;
     char buf[512];
     volatile int section_sym;
 
@@ -1212,10 +1218,13 @@ static int tcc_compile(TCCState *s1)
         ch = file->buf_ptr[0];
         tok_flags = TOK_FLAG_BOL | TOK_FLAG_BOF;
         parse_flags = PARSE_FLAG_PREPROCESS | PARSE_FLAG_TOK_NUM;
+        pvtop = vtop;
         next();
         decl(VT_CONST);
         if (tok != TOK_EOF)
             expect("declaration");
+        if (pvtop != vtop)
+            warning("internal compiler error: vstack leak? (%d)", vtop - pvtop);
 
         /* end of translation unit info */
         if (s1->do_debug) {
@@ -1223,6 +1232,7 @@ static int tcc_compile(TCCState *s1)
                         text_section->data_offset, text_section, section_sym);
         }
     }
+
     s1->error_set_jmp_enabled = 0;
 
     /* reset define stack, but leave -Dsymbols (may be incorrect if

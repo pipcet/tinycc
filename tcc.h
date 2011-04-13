@@ -140,7 +140,7 @@ typedef int BOOL;
 
 #define TOK_HASH_SIZE       8192 /* must be a power of two */
 #define TOK_ALLOC_INCR      512  /* must be a power of two */
-#define TOK_MAX_SIZE        4 /* token max size in int unit when stored in string */
+#define TOK_MAX_SIZE        31 /* token max size in int unit when stored in string */
 
 /* token symbol management */
 typedef struct TokenSym {
@@ -531,6 +531,7 @@ struct TCCState {
 #define VT_BTYPE      0x000f /* mask for basic type */
 #define VT_UNSIGNED   0x0010  /* unsigned type */
 #define VT_ARRAY      0x0020  /* array type (also has VT_PTR) */
+#define VT_VLA        0x4000  /* VLA type (also has VT_PTR and VT_ARRAY) */
 #define VT_BITFIELD   0x0040  /* bitfield modifier */
 #define VT_CONSTANT   0x0800  /* const modifier */
 #define VT_VOLATILE   0x1000  /* volatile modifier */

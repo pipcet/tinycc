@@ -1196,6 +1196,12 @@ static int pointed_size(CType *type)
     return type_size(pointed_type(type), &align);
 }
 
+static void vla_runtime_pointed_size(CType *type)
+{
+    int align;
+    vla_runtime_type_size(pointed_type(type), &align);
+}
+
 static inline int is_null_pointer(SValue *p)
 {
     if ((p->r & (VT_VALMASK | VT_LVAL | VT_SYM)) != VT_CONST)
@@ -1288,7 +1294,12 @@ void gen_op(int op)
                 error("cannot use pointers here");
             check_comparison_pointer_types(vtop - 1, vtop, op);
             /* XXX: check that types are compatible */
-            u = pointed_size(&vtop[-1].type);
+            if (vtop[-1].type.t & VT_VLA) {
+                vla_runtime_pointed_size(&vtop[-1].type);
+            } else {
+                vpushi(pointed_size(&vtop[-1].type));
+            }
+            vrott(3);
             gen_opic(op);
             /* set to integer type */
 #ifdef TCC_TARGET_X86_64
@@ -1296,7 +1307,7 @@ void gen_op(int op)
 #else
             vtop->type.t = VT_INT; 
 #endif
-            vpushi(u);
+            vswap();
             gen_op(TOK_PDIV);
         } else {
             /* exactly one pointer : must be '+' or '-'. */
@@ -1308,12 +1319,20 @@ void gen_op(int op)
                 swap(&t1, &t2);
             }
             type1 = vtop[-1].type;
+            type1.t &= ~VT_ARRAY;
+            if (vtop[-1].type.t & VT_VLA)
+                vla_runtime_pointed_size(&vtop[-1].type);
+            else {
+                u = pointed_size(&vtop[-1].type);
+                if (u < 0)
+                    error("unknown array element size");
 #ifdef TCC_TARGET_X86_64
-            vpushll(pointed_size(&vtop[-1].type));
+                vpushll(u);
 #else
-            /* XXX: cast to int ? (long long case) */
-            vpushi(pointed_size(&vtop[-1].type));
+                /* XXX: cast to int ? (long long case) */
+                vpushi(u);
 #endif
+            }
             gen_op('*');
 #ifdef CONFIG_TCC_BCHECK
             /* if evaluating constant expression, no code should be
@@ -1663,7 +1682,7 @@ static void gen_cast(CType *type)
     vtop->type = *type;
 }
 
-/* return type size. Put alignment at 'a' */
+/* return type size as known at compile time. Put alignment at 'a' */
 static int type_size(CType *type, int *a)
 {
     Sym *s;
@@ -1720,6 +1739,17 @@ static int type_size(CType *type, int *a)
         /* char, void, function, _Bool */
         *a = 1;
         return 1;
+    }
+}
+
+/* push type size as known at runtime time on top of value stack. Put
+   alignment at 'a' */
+static void vla_runtime_type_size(CType *type, int *a)
+{
+    if (type->t & VT_VLA) {
+        vset(&int_type, VT_LOCAL|VT_LVAL, type->ref->c);
+    } else {
+        vpushi(type_size(type, a));
     }
 }
 
@@ -2747,7 +2777,7 @@ static void post_type(CType *type, AttributeDef *ad)
         FUNC_ARGS(ad->func_attr) = arg_size;
         s = sym_push(SYM_FIELD, type, ad->func_attr, l);
         s->next = first;
-        type->t = t1 | VT_FUNC;
+        type->t = VT_FUNC;
         type->ref = s;
     } else if (tok == '[') {
         /* array definition */
@@ -2755,21 +2785,44 @@ static void post_type(CType *type, AttributeDef *ad)
         if (tok == TOK_RESTRICT1)
             next();
         n = -1;
+        t1 = 0;
         if (tok != ']') {
-            n = expr_const();
-            if (n < 0)
-                error("invalid array size");    
+            gexpr();
+            if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST) {
+                n = vtop->c.i;
+                if (n < 0)
+                    error("invalid array size");
+            } else if (!local_stack) {
+                error("expected constant expression (variably modified array at file scope)");
+            } else {
+                if (!is_integer_btype(vtop->type.t & VT_BTYPE))
+                    error("size of variable length array should be an integer");
+                t1 = VT_VLA;
+            }
         }
         skip(']');
         /* parse next post type */
-        t1 = type->t & VT_STORAGE;
-        type->t &= ~VT_STORAGE;
         post_type(type, ad);
+        t1 |= type->t & VT_VLA;
         
-        /* we push a anonymous symbol which will contain the array
+        if (t1 & VT_VLA) {
+            loc -= type_size(&int_type, &align);
+            loc &= -align;
+            n = loc;
+
+            vla_runtime_type_size(type, &align);
+            gen_op('*');
+            vset(&int_type, VT_LOCAL|VT_LVAL, loc);
+            vswap();
+            vstore();
+        }
+        if (n != -1)
+            vpop();
+
+        /* we push an anonymous symbol which will contain the array
            element type */
         s = sym_push(SYM_FIELD, type, 0, n);
-        type->t = t1 | VT_ARRAY | VT_PTR;
+        type->t = (t1 ? VT_VLA : VT_ARRAY) | VT_PTR;
         type->ref = s;
     }
 }
@@ -2784,7 +2837,7 @@ static void type_decl(CType *type, AttributeDef *ad, int *v, int td)
 {
     Sym *s;
     CType type1, *type2;
-    int qualifiers;
+    int qualifiers, storage;
     
     while (tok == '*') {
         qualifiers = 0;
@@ -2836,7 +2889,10 @@ static void type_decl(CType *type, AttributeDef *ad, int *v, int td)
             *v = 0;
         }
     }
+    storage = type->t & VT_STORAGE;
+    type->t &= ~VT_STORAGE;
     post_type(type, ad);
+    type->t |= storage;
     if (tok == TOK_ATTRIBUTE1 || tok == TOK_ATTRIBUTE2)
         parse_attribute(ad);
     if (!type1.t)
@@ -2883,7 +2939,7 @@ static void indir(void)
         gv(RC_INT);
     vtop->type = *pointed_type(&vtop->type);
     /* Arrays and functions are never lvalues */
-    if (!(vtop->type.t & VT_ARRAY)
+    if (!(vtop->type.t & VT_ARRAY) && !(vtop->type.t & VT_VLA)
         && (vtop->type.t & VT_BTYPE) != VT_FUNC) {
         vtop->r |= lvalue_type(vtop->type.t);
         /* if bound checking, the referenced pointer must be checked */
@@ -3132,9 +3188,13 @@ static void unary(void)
         unary_type(&type); // Perform a in_sizeof = 0;
         size = type_size(&type, &align);
         if (t == TOK_SIZEOF) {
-            if (size < 0)
-                error("sizeof applied to an incomplete type");
-            vpushi(size);
+            if (!(type.t & VT_VLA)) {
+                if (size < 0)
+                    error("sizeof applied to an incomplete type");
+                vpushi(size);
+            } else {
+                vla_runtime_type_size(&type, &align);
+            }
         } else {
             vpushi(align);
         }
@@ -3777,6 +3837,19 @@ static int expr_const(void)
     return c;
 }
 
+/* varray */
+static int expr_check_const(void)
+{
+    int last_tok = tok;
+    expr_const1();
+    if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) != VT_CONST) {
+        unget_tok(last_tok);
+        return(FALSE);
+    }
+    return(TRUE);
+}
+/* ~varray */
+
 /* return the label token if current token is a label, otherwise
    return zero */
 static int is_label(void)
@@ -4386,7 +4459,26 @@ static void decl_initializer(CType *type, Section *sec, unsigned long c,
     Sym *s, *f;
     CType *t1;
 
-    if (type->t & VT_ARRAY) {
+    if (type->t & VT_VLA) {
+#if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
+        int a;
+        CValue retcval;
+
+        vpush_global_sym(&func_old_type, TOK_alloca);
+        vla_runtime_type_size(type, &a);
+        gfunc_call(1);
+
+        /* return value */
+        retcval.i = 0;
+        vsetc(type, REG_IRET, &retcval);
+        vset(type, VT_LOCAL|VT_LVAL, c);
+        vswap();
+        vstore();
+        vpop();
+#else
+        error("variable length arrays unsupported for this target");
+#endif
+    } else if (type->t & VT_ARRAY) {
         s = type->ref;
         n = s->c;
         array_length = 0;
@@ -4787,7 +4879,7 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
             bounds_ptr[1] = size;
         }
     }
-    if (has_init) {
+    if (has_init || (type->t & VT_VLA)) {
         decl_initializer(type, sec, addr, 1, 0);
         /* restore parse state if needed */
         if (init_str.str) {
@@ -5107,6 +5199,8 @@ static void decl(int l)
                     if (!(type.t & VT_ARRAY))
                         r |= lvalue_type(type.t);
                     has_init = (tok == '=');
+                    if (has_init && (type.t & VT_VLA))
+                        error("Variable length array cannot be initialized");
                     if ((btype.t & VT_EXTERN) || 
                         ((type.t & VT_ARRAY) && (type.t & VT_STATIC) &&
                          !has_init && l == VT_CONST && type.ref->c < 0)) {
