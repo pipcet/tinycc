@@ -1,4 +1,4 @@
-From 449b8c3f1b7a65c217497aa387d66b0bde8ff69f Mon Sep 17 00:00:00 2001
+From ef33d4d13e914200f66b00af3e4d6b4cc21dd822 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Mon, 7 Feb 2011 23:43:18 +0100
 Subject: Add support of asm label for functions.
@@ -203,5 +203,5 @@ index f9568af..03eaf46 100644
                          type.t |= (btype.t & VT_STATIC); /* Retain "static". */
                          if (type.t & VT_STATIC)
 -- 
-1.7.2.3
+1.7.5.1
 

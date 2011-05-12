@@ -1,4 +1,4 @@
-From a49102994df5d0c3c0be7fd9440c5a8cd7b33455 Mon Sep 17 00:00:00 2001
+From 7b7aee7d9d025b3b5a99b5bfadd10ef0f20ee03f Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Mon, 7 Feb 2011 23:43:18 +0100
 Subject: Add support of asm label for variables.
@@ -123,5 +123,5 @@ index 03eaf46..65acfee 100644
                  }
                  if (tok != ',') {
 -- 
-1.7.2.3
+1.7.5.1
 

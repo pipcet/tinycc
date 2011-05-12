@@ -479,6 +479,7 @@ static void relocate_syms(TCCState *s1, int do_resolve)
     }
 }
 
+#ifndef TCC_TARGET_PE
 #ifdef TCC_TARGET_X86_64
 #define JMP_TABLE_ENTRY_SIZE 14
 static unsigned long add_jmp_table(TCCState *s1, unsigned long val)
@@ -501,6 +502,18 @@ static unsigned long add_got_table(TCCState *s1, unsigned long val)
     *p = val;
     return (unsigned long)p;
 }
+#elif defined TCC_TARGET_ARM
+#define JMP_TABLE_ENTRY_SIZE 8
+static int add_jmp_table(TCCState *s1, int val)
+{
+    uint32_t *p = (uint32_t *)(s1->runtime_plt_and_got + s1->runtime_plt_and_got_offset);
+    s1->runtime_plt_and_got_offset += JMP_TABLE_ENTRY_SIZE;
+    /* ldr pc, [pc, #-4] */
+    p[0] = 0xE51FF004;
+    p[1] = val;
+    return (int)p;
+}
+#endif
 #endif
 
 /* relocate a given section (CPU dependent) */
@@ -595,6 +608,11 @@ static void relocate_section(TCCState *s1, Section *s)
                     x -= 0x1000000;
                 x *= 4;
                 x += val - addr;
+#ifndef TCC_TARGET_PE
+                if((x & 3) != 0 || x >= 0x4000000 || x < -0x4000000)
+                    if (s1->output_type == TCC_OUTPUT_MEMORY)
+                        x += add_jmp_table(s1, val) - val; /* add veneer */
+#endif
                 if((x & 3) != 0 || x >= 0x4000000 || x < -0x4000000)
                     error("can't relocate value at %x",addr);
                 x >>= 2;

@@ -1,8 +1,12 @@
-From 581d9e4e4986cfc4777377f74856fb261f14f149 Mon Sep 17 00:00:00 2001
+From 2b8c29fd2fff68e883ccb663c157534109079869 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Daniel=20Gl=C3=B6ckner?= <daniel-gl@gmx.net>
 Date: Wed, 23 Jun 2010 00:20:32 +0200
-Subject: Resolve FTBFS on armel.
+Subject: Fix problem with PLT and GOT relocs on armel.
 
+TinyCC fails to link correctly to libraries when both R_ARM_PLT32 and
+R_ARM_GOT32 relocation to a same symbol exist (see
+http://lists.nongnu.org/archive/html/tinycc-devel/2010-05/msg00032.html
+for more details).
 The patch marks all undefined weak symbols found in external libraries
 as strong. The value of all remaining weak symbols is set to zero just
 before the section is output.
@@ -58,5 +62,5 @@ index e7e2541..956899e 100644
                      fputc(0, f);
                      offset++;
 -- 
-1.7.2.3
+1.7.5.1
 
