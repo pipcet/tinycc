@@ -1,4 +1,4 @@
-From bb403925f5b4dfc84734b65c35e84df06f477478 Mon Sep 17 00:00:00 2001
+From fb3453f0f66ce82ceb6759cc915b034cf4b47188 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Daniel=20Gl=C3=B6ckner?= <daniel-gl@gmx.net>
 Date: Fri, 14 May 2010 13:07:59 +0200
 Subject: Allow jumps > 32MB for -run on ARM
@@ -22,10 +22,10 @@ Applied-Upstream: 741841d863be133d4fba91933fdd83dec7a83112
  3 files changed, 23 insertions(+), 3 deletions(-)
 
 diff --git a/libtcc.c b/libtcc.c
-index dc9c885..2656ef4 100644
+index f3cd421..95e0313 100644
 --- a/libtcc.c
 +++ b/libtcc.c
-@@ -1653,7 +1653,7 @@ int tcc_relocate(TCCState *s1, void *ptr)
+@@ -1659,7 +1659,7 @@ int tcc_relocate(TCCState *s1, void *ptr)
      if (s1->nb_errors)
          return -1;
  
@@ -34,7 +34,7 @@ index dc9c885..2656ef4 100644
      s1->runtime_plt_and_got_offset = 0;
      s1->runtime_plt_and_got = (char *)(mem + offset);
      /* double the size of the buffer for got and plt entries
-@@ -1686,7 +1686,7 @@ int tcc_relocate(TCCState *s1, void *ptr)
+@@ -1692,7 +1692,7 @@ int tcc_relocate(TCCState *s1, void *ptr)
          if (s->sh_flags & SHF_EXECINSTR)
              set_pages_executable(ptr, length);
      }
@@ -44,7 +44,7 @@ index dc9c885..2656ef4 100644
                           s1->runtime_plt_and_got_offset);
  #endif
 diff --git a/tcc.h b/tcc.h
-index eb42adc..606251e 100644
+index 269f1d5..6d621c0 100644
 --- a/tcc.h
 +++ b/tcc.h
 @@ -484,11 +484,13 @@ struct TCCState {

@@ -1,4 +1,4 @@
-From 121c2b89c3364ce684d41cebecc8f3555a285bf1 Mon Sep 17 00:00:00 2001
+From f794155dbc33933ca6f0ffe737a300420e1c46eb Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Thu, 24 Jun 2010 20:53:42 +0200
 Subject: Add support for indirect functions as externals.
@@ -28,10 +28,10 @@ index 82fd7ed..fe694de 100644
  #define STT_HIOS        12              /* End of OS-specific */
  #define STT_LOPROC      13              /* Start of processor-specific */
 diff --git a/libtcc.c b/libtcc.c
-index add58ac..1cdb4c8 100644
+index cffa447..370c915 100644
 --- a/libtcc.c
 +++ b/libtcc.c
-@@ -1435,7 +1435,7 @@ static void rt_printline(unsigned long wanted_pc)
+@@ -1441,7 +1441,7 @@ static void rt_printline(unsigned long wanted_pc)
              sym < sym_end;
              sym++) {
              type = ELFW(ST_TYPE)(sym->st_info);

@@ -16,7 +16,7 @@
 0016-Add-several-ARM-archs-in-configure.patch
 0017-Don-t-load-libtcc1-on-arch-where-it-doesn-t-exist.patch
 0018-Link-alias-symbols-together.patch
-0019-Add-support-for-C99-VLA.patch
+0019-Implement-C99-Variable-Length-Arrays.patch
 0020-Fix-bashims-in-configure-and-gcctestsuite.sh.patch
 0021-Fix-problem-with-PLT-and-GOT-relocs-on-armel.patch
 0022-Add-support-for-indirect-functions-as-externals.patch

@@ -228,6 +228,8 @@
      DEF(TOK_memmove, "memmove")
      DEF(TOK_strlen, "strlen")
      DEF(TOK_strcpy, "strcpy")
+#endif
+#if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
      DEF(TOK_alloca, "alloca")
 #endif
 

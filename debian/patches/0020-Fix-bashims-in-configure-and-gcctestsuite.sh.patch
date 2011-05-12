@@ -1,4 +1,4 @@
-From 291bd5931f6b090556b3c7680dc96821a6cc6f47 Mon Sep 17 00:00:00 2001
+From 90a90a51c724be2671b8265c803fd431aaa546d7 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Wed, 26 May 2010 13:45:16 +0200
 Subject: Fix bashims in configure and gcctestsuite.sh.
