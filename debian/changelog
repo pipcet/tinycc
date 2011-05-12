@@ -1,8 +1,14 @@
 tcc (0.9.25-7) unstable; urgency=low
 
-  * Allow jumps > 32MB for -run on ARM. (Closes: #592618)
+  * debian/patches:
+    + Allow jumps > 32MB for -run on ARM. (Closes: #592618)
+    + Fix the design of previous VLA implementation:
+      + sizeof gives the correct result.
+      + support for VLA with multiple level (ex: int tab[n][m]).
+    + Reword patch fixing linkage problem with PLT and GOT relocation for the
+      same symbol on ARM architecture.
 
- -- Thomas Preud'homme <robotux@celest.fr>  Thu, 12 May 2011 15:20:10 +0200
+ -- Thomas Preud'homme <robotux@celest.fr>  Thu, 12 May 2011 15:44:59 +0200
 
 tcc (0.9.25-6) unstable; urgency=low
 
