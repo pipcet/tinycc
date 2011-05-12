@@ -1,4 +1,4 @@
-From 156edc5d465b522bcb51994bd884975d710ffd06 Mon Sep 17 00:00:00 2001
+From c160a160a90795ad918c0bc4aa9899789531b1b6 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Mon, 7 Feb 2011 23:43:18 +0100
 Subject: Add support of asm label for functions.
@@ -22,10 +22,10 @@ Applied-Upstream: commit: 32a682b88febf983420406a4ec5087d07761a8bc
  4 files changed, 57 insertions(+), 20 deletions(-)
 
 diff --git a/libtcc.c b/libtcc.c
-index 370c915..e8f4038 100644
+index 52a13ad..ad7cccf 100644
 --- a/libtcc.c
 +++ b/libtcc.c
-@@ -164,6 +164,7 @@ static Sym *sym_push(int v, CType *type, int r, int c);
+@@ -160,6 +160,7 @@ static Sym *sym_push(int v, CType *type, int r, int c);
  static int type_size(CType *type, int *a);
  static inline CType *pointed_type(CType *type);
  static int pointed_size(CType *type);
@@ -33,7 +33,7 @@ index 370c915..e8f4038 100644
  static int lvalue_type(int t);
  static int parse_btype(CType *type, AttributeDef *ad);
  static void type_decl(CType *type, AttributeDef *ad, int *v, int td);
-@@ -546,6 +547,7 @@ static inline Sym *sym_malloc(void)
+@@ -542,6 +543,7 @@ static inline Sym *sym_malloc(void)
  static inline void sym_free(Sym *sym)
  {
      sym->next = sym_free_first;
@@ -41,7 +41,7 @@ index 370c915..e8f4038 100644
      sym_free_first = sym;
  }
  
-@@ -719,6 +721,9 @@ static void put_extern_sym2(Sym *sym, Section *section,
+@@ -715,6 +717,9 @@ static void put_extern_sym2(Sym *sym, Section *section,
              pstrcpy(buf1 + 1, sizeof(buf1) - 1, name);
              name = buf1;
          }
@@ -51,7 +51,7 @@ index 370c915..e8f4038 100644
          info = ELFW(ST_INFO)(sym_bind, sym_type);
          sym->c = add_elf_sym(symtab_section, value, size, info, other, sh_num, name);
      } else {
-@@ -980,6 +985,7 @@ static Sym *sym_push2(Sym **ps, int v, int t, long c)
+@@ -976,6 +981,7 @@ static Sym *sym_push2(Sym **ps, int v, int t, long c)
  {
      Sym *s;
      s = sym_malloc();
@@ -60,7 +60,7 @@ index 370c915..e8f4038 100644
      s->type.t = t;
      s->c = c;
 diff --git a/tcc.h b/tcc.h
-index ae3e291..269f1d5 100644
+index 453c392..9a01842 100644
 --- a/tcc.h
 +++ b/tcc.h
 @@ -201,6 +201,7 @@ typedef struct SValue {
@@ -98,7 +98,7 @@ index 8834b53..96a3681 100644
  static void asm_instr(void)
  {
 diff --git a/tccgen.c b/tccgen.c
-index 5b1ad67..7de37ab 100644
+index 4d3b7c7..a04343b 100644
 --- a/tccgen.c
 +++ b/tccgen.c
 @@ -112,8 +112,10 @@ static Sym *external_global_sym(int v, CType *type, int r)
@@ -156,7 +156,7 @@ index 5b1ad67..7de37ab 100644
  static void post_type(CType *type, AttributeDef *ad)
  {
      int n, l, t1, arg_size, align;
-@@ -4916,7 +4946,8 @@ static void func_decl_list(Sym *func_sym)
+@@ -4903,7 +4933,8 @@ static void func_decl_list(Sym *func_sym)
      CType btype, type;
  
      /* parse each declaration */
@@ -166,7 +166,7 @@ index 5b1ad67..7de37ab 100644
          if (!parse_btype(&btype, &ad)) 
              expect("declaration list");
          if (((btype.t & VT_BTYPE) == VT_ENUM ||
-@@ -5188,11 +5219,25 @@ static void decl(int l)
+@@ -5175,11 +5206,25 @@ static void decl(int l)
                      sym = sym_push(v, &type, 0, 0);
                      sym->type.t |= VT_TYPEDEF;
                  } else if ((type.t & VT_BTYPE) == VT_FUNC) {
@@ -193,7 +193,7 @@ index 5b1ad67..7de37ab 100644
                  } else {
                      /* not lvalue if array */
                      r = 0;
-@@ -5208,7 +5253,7 @@ static void decl(int l)
+@@ -5195,7 +5240,7 @@ static void decl(int l)
                          /* NOTE: as GCC, uninitialized global static
                             arrays of null size are considered as
                             extern */

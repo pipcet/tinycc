@@ -2846,38 +2846,6 @@ static inline void unget_tok(int last_tok)
     tok = last_tok;
 }
 
-/* varray */
-static inline void put_user_tok_start()
-{
-    user_macro_ptr = user_saved_buffer;
-}
-
-static inline void put_user_tok_end()
-{
-    const int user_tok_size = (uint32_t)user_macro_ptr - (uint32_t)user_saved_buffer;
-
-    *user_macro_ptr = 0;
-    unget_buffer_enabled = 1;
-    if (macro_ptr) {
-        memmove((uint8_t*)macro_ptr+user_tok_size, macro_ptr, user_tok_size-1);
-        memcpy(macro_ptr, user_saved_buffer, user_tok_size-1);
-    } else {
-        macro_ptr = user_saved_buffer;
-    }
-}
-
-static inline void put_user_tok(int last_tok)
-{
-    int i, n;
-
-    *user_macro_ptr++ = last_tok;
-    n = tok_ext_size(tok) - 1;
-    for(i=0;i<n;i++)
-        *user_macro_ptr++ = tokc.tab[i];
-}
-/* ~varray */
-
-
 /* better than nothing, but needs extension to handle '-E' option
    correctly too */
 static void preprocess_init(TCCState *s1)

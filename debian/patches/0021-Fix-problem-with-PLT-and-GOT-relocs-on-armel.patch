@@ -1,4 +1,4 @@
-From c4c7d0221bbbc77ed5357bfb2ee228021989ba24 Mon Sep 17 00:00:00 2001
+From 83b4bb69d4d623a9796a44d96160fd4cda2a1ec6 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Daniel=20Gl=C3=B6ckner?= <daniel-gl@gmx.net>
 Date: Wed, 23 Jun 2010 00:20:32 +0200
 Subject: Fix problem with PLT and GOT relocs on armel.

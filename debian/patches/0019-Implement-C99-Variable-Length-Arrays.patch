@@ -1,4 +1,4 @@
-From 56283ce671fadbc011fc1e3f9619bdbed1a4f44c Mon Sep 17 00:00:00 2001
+From 0ad430d38faff1ccd850e75b5d37bf101c5dfc9d Mon Sep 17 00:00:00 2001
 From: Joe Soroka <gits@joesoroka.com>
 Date: Wed, 13 Apr 2011 22:45:30 +0200
 Subject: Implement C99 Variable Length Arrays
@@ -15,14 +15,14 @@ Applied-Upstream: commit: ace0f7f2598f5e9d9d2ad8999e3140b8535d9459 to 7391cf01a7
 ---
  Changelog       |    4 ++
  TODO            |    1 -
- libtcc.c        |   10 ++++
- tcc-doc.texi    |   18 ++++++-
- tcc.h           |    3 +-
- tccgen.c        |  136 ++++++++++++++++++++++++++++++++++++++++++++++---------
- tccpp.c         |   31 +++++++++++++
+ libtcc.c        |    6 +++
+ tcc-doc.texi    |   18 +++++++-
+ tcc.h           |    1 +
+ tccgen.c        |  123 +++++++++++++++++++++++++++++++++++++++++++++---------
+ tccpp.c         |    1 -
  tcctok.h        |    2 +
- tests/tcctest.c |   59 ++++++++++++++++++++++++
- 9 files changed, 238 insertions(+), 26 deletions(-)
+ tests/tcctest.c |   59 ++++++++++++++++++++++++++
+ 9 files changed, 189 insertions(+), 26 deletions(-)
 
 diff --git a/Changelog b/Changelog
 index b271054..3e0e04c 100644
@@ -49,19 +49,10 @@ index 6f49c5d..760c576 100644
  - postfix compound literals (see 20010124-1.c)
  
 diff --git a/libtcc.c b/libtcc.c
-index 31914f7..cffa447 100644
+index 31914f7..f40fc82 100644
 --- a/libtcc.c
 +++ b/libtcc.c
-@@ -40,6 +40,8 @@ static int tok_flags;
- #define TOK_FLAG_EOF   0x0008 /* end of file */
- 
- static int *macro_ptr, *macro_ptr_allocated;
-+static int *user_macro_ptr;
-+static int user_saved_buffer[TOK_MAX_SIZE + 1];
- static int *unget_saved_macro_ptr;
- static int unget_saved_buffer[TOK_MAX_SIZE + 1];
- static int unget_buffer_enabled;
-@@ -126,9 +128,12 @@ char *get_tok_str(int v, CValue *cv);
+@@ -126,6 +126,7 @@ char *get_tok_str(int v, CValue *cv);
  static void parse_expr_type(CType *type);
  static void expr_type(CType *type);
  static void unary_type(CType *type);
@@ -69,12 +60,7 @@ index 31914f7..cffa447 100644
  static void block(int *bsym, int *csym, int *case_sym, int *def_sym, 
                    int case_reg, int is_expr);
  static int expr_const(void);
-+/* varray */
-+static int expr_check_const(void);
- static void expr_eq(void);
- static void gexpr(void);
- static void gen_inline_functions(void);
-@@ -1135,6 +1140,7 @@ void tcc_close(BufferedFile *bf)
+@@ -1135,6 +1136,7 @@ void tcc_close(BufferedFile *bf)
  static int tcc_compile(TCCState *s1)
  {
      Sym *define_start;
@@ -82,7 +68,7 @@ index 31914f7..cffa447 100644
      char buf[512];
      volatile int section_sym;
  
-@@ -1212,10 +1218,13 @@ static int tcc_compile(TCCState *s1)
+@@ -1212,10 +1214,13 @@ static int tcc_compile(TCCState *s1)
          ch = file->buf_ptr[0];
          tok_flags = TOK_FLAG_BOL | TOK_FLAG_BOF;
          parse_flags = PARSE_FLAG_PREPROCESS | PARSE_FLAG_TOK_NUM;
@@ -96,7 +82,7 @@ index 31914f7..cffa447 100644
  
          /* end of translation unit info */
          if (s1->do_debug) {
-@@ -1223,6 +1232,7 @@ static int tcc_compile(TCCState *s1)
+@@ -1223,6 +1228,7 @@ static int tcc_compile(TCCState *s1)
                          text_section->data_offset, text_section, section_sym);
          }
      }
@@ -158,18 +144,9 @@ index e47c917..9acde05 100644
  Four main symbol stacks are defined:
  
 diff --git a/tcc.h b/tcc.h
-index 4eccd23..ae3e291 100644
+index 4eccd23..453c392 100644
 --- a/tcc.h
 +++ b/tcc.h
-@@ -140,7 +140,7 @@ typedef int BOOL;
- 
- #define TOK_HASH_SIZE       8192 /* must be a power of two */
- #define TOK_ALLOC_INCR      512  /* must be a power of two */
--#define TOK_MAX_SIZE        4 /* token max size in int unit when stored in string */
-+#define TOK_MAX_SIZE        31 /* token max size in int unit when stored in string */
- 
- /* token symbol management */
- typedef struct TokenSym {
 @@ -531,6 +531,7 @@ struct TCCState {
  #define VT_BTYPE      0x000f /* mask for basic type */
  #define VT_UNSIGNED   0x0010  /* unsigned type */
@@ -179,7 +156,7 @@ index 4eccd23..ae3e291 100644
  #define VT_CONSTANT   0x0800  /* const modifier */
  #define VT_VOLATILE   0x1000  /* volatile modifier */
 diff --git a/tccgen.c b/tccgen.c
-index fee07ae..5b1ad67 100644
+index fee07ae..4d3b7c7 100644
 --- a/tccgen.c
 +++ b/tccgen.c
 @@ -1196,6 +1196,12 @@ static int pointed_size(CType *type)
@@ -376,27 +353,7 @@ index fee07ae..5b1ad67 100644
          } else {
              vpushi(align);
          }
-@@ -3777,6 +3837,19 @@ static int expr_const(void)
-     return c;
- }
- 
-+/* varray */
-+static int expr_check_const(void)
-+{
-+    int last_tok = tok;
-+    expr_const1();
-+    if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) != VT_CONST) {
-+        unget_tok(last_tok);
-+        return(FALSE);
-+    }
-+    return(TRUE);
-+}
-+/* ~varray */
-+
- /* return the label token if current token is a label, otherwise
-    return zero */
- static int is_label(void)
-@@ -4386,7 +4459,26 @@ static void decl_initializer(CType *type, Section *sec, unsigned long c,
+@@ -4386,7 +4446,26 @@ static void decl_initializer(CType *type, Section *sec, unsigned long c,
      Sym *s, *f;
      CType *t1;
  
@@ -424,7 +381,7 @@ index fee07ae..5b1ad67 100644
          s = type->ref;
          n = s->c;
          array_length = 0;
-@@ -4787,7 +4879,7 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
+@@ -4787,7 +4866,7 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
              bounds_ptr[1] = size;
          }
      }
@@ -433,7 +390,7 @@ index fee07ae..5b1ad67 100644
          decl_initializer(type, sec, addr, 1, 0);
          /* restore parse state if needed */
          if (init_str.str) {
-@@ -5107,6 +5199,8 @@ static void decl(int l)
+@@ -5107,6 +5186,8 @@ static void decl(int l)
                      if (!(type.t & VT_ARRAY))
                          r |= lvalue_type(type.t);
                      has_init = (tok == '=');
@@ -443,47 +400,17 @@ index fee07ae..5b1ad67 100644
                          ((type.t & VT_ARRAY) && (type.t & VT_STATIC) &&
                           !has_init && l == VT_CONST && type.ref->c < 0)) {
 diff --git a/tccpp.c b/tccpp.c
-index ff17d8b..4b8afd7 100644
+index ff17d8b..e0a6b9c 100644
 --- a/tccpp.c
 +++ b/tccpp.c
-@@ -2846,6 +2846,37 @@ static inline void unget_tok(int last_tok)
+@@ -2846,7 +2846,6 @@ static inline void unget_tok(int last_tok)
      tok = last_tok;
  }
  
-+/* varray */
-+static inline void put_user_tok_start()
-+{
-+    user_macro_ptr = user_saved_buffer;
-+}
-+
-+static inline void put_user_tok_end()
-+{
-+    const int user_tok_size = (uint32_t)user_macro_ptr - (uint32_t)user_saved_buffer;
-+
-+    *user_macro_ptr = 0;
-+    unget_buffer_enabled = 1;
-+    if (macro_ptr) {
-+        memmove((uint8_t*)macro_ptr+user_tok_size, macro_ptr, user_tok_size-1);
-+        memcpy(macro_ptr, user_saved_buffer, user_tok_size-1);
-+    } else {
-+        macro_ptr = user_saved_buffer;
-+    }
-+}
-+
-+static inline void put_user_tok(int last_tok)
-+{
-+    int i, n;
-+
-+    *user_macro_ptr++ = last_tok;
-+    n = tok_ext_size(tok) - 1;
-+    for(i=0;i<n;i++)
-+        *user_macro_ptr++ = tokc.tab[i];
-+}
-+/* ~varray */
-+
- 
+-
  /* better than nothing, but needs extension to handle '-E' option
     correctly too */
+ static void preprocess_init(TCCState *s1)
 diff --git a/tcctok.h b/tcctok.h
 index 6dc4778..9e61761 100644
 --- a/tcctok.h

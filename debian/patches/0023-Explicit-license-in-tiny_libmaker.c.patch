@@ -1,4 +1,4 @@
-From e773cbc4290dec796e6bdef14c163a9650c85fb2 Mon Sep 17 00:00:00 2001
+From d79cc15c9de69f3c0b85b46be5a32399ebc3a7ef Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Thu, 7 Oct 2010 10:04:25 +0200
 Subject: Explicit license in tiny_libmaker.c

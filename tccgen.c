@@ -3867,19 +3867,6 @@ static int expr_const(void)
     return c;
 }
 
-/* varray */
-static int expr_check_const(void)
-{
-    int last_tok = tok;
-    expr_const1();
-    if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) != VT_CONST) {
-        unget_tok(last_tok);
-        return(FALSE);
-    }
-    return(TRUE);
-}
-/* ~varray */
-
 /* return the label token if current token is a label, otherwise
    return zero */
 static int is_label(void)

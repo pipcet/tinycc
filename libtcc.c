@@ -40,8 +40,6 @@ static int tok_flags;
 #define TOK_FLAG_EOF   0x0008 /* end of file */
 
 static int *macro_ptr, *macro_ptr_allocated;
-static int *user_macro_ptr;
-static int user_saved_buffer[TOK_MAX_SIZE + 1];
 static int *unget_saved_macro_ptr;
 static int unget_saved_buffer[TOK_MAX_SIZE + 1];
 static int unget_buffer_enabled;
@@ -132,8 +130,6 @@ static void vla_runtime_type_size(CType *type, int *a);
 static void block(int *bsym, int *csym, int *case_sym, int *def_sym, 
                   int case_reg, int is_expr);
 static int expr_const(void);
-/* varray */
-static int expr_check_const(void);
 static void expr_eq(void);
 static void gexpr(void);
 static void gen_inline_functions(void);
@@ -1659,7 +1655,7 @@ int tcc_relocate(TCCState *s1, void *ptr)
     if (s1->nb_errors)
         return -1;
 
-#ifdef (defined TCC_TARGET_X86_64 || defined TCC_TARGET_ARM) && !defined TCC_TARGET_PE
+#if (defined TCC_TARGET_X86_64 || defined TCC_TARGET_ARM) && !defined TCC_TARGET_PE
     s1->runtime_plt_and_got_offset = 0;
     s1->runtime_plt_and_got = (char *)(mem + offset);
     /* double the size of the buffer for got and plt entries
@@ -1692,7 +1688,7 @@ int tcc_relocate(TCCState *s1, void *ptr)
         if (s->sh_flags & SHF_EXECINSTR)
             set_pages_executable(ptr, length);
     }
-#ifdef (defined TCC_TARGET_X86_64 || defined TCC_TARGET_ARM) && !defined TCC_TARGET_PE
+#if (defined TCC_TARGET_X86_64 || defined TCC_TARGET_ARM) && !defined TCC_TARGET_PE
     set_pages_executable(s1->runtime_plt_and_got,
                          s1->runtime_plt_and_got_offset);
 #endif
