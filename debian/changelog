@@ -7,8 +7,10 @@ tcc (0.9.25-7) unstable; urgency=low
       + support for VLA with multiple level (ex: int tab[n][m]).
     + Reword patch fixing linkage problem with PLT and GOT relocation for the
       same symbol on ARM architecture.
+  * debian/rules:
+    + Use dpkg-buildflags to set build flags (CPPFLAGS, CFLAGS and LDFLAGS).
 
- -- Thomas Preud'homme <robotux@celest.fr>  Thu, 12 May 2011 15:57:12 +0200
+ -- Thomas Preud'homme <robotux@celest.fr>  Thu, 16 Jun 2011 16:17:16 +0200
 
 tcc (0.9.25-6) unstable; urgency=low
 
