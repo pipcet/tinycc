@@ -45,6 +45,7 @@
 void string_test();
 void expr_test();
 void macro_test();
+void recursive_macro_test();
 void scope_test();
 void forward_test();
 void funcptr_test();
@@ -83,6 +84,7 @@ void local_label_test(void);
 void statement_expr_test(void);
 void asm_test(void);
 void builtin_test(void);
+void weak_test(void);
 
 int fib(int n);
 void num(int n);
@@ -281,6 +283,35 @@ comment
     TEST2();
 }
 
+
+static void print_num(char *fn, int line, int num) {
+    printf("fn %s, line %d, num %d\n", fn, line, num);
+}
+
+void recursive_macro_test(void)
+{
+#if 0 /* doesnt work yet */
+#define ELF32_ST_TYPE(val)              ((val) & 0xf)
+#define ELF32_ST_INFO(bind, type)       (((bind) << 4) + ((type) & 0xf))
+#define STB_WEAK        2               /* Weak symbol */
+#define ELFW(type) ELF##32##_##type
+    printf("%d\n", ELFW(ST_INFO)(STB_WEAK, ELFW(ST_TYPE)(123)));
+#endif
+
+#define WRAP(x) x
+    
+#define print_num(x) print_num(__FILE__,__LINE__,x)
+    print_num(123);
+    WRAP(print_num(123));
+    WRAP(WRAP(print_num(123)));
+
+static struct recursive_macro { int rm_field; } G;
+#define rm_field (G.rm_field)
+    printf("rm_field = %d\n", rm_field);
+    printf("rm_field = %d\n", WRAP(rm_field));
+    WRAP((printf("rm_field = %d %d\n", rm_field, WRAP(rm_field))));
+}
+
 int op(a,b)
 {
     return a / b;
@@ -356,6 +387,12 @@ void loop_test()
         printf("%d", i++);
     } while (i < 10);
     printf("\n");
+
+    char count = 123;
+    /* c99 for loop init test */
+    for (size_t count = 1; count < 3; count++)
+        printf("count=%d\n", count);
+    printf("count = %d\n", count);
 
     /* break/continue tests */
     i = 0;
@@ -501,6 +538,7 @@ int main(int argc, char **argv)
     string_test();
     expr_test();
     macro_test();
+    recursive_macro_test();
     scope_test();
     forward_test();
     funcptr_test();
@@ -539,6 +577,7 @@ int main(int argc, char **argv)
     local_label_test();
     asm_test();
     builtin_test();
+    weak_test();
     return 0; 
 }
 
@@ -594,6 +633,8 @@ void array_test(int a[4])
         printf(" %3d", ((int *)tab2)[i]);
     }
     printf("\n");
+    printf("sizeof(size_t)=%d\n", sizeof(size_t));
+    printf("sizeof(ptrdiff_t)=%d\n", sizeof(ptrdiff_t));
 }
 
 void expr_test()
@@ -1051,6 +1092,7 @@ void num(int n)
         printf("%c", *p);
     }
     printf("\n");
+    free(tab);
 }
 
 /* structure assignment tests */
@@ -1061,9 +1103,9 @@ struct structa1 {
 
 struct structa1 ssta1;
 
-void struct_assign_test1(struct structa1 s1, int t)
+void struct_assign_test1(struct structa1 s1, int t, float f)
 {
-    printf("%d %d %d\n", s1.f1, s1.f2, t);
+    printf("%d %d %d %f\n", s1.f1, s1.f2, t, f);
 }
 
 struct structa1 struct_assign_test2(struct structa1 s1, int t)
@@ -1089,11 +1131,19 @@ void struct_assign_test(void)
     lsta2.f1 = 1;
     lsta2.f2 = 2;
 #endif
-    struct_assign_test1(lsta2, 3);
+    struct_assign_test1(lsta2, 3, 4.5);
     
     printf("before call: %d %d\n", lsta2.f1, lsta2.f2);
     lsta2 = struct_assign_test2(lsta2, 4);
     printf("after call: %d %d\n", lsta2.f1, lsta2.f2);
+
+    static struct {
+        void (*elem)();
+    } t[] = {
+        /* XXX: we should allow this even without braces */
+        { struct_assign_test }
+    };
+    printf("%d\n", struct_assign_test == t[0].elem);
 }
 
 /* casts to short/char */
@@ -1220,6 +1270,42 @@ int sinit18[10] = {
     [8] = 10,
 };
 
+struct complexinit0 {
+    int a;
+    int b;
+};
+
+struct complexinit {
+    int a;
+    const struct complexinit0 *b;
+};
+
+const static struct complexinit cix[] = {
+    [0] = {
+	.a = 2000,
+	.b = (const struct complexinit0[]) {
+		{ 2001, 2002 },
+		{ 2003, 2003 },
+		{}
+	}
+    }
+};
+
+struct complexinit2 {
+	int a;
+	int b[];
+};
+
+struct complexinit2 cix21 = {
+	.a = 3000,
+	.b = { 3001, 3002, 3003 }
+};
+
+struct complexinit2 cix22 = {
+	.a = 4000,
+	.b = { 4001, 4002, 4003, 4004, 4005, 4006 }
+};
+
 void init_test(void)
 {
     int linit1 = 2;
@@ -1312,6 +1398,14 @@ void init_test(void)
     for(i=0;i<10;i++)
         printf("%x ", sinit18[i]);
     printf("\n");
+    /* complex init check */
+    printf("cix: %d %d %d %d %d %d %d\n",
+	cix[0].a,
+	cix[0].b[0].a, cix[0].b[0].b,
+	cix[0].b[1].a, cix[0].b[1].b,
+	cix[0].b[2].a, cix[0].b[2].b);
+    printf("cix2: %d %d\n", cix21.b[2], cix22.b[5]);
+    printf("sizeof cix21 %d, sizeof cix22 %d\n", sizeof cix21, sizeof cix22);
 }
 
 
@@ -1778,14 +1872,15 @@ void manyarg_test(void)
 
 void vprintf1(const char *fmt, ...)
 {
-    va_list ap;
+    va_list ap, aq;
     const char *p;
     int c, i;
     double d;
     long long ll;
     long double ld;
 
-    va_start(ap, fmt);
+    va_start(aq, fmt);
+    va_copy(ap, aq);
     
     p = fmt;
     for(;;) {
@@ -1821,13 +1916,34 @@ void vprintf1(const char *fmt, ...)
         }
     }
  the_end:
+    va_end(aq);
     va_end(ap);
 }
 
+struct myspace {
+    short int profile;
+};
+
+void stdarg_for_struct(struct myspace bob, ...)
+{
+    struct myspace george, bill;
+    va_list ap;
+    short int validate;
+
+    va_start(ap, bob);
+    bill     = va_arg(ap, struct myspace);
+    george   = va_arg(ap, struct myspace);
+    validate = va_arg(ap, int);
+    printf("stdarg_for_struct: %d %d %d %d\n",
+           bob.profile, bill.profile, george.profile, validate);
+    va_end(ap);
+}
 
 void stdarg_test(void)
 {
     long double ld = 1234567891234LL;
+    struct myspace bob;
+
     vprintf1("%d %d %d\n", 1, 2, 3);
     vprintf1("%f %d %f\n", 1.0, 2, 3.0);
     vprintf1("%l %l %d %f\n", 1234567891234LL, 987654321986LL, 3, 1234.0);
@@ -1869,6 +1985,9 @@ void stdarg_test(void)
              0.1, 1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.0,
              ld, 1234567891234LL, 987654321986LL,
              42.0, 43.0, ld);
+
+    bob.profile = 42;
+    stdarg_for_struct(bob, bob, bob, bob.profile);
 }
 
 void whitespace_test(void)
@@ -1964,10 +2083,10 @@ void c99_vla_test(int size1, int size2)
     int tab1[size][2], tab2[10][2];
     void *tab1_ptr, *tab2_ptr, *bad_ptr;
 
-    /* "size" should have been 'captured' at tab1 declaration,
+    /* "size" should have been 'captured' at tab1 declaration, 
         so modifying it should have no effect on VLA behaviour. */
     size = size-1;
-
+    
     printf("Test C99 VLA 1 (sizeof): ");
     printf("%s\n", (sizeof tab1 == size1 * size2 * 2 * sizeof(int)) ? "PASSED" : "FAILED");
     tab1_ptr = tab1;
@@ -2123,11 +2242,50 @@ __asm__ __volatile__(
 return dest;
 }
 
+static char * strncat2(char * dest,const char * src,size_t count)
+{
+int d0, d1, d2, d3;
+__asm__ __volatile__(
+	"repne scasb\n\t" /* one-line repne prefix + string op */
+	"decl %1\n\t"
+	"movl %8,%3\n"
+	"1:\tdecl %3\n\t"
+	"js 2f\n\t"
+	"lodsb\n\t"
+	"stosb\n\t"
+	"testb %%al,%%al\n\t"
+	"jne 1b\n"
+	"2:\txorl %2,%2\n\t"
+	"stosb"
+	: "=&S" (d0), "=&D" (d1), "=&a" (d2), "=&c" (d3)
+	: "0" (src),"1" (dest),"2" (0),"3" (0xffffffff), "g" (count)
+	: "memory");
+return dest;
+}
+
 static inline void * memcpy1(void * to, const void * from, size_t n)
 {
 int d0, d1, d2;
 __asm__ __volatile__(
 	"rep ; movsl\n\t"
+	"testb $2,%b4\n\t"
+	"je 1f\n\t"
+	"movsw\n"
+	"1:\ttestb $1,%b4\n\t"
+	"je 2f\n\t"
+	"movsb\n"
+	"2:"
+	: "=&c" (d0), "=&D" (d1), "=&S" (d2)
+	:"0" (n/4), "q" (n),"1" ((long) to),"2" ((long) from)
+	: "memory");
+return (to);
+}
+
+static inline void * memcpy2(void * to, const void * from, size_t n)
+{
+int d0, d1, d2;
+__asm__ __volatile__(
+	"rep movsl\n\t"  /* one-line rep prefix + string op */
 	"testb $2,%b4\n\t"
 	"je 1f\n\t"
 	"movsw\n"
@@ -2190,6 +2348,10 @@ void asm_test(void)
     strncat1(buf, " worldXXXXX", 3);
     printf("%s\n", buf);
 
+    memcpy2(buf, "hello", 6);
+    strncat2(buf, " worldXXXXX", 3);
+    printf("%s\n", buf);
+
     /* 'A' constraint test */
     printf("mul64=0x%Lx\n", mul64(0x12345678, 0xabcd1234));
     printf("inc64=0x%Lx\n", inc64(0x12345678ffffffff));
@@ -2250,6 +2412,62 @@ void builtin_test(void)
     printf("res = %d\n", __builtin_constant_p(constant_p_var));
 }
 
+
+extern int __attribute__((weak)) weak_f1(void);
+extern int __attribute__((weak)) weak_f2(void);
+extern int                       weak_f3(void);
+extern int __attribute__((weak)) weak_v1;
+extern int __attribute__((weak)) weak_v2;
+extern int                       weak_v3;
+
+extern int                           (*weak_fpa)() __attribute__((weak));
+extern int __attribute__((weak))     (*weak_fpb)();
+extern     __attribute__((weak)) int (*weak_fpc)();
+
+extern int                     weak_asm_f1(void) asm("weak_asm_f1x") __attribute((weak));
+extern int __attribute((weak)) weak_asm_f2(void) asm("weak_asm_f2x")                    ;
+extern int __attribute((weak)) weak_asm_f3(void) asm("weak_asm_f3x") __attribute((weak));
+extern int                     weak_asm_v1       asm("weak_asm_v1x") __attribute((weak));
+extern int __attribute((weak)) weak_asm_v2       asm("weak_asm_v2x")                    ;
+extern int __attribute((weak)) weak_asm_v3(void) asm("weak_asm_v3x") __attribute((weak));
+
+static const size_t dummy = 0;
+extern __typeof(dummy) weak_dummy1 __attribute__((weak, alias("dummy")));
+extern __typeof(dummy) __attribute__((weak, alias("dummy"))) weak_dummy2;
+extern __attribute__((weak, alias("dummy"))) __typeof(dummy) weak_dummy3;
+
+int some_lib_func(void);
+int dummy_impl_of_slf(void) { return 444; }
+int some_lib_func(void) __attribute__((weak, alias("dummy_impl_of_slf")));
+
+int weak_toolate() { return 0; }
+int weak_toolate() __attribute__((weak));
+
+void __attribute__((weak)) weak_test(void)
+{
+	printf("weak_f1=%d\n", weak_f1 ? weak_f1() : 123);
+	printf("weak_f2=%d\n", weak_f2 ? weak_f2() : 123);
+	printf("weak_f3=%d\n", weak_f3 ? weak_f3() : 123);
+	printf("weak_v1=%d\n",&weak_v1 ? weak_v1   : 123);
+	printf("weak_v2=%d\n",&weak_v2 ? weak_v2   : 123);
+	printf("weak_v3=%d\n",&weak_v3 ? weak_v3   : 123);
+
+	printf("weak_fpa=%d\n",&weak_fpa ? weak_fpa() : 123);
+	printf("weak_fpb=%d\n",&weak_fpb ? weak_fpb() : 123);
+	printf("weak_fpc=%d\n",&weak_fpc ? weak_fpc() : 123);
+	
+	printf("weak_asm_f1=%d\n", weak_asm_f1 != NULL);
+	printf("weak_asm_f2=%d\n", weak_asm_f2 != NULL);
+	printf("weak_asm_f3=%d\n", weak_asm_f3 != NULL);
+	printf("weak_asm_v1=%d\n",&weak_asm_v1 != NULL);
+	printf("weak_asm_v2=%d\n",&weak_asm_v2 != NULL);
+	printf("weak_asm_v3=%d\n",&weak_asm_v3 != NULL);
+}
+
+int __attribute__((weak)) weak_f2() { return 222; }
+int __attribute__((weak)) weak_f3() { return 333; }
+int __attribute__((weak)) weak_v2 = 222;
+int __attribute__((weak)) weak_v3 = 333;
 
 void const_func(const int a)
 {

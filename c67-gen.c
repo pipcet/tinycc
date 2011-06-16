@@ -18,6 +18,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef TARGET_DEFS_ONLY
+
 //#define ASSEMBLY_LISTING_C67
 
 /* number of available registers */
@@ -85,12 +87,58 @@ enum {
     TREG_C67_B13,
 };
 
-int reg_classes[NB_REGS] = {
-						/* eax */ RC_INT | RC_FLOAT | RC_EAX,
-						// only allow even regs for floats (allow for doubles)
+/* return registers for function */
+#define REG_IRET TREG_C67_A4	/* single word int return register */
+#define REG_LRET TREG_C67_A5	/* second word return register (for long long) */
+#define REG_FRET TREG_C67_A4	/* float return register */
+
+#define ALWAYS_ASSERT(x) \
+do {\
+   if (!(x))\
+       error("internal compiler error file at %s:%d", __FILE__, __LINE__);\
+} while (0)
+
+/* defined if function parameters must be evaluated in reverse order */
+//#define INVERT_FUNC_PARAMS
+
+/* defined if structures are passed as pointers. Otherwise structures
+   are directly pushed on stack. */
+//#define FUNC_STRUCT_PARAM_AS_PTR
+
+/* pointer size, in bytes */
+#define PTR_SIZE 4
+
+/* long double size and alignment, in bytes */
+#define LDOUBLE_SIZE  12
+#define LDOUBLE_ALIGN 4
+/* maximum alignment (for aligned attribute support) */
+#define MAX_ALIGN     8
+
+/******************************************************/
+/* ELF defines */
+
+#define EM_TCC_TARGET EM_C60
+
+/* relocation type for 32 bit data relocation */
+#define R_DATA_32   R_C60_32
+#define R_DATA_PTR  R_C60_32
+#define R_JMP_SLOT  R_C60_JMP_SLOT
+#define R_COPY      R_C60_COPY
+
+#define ELF_START_ADDR 0x00000400
+#define ELF_PAGE_SIZE  0x1000
+
+/******************************************************/
+#else /* ! TARGET_DEFS_ONLY */
+/******************************************************/
+#include "tcc.h"
+
+ST_DATA const int reg_classes[NB_REGS] = {
+    /* eax */ RC_INT | RC_FLOAT | RC_EAX, 
+    // only allow even regs for floats (allow for doubles)
     /* ecx */ RC_INT | RC_ECX,
-								/* edx */ RC_INT | RC_INT_BSIDE | RC_FLOAT | RC_EDX,
-								// only allow even regs for floats (allow for doubles)
+    /* edx */ RC_INT | RC_INT_BSIDE | RC_FLOAT | RC_EDX,
+    // only allow even regs for floats (allow for doubles)
     /* st0 */ RC_INT | RC_INT_BSIDE | RC_ST0,
     /* A4  */ RC_C67_A4,
     /* A5  */ RC_C67_A5,
@@ -114,24 +162,11 @@ int reg_classes[NB_REGS] = {
     /* B13  */ RC_C67_B11
 };
 
-/* return registers for function */
-#define REG_IRET TREG_C67_A4	/* single word int return register */
-#define REG_LRET TREG_C67_A5	/* second word return register (for long long) */
-#define REG_FRET TREG_C67_A4	/* float return register */
-
-
-#define ALWAYS_ASSERT(x) \
-do {\
-   if (!(x))\
-       error("internal compiler error file at %s:%d", __FILE__, __LINE__);\
-} while (0)
-
 // although tcc thinks it is passing parameters on the stack,
 // the C67 really passes up to the first 10 params in special
 // regs or regs pairs (for 64 bit params).  So keep track of
 // the stack offsets so we can translate to the appropriate 
 // reg (pair)
-
 
 #define NoCallArgsPassedOnStack 10
 int NoOfCurFuncArgs;
@@ -139,38 +174,7 @@ int TranslateStackToReg[NoCallArgsPassedOnStack];
 int ParamLocOnStack[NoCallArgsPassedOnStack];
 int TotalBytesPushedOnStack;
 
-/* defined if function parameters must be evaluated in reverse order */
-
-//#define INVERT_FUNC_PARAMS
-
-/* defined if structures are passed as pointers. Otherwise structures
-   are directly pushed on stack. */
-//#define FUNC_STRUCT_PARAM_AS_PTR
-
-/* pointer size, in bytes */
-#define PTR_SIZE 4
-
-/* long double size and alignment, in bytes */
-#define LDOUBLE_SIZE  12
-#define LDOUBLE_ALIGN 4
-/* maximum alignment (for aligned attribute support) */
-#define MAX_ALIGN     8
-
 /******************************************************/
-/* ELF defines */
-
-#define EM_TCC_TARGET EM_C60
-
-/* relocation type for 32 bit data relocation */
-#define R_DATA_32   R_C60_32
-#define R_JMP_SLOT  R_C60_JMP_SLOT
-#define R_COPY      R_C60_COPY
-
-#define ELF_START_ADDR 0x00000400
-#define ELF_PAGE_SIZE  0x1000
-
-/******************************************************/
-
 static unsigned long func_sub_sp_offset;
 static int func_ret_sub;
 
@@ -2544,5 +2548,7 @@ void ggoto(void)
     vtop--;
 }
 
-/* end of X86 code generator */
+/* end of C67 code generator */
+/*************************************************************/
+#endif
 /*************************************************************/

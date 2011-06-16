@@ -318,7 +318,12 @@ typedef struct
 #define SHT_REL          9              /* Relocation entries, no addends */
 #define SHT_SHLIB        10             /* Reserved */
 #define SHT_DYNSYM       11             /* Dynamic linker symbol table */
-#define SHT_NUM          12             /* Number of defined types.  */
+#define SHT_INIT_ARRAY   14             /* Array of constructors */
+#define SHT_FINI_ARRAY   15             /* Array of destructors */
+#define SHT_PREINIT_ARRAY 16            /* Array of pre-constructors */
+#define SHT_GROUP        17             /* Section group */
+#define SHT_SYMTAB_SHNDX 18             /* Extended section indices */
+#define SHT_NUM          19             /* Number of defined types.  */
 #define SHT_LOOS         0x60000000     /* Start OS-specific */
 #define SHT_LOSUNW       0x6ffffffb     /* Sun-specific low bound.  */
 #define SHT_SUNW_COMDAT  0x6ffffffb
@@ -949,6 +954,10 @@ typedef struct
 #define R_386_GOTPC     10              /* 32 bit PC relative offset to GOT */
 /* Keep this the last entry.  */
 #define R_386_NUM       11
+
+/* TCC-specific 16-bit relocs. */
+#define R_386_16        12              /* Direct 16 bit  */
+#define R_386_PC16      13              /* PC relative 16 bit */
 
 /* SUN SPARC specific definitions.  */
 
@@ -1670,6 +1679,7 @@ typedef Elf32_Addr Elf32_Conflict;
 #define R_ARM_PLT32             27      /* 32 bit PLT address */
 #define R_ARM_CALL              28
 #define R_ARM_JUMP24            29
+#define R_ARM_V4BX              40
 #define R_ARM_PREL31            42
 #define R_ARM_GNU_VTENTRY       100
 #define R_ARM_GNU_VTINHERIT     101

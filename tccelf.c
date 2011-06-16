@@ -18,6 +18,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include "tcc.h"
+
 #ifdef TCC_TARGET_X86_64
 #define ElfW_Rel ElfW(Rela)
 #define SHT_RELX SHT_RELA
@@ -35,7 +37,7 @@ static int new_undef_sym = 0; /* Is there a new undefined sym since last new_und
 /* XXX: DLL with PLT would only work with x86-64 for now */
 //#define TCC_OUTPUT_DLL_WITH_PLT
 
-static int put_elf_str(Section *s, const char *sym)
+ST_FUNC int put_elf_str(Section *s, const char *sym)
 {
     int offset, len;
     char *ptr;
@@ -97,9 +99,8 @@ static void rebuild_hash(Section *s, unsigned int nb_buckets)
 }
 
 /* return the symbol number */
-static int put_elf_sym(Section *s, 
-                       unsigned long value, unsigned long size,
-                       int info, int other, int shndx, const char *name)
+ST_FUNC int put_elf_sym(Section *s, uplong value, unsigned long size,
+    int info, int other, int shndx, const char *name)
 {
     int name_offset, sym_index;
     int nbuckets, h;
@@ -147,7 +148,7 @@ static int put_elf_sym(Section *s,
 
 /* find global ELF symbol 'name' and return its index. Return 0 if not
    found. */
-static int find_elf_sym(Section *s, const char *name)
+ST_FUNC int find_elf_sym(Section *s, const char *name)
 {
     ElfW(Sym) *sym;
     Section *hs;
@@ -170,30 +171,37 @@ static int find_elf_sym(Section *s, const char *name)
     return 0;
 }
 
-/* return elf symbol value or error */
-void *tcc_get_symbol(TCCState *s, const char *name)
+/* return elf symbol value, signal error if 'err' is nonzero */
+static void *get_elf_sym_addr(TCCState *s, const char *name, int err)
 {
     int sym_index;
     ElfW(Sym) *sym;
+
     sym_index = find_elf_sym(symtab_section, name);
-    if (!sym_index)
-        return NULL;
     sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
-    return (void*)(long)sym->st_value;
+    if (!sym_index || sym->st_shndx == SHN_UNDEF) {
+        if (err)
+            error("%s not defined", name);
+        return NULL;
+    }
+    return (void*)(uplong)sym->st_value;
 }
 
-void *tcc_get_symbol_err(TCCState *s, const char *name)
+/* return elf symbol value */
+LIBTCCAPI void *tcc_get_symbol(TCCState *s, const char *name)
 {
-    void *sym;
-    sym = tcc_get_symbol(s, name);
-    if (!sym)
-        error("%s not defined", name);
-    return sym;
+    return get_elf_sym_addr(s, name, 0);
+}
+
+/* return elf symbol value or error */
+ST_FUNC void *tcc_get_symbol_err(TCCState *s, const char *name)
+{
+    return get_elf_sym_addr(s, name, 1);
 }
 
 /* add an elf symbol : check if it is already defined and patch
    it. Return symbol index. NOTE that sh_num can be SHN_UNDEF. */
-static int add_elf_sym(Section *s, unsigned long value, unsigned long size,
+ST_FUNC int add_elf_sym(Section *s, uplong value, unsigned long size,
                        int info, int other, int sh_num, const char *name)
 {
     ElfW(Sym) *esym;
@@ -233,9 +241,12 @@ static int add_elf_sym(Section *s, unsigned long value, unsigned long size,
                 goto do_patch;
             } else if (sym_bind == STB_WEAK && esym_bind == STB_GLOBAL) {
                 /* weak is ignored if already global */
+            } else if (sym_bind == STB_WEAK && esym_bind == STB_WEAK) {
+                /* keep first-found weak definition, ignore subsequents */
             } else if (sym_vis == STV_HIDDEN || sym_vis == STV_INTERNAL) {
                 /* ignore hidden symbols after */
-            } else if (esym->st_shndx == SHN_COMMON && sh_num < SHN_LORESERVE) {
+            } else if (esym->st_shndx == SHN_COMMON
+                    && (sh_num < SHN_LORESERVE || sh_num == SHN_COMMON)) {
                 /* gr: Happens with 'tcc ... -static tcctest.c' on e.g. Ubuntu 6.01
                    No idea if this is the correct solution ... */
                 goto do_patch;
@@ -267,7 +278,7 @@ static int add_elf_sym(Section *s, unsigned long value, unsigned long size,
 }
 
 /* put relocation */
-static void put_elf_reloc(Section *symtab, Section *s, unsigned long offset,
+ST_FUNC void put_elf_reloc(Section *symtab, Section *s, unsigned long offset,
                           int type, int symbol)
 {
     char buf[256];
@@ -296,15 +307,7 @@ static void put_elf_reloc(Section *symtab, Section *s, unsigned long offset,
 
 /* put stab debug information */
 
-typedef struct {
-    unsigned int n_strx;         /* index into string table of name */
-    unsigned char n_type;         /* type of symbol */
-    unsigned char n_other;        /* misc info (usually empty) */
-    unsigned short n_desc;        /* description field */
-    unsigned int n_value;        /* value of symbol */
-} Stab_Sym;
-
-static void put_stabs(const char *str, int type, int other, int desc, 
+ST_FUNC void put_stabs(const char *str, int type, int other, int desc,
                       unsigned long value)
 {
     Stab_Sym *sym;
@@ -321,7 +324,7 @@ static void put_stabs(const char *str, int type, int other, int desc,
     sym->n_value = value;
 }
 
-static void put_stabs_r(const char *str, int type, int other, int desc, 
+ST_FUNC void put_stabs_r(const char *str, int type, int other, int desc, 
                         unsigned long value, Section *sec, int sym_index)
 {
     put_stabs(str, type, other, desc, value);
@@ -330,12 +333,12 @@ static void put_stabs_r(const char *str, int type, int other, int desc,
                   R_DATA_32, sym_index);
 }
 
-static void put_stabn(int type, int other, int desc, int value)
+ST_FUNC void put_stabn(int type, int other, int desc, int value)
 {
     put_stabs(NULL, type, other, desc, value);
 }
 
-static void put_stabd(int type, int other, int desc)
+ST_FUNC void put_stabd(int type, int other, int desc)
 {
     put_stabs(NULL, type, other, desc, 0);
 }
@@ -405,7 +408,7 @@ static void sort_syms(TCCState *s1, Section *s)
 }
 
 /* relocate common symbols in the .bss section */
-static void relocate_common_syms(void)
+ST_FUNC void relocate_common_syms(void)
 {
     ElfW(Sym) *sym, *sym_end;
     unsigned long offset, align;
@@ -429,12 +432,11 @@ static void relocate_common_syms(void)
 
 /* relocate symbol table, resolve undefined symbols if do_resolve is
    true and output error if undefined symbol. */
-static void relocate_syms(TCCState *s1, int do_resolve)
+ST_FUNC void relocate_syms(TCCState *s1, int do_resolve)
 {
     ElfW(Sym) *sym, *esym, *sym_end;
     int sym_bind, sh_num, sym_index;
     const char *name;
-    unsigned long addr;
 
     sym_end = (ElfW(Sym) *)(symtab_section->data + symtab_section->data_offset);
     for(sym = (ElfW(Sym) *)symtab_section->data + 1; 
@@ -444,12 +446,15 @@ static void relocate_syms(TCCState *s1, int do_resolve)
         if (sh_num == SHN_UNDEF) {
             name = strtab_section->data + sym->st_name;
             if (do_resolve) {
+#if !defined TCC_TARGET_PE || !defined _WIN32
+                void *addr;
                 name = symtab_section->link->data + sym->st_name;
-                addr = (unsigned long)resolve_sym(s1, name, ELFW(ST_TYPE)(sym->st_info));
+                addr = resolve_sym(s1, name);
                 if (addr) {
-                    sym->st_value = addr;
+                    sym->st_value = (uplong)addr;
                     goto found;
                 }
+#endif
             } else if (s1->dynsym) {
                 /* if dynamic symbol exist, then use it */
                 sym_index = find_elf_sym(s1->dynsym, name);
@@ -482,7 +487,7 @@ static void relocate_syms(TCCState *s1, int do_resolve)
 #ifndef TCC_TARGET_PE
 #ifdef TCC_TARGET_X86_64
 #define JMP_TABLE_ENTRY_SIZE 14
-static unsigned long add_jmp_table(TCCState *s1, unsigned long val)
+static uplong add_jmp_table(TCCState *s1, uplong val)
 {
     char *p = s1->runtime_plt_and_got + s1->runtime_plt_and_got_offset;
     s1->runtime_plt_and_got_offset += JMP_TABLE_ENTRY_SIZE;
@@ -490,41 +495,40 @@ static unsigned long add_jmp_table(TCCState *s1, unsigned long val)
     p[0] = 0xff;
     p[1] = 0x25;
     *(int *)(p + 2) = 0;
-    *(unsigned long *)(p + 6) = val;
-    return (unsigned long)p;
+    *(uplong *)(p + 6) = val;
+    return (uplong)p;
 }
 
-static unsigned long add_got_table(TCCState *s1, unsigned long val)
+static uplong add_got_table(TCCState *s1, uplong val)
 {
-    unsigned long *p =(unsigned long *)(s1->runtime_plt_and_got +
-                                        s1->runtime_plt_and_got_offset);
-    s1->runtime_plt_and_got_offset += sizeof(void *);
+    uplong *p = (uplong *)(s1->runtime_plt_and_got + s1->runtime_plt_and_got_offset);
+    s1->runtime_plt_and_got_offset += sizeof(uplong);
     *p = val;
-    return (unsigned long)p;
+    return (uplong)p;
 }
 #elif defined TCC_TARGET_ARM
 #define JMP_TABLE_ENTRY_SIZE 8
-static int add_jmp_table(TCCState *s1, int val)
+static uplong add_jmp_table(TCCState *s1, int val)
 {
     uint32_t *p = (uint32_t *)(s1->runtime_plt_and_got + s1->runtime_plt_and_got_offset);
     s1->runtime_plt_and_got_offset += JMP_TABLE_ENTRY_SIZE;
     /* ldr pc, [pc, #-4] */
     p[0] = 0xE51FF004;
     p[1] = val;
-    return (int)p;
+    return (uplong)p;
 }
 #endif
 #endif
 
 /* relocate a given section (CPU dependent) */
-static void relocate_section(TCCState *s1, Section *s)
+ST_FUNC void relocate_section(TCCState *s1, Section *s)
 {
     Section *sr;
     ElfW_Rel *rel, *rel_end, *qrel;
     ElfW(Sym) *sym;
     int type, sym_index;
     unsigned char *ptr;
-    unsigned long val, addr;
+    uplong val, addr;
 #if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
     int esym_index;
 #endif
@@ -541,7 +545,6 @@ static void relocate_section(TCCState *s1, Section *s)
         sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
         val = sym->st_value;
 #ifdef TCC_TARGET_X86_64
-        /* XXX: not tested */
         val += rel->r_addend;
 #endif
         type = ELFW(R_TYPE)(rel->r_info);
@@ -595,6 +598,18 @@ static void relocate_section(TCCState *s1, Section *s)
             /* we load the got offset */
             *(int *)ptr += s1->got_offsets[sym_index];
             break;
+        case R_386_16:
+            if (s1->output_format != TCC_OUTPUT_FORMAT_BINARY) {
+            output_file:
+		error("can only produce 16-bit binary files");
+            }
+            *(short *)ptr += val;
+            break;
+        case R_386_PC16:
+            if (s1->output_format != TCC_OUTPUT_FORMAT_BINARY)
+		goto output_file;
+            *(short *)ptr += val - addr;
+            break;
 #elif defined(TCC_TARGET_ARM)
         case R_ARM_PC24:
         case R_ARM_CALL:
@@ -646,9 +661,14 @@ static void relocate_section(TCCState *s1, Section *s)
             break;
         case R_ARM_COPY:
             break;
+        case R_ARM_V4BX:
+            /* trade Thumb support for ARMv4 support */
+            if ((0x0ffffff0 & *(int*)ptr) == 0x012FFF10)
+                *(int*)ptr ^= 0xE12FFF10 ^ 0xE1A0F000; /* BX Rm -> MOV PC, Rm */
+            break;
         default:
-            fprintf(stderr,"FIXME: handle reloc type %x at %lx [%.8x] to %lx\n",
-                    type,addr,(unsigned int )ptr,val);
+            fprintf(stderr,"FIXME: handle reloc type %x at %x [%.8x] to %x\n",
+                type, (unsigned)addr, (unsigned)(uplong)ptr, (unsigned)val);
             break;
 #elif defined(TCC_TARGET_C67)
         case R_C60_32:
@@ -673,8 +693,8 @@ static void relocate_section(TCCState *s1, Section *s)
         case R_C60HI16:
             break;
         default:
-            fprintf(stderr,"FIXME: handle reloc type %x at %lx [%.8x] to %lx\n",
-                    type,addr,(unsigned int )ptr,val);
+            fprintf(stderr,"FIXME: handle reloc type %x at %x [%.8x] to %x\n",
+                type, (unsigned)addr, (unsigned)(uplong)ptr, (unsigned)val);
             break;
 #elif defined(TCC_TARGET_X86_64)
         case R_X86_64_64:
@@ -696,7 +716,8 @@ static void relocate_section(TCCState *s1, Section *s)
             }
             *(int *)ptr += val;
             break;
-        case R_X86_64_PC32: {
+
+        case R_X86_64_PC32:
             if (s1->output_type == TCC_OUTPUT_DLL) {
                 /* DLL relocation */
                 esym_index = s1->symtab_to_dynsym[sym_index];
@@ -708,13 +729,19 @@ static void relocate_section(TCCState *s1, Section *s)
                     break;
                 }
             }
-            long diff = val - addr;
+            /* fall through */
+        case R_X86_64_PLT32: {
+            long long diff;
+            diff = (long long)val - addr;
             if (diff <= -2147483647 || diff > 2147483647) {
+#ifndef TCC_TARGET_PE
                 /* XXX: naive support for over 32bit jump */
                 if (s1->output_type == TCC_OUTPUT_MEMORY) {
-                    val = add_jmp_table(s1, val);
+                    val = (add_jmp_table(s1, val - rel->r_addend) +
+                           rel->r_addend);
                     diff = val - addr;
                 }
+#endif
                 if (diff <= -2147483647 || diff > 2147483647) {
                     error("internal error: relocation failed");
                 }
@@ -722,19 +749,19 @@ static void relocate_section(TCCState *s1, Section *s)
             *(int *)ptr += diff;
         }
             break;
-        case R_X86_64_PLT32:
-            *(int *)ptr += val - addr;
-            break;
         case R_X86_64_GLOB_DAT:
         case R_X86_64_JUMP_SLOT:
-            *(int *)ptr = val;
+            /* They don't need addend */
+            *(int *)ptr = val - rel->r_addend;
             break;
         case R_X86_64_GOTPCREL:
+#ifndef TCC_TARGET_PE
             if (s1->output_type == TCC_OUTPUT_MEMORY) {
                 val = add_got_table(s1, val - rel->r_addend) + rel->r_addend;
                 *(int *)ptr += val - addr;
                 break;
             }
+#endif
             *(int *)ptr += (s1->got->sh_addr - addr +
                             s1->got_offsets[sym_index] - 4);
             break;
@@ -1004,9 +1031,9 @@ static void put_got_entry(TCCState *s1,
 }
 
 /* build GOT and PLT entries */
-static void build_got_entries(TCCState *s1)
+ST_FUNC void build_got_entries(TCCState *s1)
 {
-    Section *s, *symtab;
+    Section *s;
     ElfW_Rel *rel, *rel_end;
     ElfW(Sym) *sym;
     int i, type, reloc_type, sym_index;
@@ -1018,7 +1045,6 @@ static void build_got_entries(TCCState *s1)
         /* no need to handle got relocations */
         if (s->link != symtab_section)
             continue;
-        symtab = s->link;
         rel_end = (ElfW_Rel *)(s->data + s->data_offset);
         for(rel = (ElfW_Rel *)s->data;
             rel < rel_end;
@@ -1112,7 +1138,7 @@ static void build_got_entries(TCCState *s1)
     }
 }
 
-static Section *new_symtab(TCCState *s1,
+ST_FUNC Section *new_symtab(TCCState *s1,
                            const char *symtab_name, int sh_type, int sh_flags,
                            const char *strtab_name, 
                            const char *hash_name, int hash_sh_flags)
@@ -1178,53 +1204,64 @@ static void add_init_array_defines(TCCState *s1, const char *section_name)
                 s->sh_num, sym_end);
 }
 
-/* add tcc runtime libraries */
-static void tcc_add_runtime(TCCState *s1)
+ST_FUNC void tcc_add_bcheck(TCCState *s1)
 {
-#if defined(CONFIG_TCC_BCHECK) || !defined(CONFIG_USE_LIBGCC)
-    char buf[1024];
-#endif
-
 #ifdef CONFIG_TCC_BCHECK
-    if (s1->do_bounds_check) {
-        unsigned long *ptr;
-        Section *init_section;
-        unsigned char *pinit;
-        int sym_index;
+    unsigned long *ptr;
+    Section *init_section;
+    unsigned char *pinit;
+    int sym_index;
 
-        /* XXX: add an object file to do that */
-        ptr = section_ptr_add(bounds_section, sizeof(unsigned long));
-        *ptr = 0;
-        add_elf_sym(symtab_section, 0, 0, 
-                    ELFW(ST_INFO)(STB_GLOBAL, STT_NOTYPE), 0,
-                    bounds_section->sh_num, "__bounds_start");
-        /* add bound check code */
-        snprintf(buf, sizeof(buf), "%s/%s", s1->tcc_lib_path, "bcheck.o");
-        tcc_add_file(s1, buf);
-#ifdef TCC_TARGET_I386
-        if (s1->output_type != TCC_OUTPUT_MEMORY) {
-            /* add 'call __bound_init()' in .init section */
-            init_section = find_section(s1, ".init");
-            pinit = section_ptr_add(init_section, 5);
-            pinit[0] = 0xe8;
-            put32(pinit + 1, -4);
-            sym_index = find_elf_sym(symtab_section, "__bound_init");
-            put_elf_reloc(symtab_section, init_section, 
-                          init_section->data_offset - 4, R_386_PC32, sym_index);
-        }
-#endif
+    if (0 == s1->do_bounds_check)
+        return;
+
+    /* XXX: add an object file to do that */
+    ptr = section_ptr_add(bounds_section, sizeof(unsigned long));
+    *ptr = 0;
+    add_elf_sym(symtab_section, 0, 0,
+                ELFW(ST_INFO)(STB_GLOBAL, STT_NOTYPE), 0,
+                bounds_section->sh_num, "__bounds_start");
+    /* add bound check code */
+#ifndef TCC_TARGET_PE
+    {
+    char buf[1024];
+    snprintf(buf, sizeof(buf), "%s/%s", s1->tcc_lib_path, "bcheck.o");
+    tcc_add_file(s1, buf);
     }
 #endif
+#ifdef TCC_TARGET_I386
+    if (s1->output_type != TCC_OUTPUT_MEMORY) {
+        /* add 'call __bound_init()' in .init section */
+        init_section = find_section(s1, ".init");
+        pinit = section_ptr_add(init_section, 5);
+        pinit[0] = 0xe8;
+        put32(pinit + 1, -4);
+        sym_index = find_elf_sym(symtab_section, "__bound_init");
+        put_elf_reloc(symtab_section, init_section,
+                      init_section->data_offset - 4, R_386_PC32, sym_index);
+    }
+#endif
+#endif
+}
+
+/* add tcc runtime libraries */
+ST_FUNC void tcc_add_runtime(TCCState *s1)
+{
+    tcc_add_bcheck(s1);
+
     /* add libc */
     if (!s1->nostdlib) {
-        tcc_add_library(s1, "c");
-
 #ifdef CONFIG_USE_LIBGCC
-        tcc_add_file(s1, CONFIG_SYSROOT "/lib/libgcc_s.so.1");
+        tcc_add_library(s1, "c");
+        tcc_add_file(s1, CONFIG_SYSROOT CONFIG_TCC_LDDIR"/libgcc_s.so.1");
 #else
+        tcc_add_library(s1, "c");
 #ifndef WITHOUT_LIBTCC
-        snprintf(buf, sizeof(buf), "%s/%s", s1->tcc_lib_path, "libtcc1.a");
-        tcc_add_file(s1, buf);
+	{
+            char buf[1024];
+            snprintf(buf, sizeof(buf), "%s/%s", s1->tcc_lib_path, "libtcc1.a");
+            tcc_add_file(s1, buf);
+	}
 #endif
 #endif
     }
@@ -1237,7 +1274,7 @@ static void tcc_add_runtime(TCCState *s1)
 /* add various standard linker symbols (must be done after the
    sections are filled (for example after allocating common
    symbols)) */
-static void tcc_add_linker_symbols(TCCState *s1)
+ST_FUNC void tcc_add_linker_symbols(TCCState *s1)
 {
     char buf[1024];
     int i;
@@ -1296,19 +1333,17 @@ static void tcc_add_linker_symbols(TCCState *s1)
 
 /* name of ELF interpreter */
 #if defined __FreeBSD__
-static char elf_interp[] = "/libexec/ld-elf.so.1";
+static const char elf_interp[] = "/libexec/ld-elf.so.1";
 #elif defined __FreeBSD_kernel__
 static char elf_interp[] = "/lib/ld.so.1";
-#elif defined __gnu_hurd__
-static char elf_interp[] = "/lib/ld.so";
 #elif defined TCC_ARM_EABI
-static char elf_interp[] = "/lib/ld-linux.so.3";
+static const char elf_interp[] = "/lib/ld-linux.so.3";
 #elif defined(TCC_TARGET_X86_64)
-static char elf_interp[] = "/lib/ld-linux-x86-64.so.2";
+static const char elf_interp[] = CONFIG_TCC_LDDIR"/ld-linux-x86-64.so.2";
 #elif defined(TCC_UCLIBC)
-static char elf_interp[] = "/lib/ld-uClibc.so.0";
+static const char elf_interp[] = "/lib/ld-uClibc.so.0";
 #else
-static char elf_interp[] = "/lib/ld-linux.so.2";
+static const char elf_interp[] = "/lib/ld-linux.so.2";
 #endif
 
 static void tcc_output_binary(TCCState *s1, FILE *f,
@@ -1369,9 +1404,53 @@ void patch_dynsym_undef(TCCState *s1, Section *s)
 }
 #endif
 
+ST_FUNC void fill_got_entry(TCCState *s1, ElfW_Rel *rel)
+{
+	int sym_index = ELFW(R_SYM) (rel->r_info);
+	ElfW(Sym) *sym = &((ElfW(Sym) *) symtab_section->data)[sym_index];
+	unsigned long offset;
+
+	if (sym_index >= s1->nb_got_offsets)
+		return;
+	offset = s1->got_offsets[sym_index];
+	section_reserve(s1->got, offset + PTR_SIZE);
+#ifdef TCC_TARGET_X86_64
+	/* only works for x86-64 */
+	put32(s1->got->data + offset, sym->st_value >> 32);
+#endif
+	put32(s1->got->data + offset, sym->st_value & 0xffffffff);
+}
+
+ST_FUNC void fill_got(TCCState *s1)
+{
+	Section *s;
+	ElfW_Rel *rel, *rel_end;
+	int i;
+
+	for(i = 1; i < s1->nb_sections; i++) {
+		s = s1->sections[i];
+		if (s->sh_type != SHT_RELX)
+			continue;
+		/* no need to handle got relocations */
+		if (s->link != symtab_section)
+			continue;
+		rel_end = (ElfW_Rel *) (s->data + s->data_offset);
+		for(rel = (ElfW_Rel *) s->data; rel < rel_end; rel++) {
+			switch (ELFW(R_TYPE) (rel->r_info)) {
+			case R_X86_64_GOT32:
+			case R_X86_64_GOTPCREL:
+			case R_X86_64_PLT32:
+				fill_got_entry(s1, rel);
+				break;
+			}
+		}
+	}
+}
+
+
 /* output an ELF file */
 /* XXX: suppress unneeded sections */
-int elf_output_file(TCCState *s1, const char *filename)
+static int elf_output_file(TCCState *s1, const char *filename)
 {
     ElfW(Ehdr) ehdr;
     FILE *f;
@@ -1387,7 +1466,9 @@ int elf_output_file(TCCState *s1, const char *filename)
     ElfW(Sym) *sym;
     int type, file_type;
     unsigned long rel_addr, rel_size;
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
     unsigned long bss_addr, bss_size;
+#endif
 
     file_type = s1->output_type;
     s1->nb_errors = 0;
@@ -1475,23 +1556,25 @@ int elf_output_file(TCCState *s1, const char *filename)
                                 index = put_elf_sym(s1->dynsym, offset, esym->st_size, 
                                                     esym->st_info, 0, 
                                                     bss_section->sh_num, name);
-                                /* Ensure symbol aliases (that is, symbols with
-                                   the same st_value) resolve to the same
-                                   address in program .bss or .data section. */
-                                dynsym_end = (ElfW(Sym) *)
-                                             (s1->dynsymtab_section->data +
-                                              s1->dynsymtab_section->data_offset);
-                                for(dynsym = (ElfW(Sym) *)s1->dynsymtab_section->data + 1;
-                                    dynsym < dynsym_end; dynsym++) {
-                                    if (dynsym->st_value == esym->st_value) {
-                                        char *dynname;
-                                        dynname = s1->dynsymtab_section->link->data
-                                                  + dynsym->st_name;
-                                        put_elf_sym(s1->dynsym, offset,
-                                                    dynsym->st_size,
-                                                    dynsym->st_info, 0,
-                                                    bss_section->sh_num,
-                                                    dynname);
+                                // Ensure R_COPY works for weak symbol aliases
+                                if (ELFW(ST_BIND)(esym->st_info) == STB_WEAK) {
+                                    dynsym_end = (ElfW(Sym) *)
+                                                 (s1->dynsymtab_section->data +
+                                                  s1->dynsymtab_section->data_offset);
+                                    for(dynsym = (ElfW(Sym) *)s1->dynsymtab_section->data + 1;
+                                        dynsym < dynsym_end; dynsym++) {
+                                        if ((dynsym->st_value == esym->st_value)
+                                           && (ELFW(ST_BIND)(dynsym->st_info) == STB_GLOBAL)) {
+                                            char *dynname;
+                                            dynname = s1->dynsymtab_section->link->data
+                                                      + dynsym->st_name;
+                                            put_elf_sym(s1->dynsym, offset,
+                                                        dynsym->st_size,
+                                                        dynsym->st_info, 0,
+                                                        bss_section->sh_num,
+                                                        dynname);
+                                            break;
+                                        }
                                     }
                                 }
                                 put_elf_reloc(s1->dynsym, bss_section, 
@@ -1560,8 +1643,8 @@ int elf_output_file(TCCState *s1, const char *filename)
                     if (ELFW(ST_BIND)(sym->st_info) != STB_LOCAL) {
 #if defined(TCC_OUTPUT_DLL_WITH_PLT)
                         if ((ELFW(ST_TYPE)(sym->st_info) == STT_FUNC ||
-                            ELFW(ST_TYPE)(sym->st_info) == STT_GNU_IFUNC) &&
-                            sym->st_shndx == SHN_UNDEF) {
+                            ELFW(ST_TYPE)(sym->st_info) == STT_GNU_IFUNC)
+                            && sym->st_shndx == SHN_UNDEF) {
                             put_got_entry(s1, R_JMP_SLOT, sym->st_size, 
                                           sym->st_info, 
                                           sym - (ElfW(Sym) *)symtab_section->data);
@@ -1594,6 +1677,10 @@ int elf_output_file(TCCState *s1, const char *filename)
                 if (dllref->level == 0)
                     put_dt(dynamic, DT_NEEDED, put_elf_str(dynstr, dllref->name));
             }
+
+            if (s1->rpath)
+                put_dt(dynamic, DT_RPATH, put_elf_str(dynstr, s1->rpath));
+
             /* XXX: currently, since we do not handle PIC code, we
                must relocate the readonly segments */
             if (file_type == TCC_OUTPUT_DLL) {
@@ -1601,6 +1688,9 @@ int elf_output_file(TCCState *s1, const char *filename)
                     put_dt(dynamic, DT_SONAME, put_elf_str(dynstr, s1->soname));
                 put_dt(dynamic, DT_TEXTREL, 0);
             }
+
+            if (s1->symbolic)
+                put_dt(dynamic, DT_SYMBOLIC, 0);
 
             /* add necessary space for other entries */
             saved_dynamic_data_offset = dynamic->data_offset;
@@ -1692,10 +1782,10 @@ int elf_output_file(TCCState *s1, const char *filename)
             addr = s1->text_addr;
             /* we ensure that (addr % ELF_PAGE_SIZE) == file_offset %
                ELF_PAGE_SIZE */
-            a_offset = addr & (ELF_PAGE_SIZE - 1);
-            p_offset = file_offset & (ELF_PAGE_SIZE - 1);
+            a_offset = addr & (s1->section_align - 1);
+            p_offset = file_offset & (s1->section_align - 1);
             if (a_offset < p_offset) 
-                a_offset += ELF_PAGE_SIZE;
+                a_offset += s1->section_align;
             file_offset += (a_offset - p_offset);
         } else {
             if (file_type == TCC_OUTPUT_DLL)
@@ -1703,14 +1793,16 @@ int elf_output_file(TCCState *s1, const char *filename)
             else
                 addr = ELF_START_ADDR;
             /* compute address after headers */
-            addr += (file_offset & (ELF_PAGE_SIZE - 1));
+            addr += (file_offset & (s1->section_align - 1));
         }
         
         /* dynamic relocation table information, for .dynamic section */
         rel_size = 0;
         rel_addr = 0;
 
-	bss_addr = bss_size = 0;
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+        bss_addr = bss_size = 0;
+#endif
         /* leave one program header for the program interpreter */
         ph = &phdr[0];
         if (interp)
@@ -1722,7 +1814,7 @@ int elf_output_file(TCCState *s1, const char *filename)
                 ph->p_flags = PF_R | PF_X;
             else
                 ph->p_flags = PF_R | PF_W;
-            ph->p_align = ELF_PAGE_SIZE;
+            ph->p_align = s1->section_align;
             
             /* we do the following ordering: interp, symbol tables,
                relocations, progbits, nobits */
@@ -1803,12 +1895,12 @@ int elf_output_file(TCCState *s1, const char *filename)
                 if (s1->output_format == TCC_OUTPUT_FORMAT_ELF) {
                     /* if in the middle of a page, we duplicate the page in
                        memory so that one copy is RX and the other is RW */
-                    if ((addr & (ELF_PAGE_SIZE - 1)) != 0)
-                        addr += ELF_PAGE_SIZE;
+                    if ((addr & (s1->section_align - 1)) != 0)
+                        addr += s1->section_align;
                 } else {
-                    addr = (addr + ELF_PAGE_SIZE - 1) & ~(ELF_PAGE_SIZE - 1);
-                    file_offset = (file_offset + ELF_PAGE_SIZE - 1) & 
-                        ~(ELF_PAGE_SIZE - 1);
+                    addr = (addr + s1->section_align - 1) & ~(s1->section_align - 1);
+                    file_offset = (file_offset + s1->section_align - 1) &
+                        ~(s1->section_align - 1);
                 }
             }
         }
@@ -2000,16 +2092,19 @@ int elf_output_file(TCCState *s1, const char *filename)
 
         /* get entry point address */
         if (file_type == TCC_OUTPUT_EXE)
-            ehdr.e_entry = (unsigned long)tcc_get_symbol_err(s1, "_start");
+            ehdr.e_entry = (uplong)tcc_get_symbol_err(s1, "_start");
         else
             ehdr.e_entry = text_section->sh_addr; /* XXX: is it correct ? */
     }
+    if (file_type == TCC_OUTPUT_EXE && s1->static_link)
+        fill_got(s1);
 
     /* write elf file */
     if (file_type == TCC_OUTPUT_OBJ)
         mode = 0666;
     else
         mode = 0777;
+    unlink(filename);
     fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, mode); 
     if (fd < 0) {
         error_noabort("could not write '%s'", filename);
@@ -2127,7 +2222,7 @@ int elf_output_file(TCCState *s1, const char *filename)
     return ret;
 }
 
-int tcc_output_file(TCCState *s, const char *filename)
+LIBTCCAPI int tcc_output_file(TCCState *s, const char *filename)
 {
     int ret;
 #ifdef TCC_TARGET_PE
@@ -2160,7 +2255,7 @@ typedef struct SectionMergeInfo {
 
 /* load an object file and merge it with current files */
 /* XXX: handle correctly stab (debug) info */
-static int tcc_load_object_file(TCCState *s1, 
+ST_FUNC int tcc_load_object_file(TCCState *s1, 
                                 int fd, unsigned long file_offset)
 { 
     ElfW(Ehdr) ehdr;
@@ -2244,6 +2339,9 @@ static int tcc_load_object_file(TCCState *s1,
             sh->sh_type != SHT_ARM_EXIDX &&
 #endif
             sh->sh_type != SHT_NOBITS && 
+            sh->sh_type != SHT_PREINIT_ARRAY &&
+            sh->sh_type != SHT_INIT_ARRAY &&
+            sh->sh_type != SHT_FINI_ARRAY &&
             strcmp(sh_name, ".stabstr")
             )
             continue;
@@ -2402,7 +2500,11 @@ static int tcc_load_object_file(TCCState *s1,
                     goto invalid_reloc;
                 sym_index = old_to_new_syms[sym_index];
                 /* ignore link_once in rel section. */
-                if (!sym_index && !sm->link_once) {
+                if (!sym_index && !sm->link_once
+#ifdef TCC_TARGET_ARM
+                    && type != R_ARM_V4BX
+#endif
+                   ) {
                 invalid_reloc:
                     error_noabort("Invalid relocation entry [%2d] '%s' @ %.8x",
                         i, strsec + sh->sh_name, rel->r_offset);
@@ -2428,8 +2530,6 @@ static int tcc_load_object_file(TCCState *s1,
     tcc_free(shdr);
     return ret;
 }
-
-#define ARMAG  "!<arch>\012"    /* For COFF and a.out archives */
 
 typedef struct ArchiveHeader {
     char ar_name[16];           /* name of this member */
@@ -2491,7 +2591,7 @@ static int tcc_load_alacarte(TCCState *s1, int fd, int size)
 }
 
 /* load a '.a' file */
-static int tcc_load_archive(TCCState *s1, int fd)
+ST_FUNC int tcc_load_archive(TCCState *s1, int fd)
 {
     ArchiveHeader hdr;
     char ar_size[11];
@@ -2542,10 +2642,11 @@ static int tcc_load_archive(TCCState *s1, int fd)
     return 0;
 }
 
+#ifndef TCC_TARGET_PE
 /* load a DLL and all referenced DLLs. 'level = 0' means that the DLL
    is referenced by the user (so it should be added as DT_NEEDED in
    the generated ELF file) */
-static int tcc_load_dll(TCCState *s1, int fd, const char *filename, int level)
+ST_FUNC int tcc_load_dll(TCCState *s1, int fd, const char *filename, int level)
 { 
     ElfW(Ehdr) ehdr;
     ElfW(Shdr) *shdr, *sh, *sh1;
@@ -2939,7 +3040,7 @@ lib_parse_error:
 
 /* interpret a subset of GNU ldscripts to handle the dummy libc.so
    files */
-static int tcc_load_ldscript(TCCState *s1)
+ST_FUNC int tcc_load_ldscript(TCCState *s1)
 {
     char cmd[64];
     char filename[1024];
@@ -2979,3 +3080,4 @@ static int tcc_load_ldscript(TCCState *s1)
     }
     return 0;
 }
+#endif

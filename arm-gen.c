@@ -20,10 +20,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef TARGET_DEFS_ONLY
+
 #ifdef TCC_ARM_EABI
+#ifndef TCC_ARM_VFP // Avoid useless warning
 #define TCC_ARM_VFP
 #endif
-
+#endif
 
 /* number of available registers */
 #ifdef TCC_ARM_VFP
@@ -75,32 +78,6 @@ enum {
 #endif
 };
 
-int reg_classes[NB_REGS] = {
-    /* r0 */ RC_INT | RC_R0,
-    /* r1 */ RC_INT | RC_R1,
-    /* r2 */ RC_INT | RC_R2,
-    /* r3 */ RC_INT | RC_R3,
-    /* r12 */ RC_INT | RC_R12,
-    /* f0 */ RC_FLOAT | RC_F0,
-    /* f1 */ RC_FLOAT | RC_F1,
-    /* f2 */ RC_FLOAT | RC_F2,
-    /* f3 */ RC_FLOAT | RC_F3,
-#ifdef TCC_ARM_VFP
- /* d4/s8 */ RC_FLOAT | RC_F4,
-/* d5/s10 */ RC_FLOAT | RC_F5,
-/* d6/s12 */ RC_FLOAT | RC_F6,
-/* d7/s14 */ RC_FLOAT | RC_F7,
-#endif
-};
-
-static int two2mask(int a,int b) {
-  return (reg_classes[a]|reg_classes[b])&~(RC_INT|RC_FLOAT);
-}
-
-static int regmask(int r) {
-  return reg_classes[r]&~(RC_INT|RC_FLOAT);
-}
-
 #ifdef TCC_ARM_VFP
 #define T2CPR(t) (((t) & VT_BTYPE) != VT_FLOAT ? 0x100 : 0)
 #endif
@@ -125,8 +102,10 @@ static int regmask(int r) {
 //#define FUNC_STRUCT_PARAM_AS_PTR
 
 #if defined(TCC_ARM_EABI) && defined(TCC_ARM_VFP)
+#ifdef NEED_FLOAT_TYPES
 static CType float_type, double_type, func_float_type, func_double_type;
 #define func_ldouble_type func_double_type
+#endif
 #else
 #define func_float_type func_old_type
 #define func_double_type func_old_type
@@ -163,6 +142,7 @@ static CType float_type, double_type, func_float_type, func_double_type;
 
 /* relocation type for 32 bit data relocation */
 #define R_DATA_32   R_ARM_ABS32
+#define R_DATA_PTR  R_ARM_ABS32
 #define R_JMP_SLOT  R_ARM_JUMP_SLOT
 #define R_COPY      R_ARM_COPY
 
@@ -170,10 +150,42 @@ static CType float_type, double_type, func_float_type, func_double_type;
 #define ELF_PAGE_SIZE  0x1000
 
 /******************************************************/
-static unsigned long func_sub_sp_offset,last_itod_magic;
+#else /* ! TARGET_DEFS_ONLY */
+/******************************************************/
+#include "tcc.h"
+
+ST_DATA const int reg_classes[NB_REGS] = {
+    /* r0 */ RC_INT | RC_R0,
+    /* r1 */ RC_INT | RC_R1,
+    /* r2 */ RC_INT | RC_R2,
+    /* r3 */ RC_INT | RC_R3,
+    /* r12 */ RC_INT | RC_R12,
+    /* f0 */ RC_FLOAT | RC_F0,
+    /* f1 */ RC_FLOAT | RC_F1,
+    /* f2 */ RC_FLOAT | RC_F2,
+    /* f3 */ RC_FLOAT | RC_F3,
+#ifdef TCC_ARM_VFP
+ /* d4/s8 */ RC_FLOAT | RC_F4,
+/* d5/s10 */ RC_FLOAT | RC_F5,
+/* d6/s12 */ RC_FLOAT | RC_F6,
+/* d7/s14 */ RC_FLOAT | RC_F7,
+#endif
+};
+
+static int func_sub_sp_offset, last_itod_magic;
 static int leaffunc;
 
-void o(unsigned long i)
+static int two2mask(int a,int b) {
+  return (reg_classes[a]|reg_classes[b])&~(RC_INT|RC_FLOAT);
+}
+
+static int regmask(int r) {
+  return reg_classes[r]&~(RC_INT|RC_FLOAT);
+}
+
+/******************************************************/
+
+void o(uint32_t i)
 {
   /* this is a good place to start adding big-endian support*/
   int ind1;
@@ -193,10 +205,10 @@ void o(unsigned long i)
   cur_text_section->data[ind++] = i;
 }
 
-static unsigned long stuff_const(unsigned long op,unsigned long c)
+static uint32_t stuff_const(uint32_t op, uint32_t c)
 {
   int try_neg=0;
-  unsigned long nc = 0,negop = 0;
+  uint32_t nc = 0, negop = 0;
 
   switch(op&0x1F00000)
   {
@@ -230,7 +242,7 @@ static unsigned long stuff_const(unsigned long op,unsigned long c)
       break;
   }
   do {
-    unsigned long m;
+    uint32_t m;
     int i;
     if(c<256) /* catch undefined <<32 */
       return op|c;
@@ -247,13 +259,13 @@ static unsigned long stuff_const(unsigned long op,unsigned long c)
 
 
 //only add,sub
-void stuff_const_harder(unsigned long op,unsigned long v) {
-  unsigned long x;
+void stuff_const_harder(uint32_t op, uint32_t v) {
+  uint32_t x;
   x=stuff_const(op,v);
   if(x)
     o(x);
   else {
-    unsigned long a[16],nv,no,o2,n2;
+    uint32_t a[16], nv, no, o2, n2;
     int i,j,k;
     a[0]=0xff;
     o2=(op&0xfff0ffff)|((op&0xf000)<<4);;
@@ -303,7 +315,7 @@ void stuff_const_harder(unsigned long op,unsigned long v) {
   }
 }
 
-unsigned long encbranch(int pos,int addr,int fail)
+ST_FUNC uint32_t encbranch(int pos, int addr, int fail)
 {
   addr-=pos+8;
   addr/=4;
@@ -318,7 +330,7 @@ unsigned long encbranch(int pos,int addr,int fail)
 int decbranch(int pos)
 {
   int x;
-  x=*(int *)(cur_text_section->data + pos);
+  x=*(uint32_t *)(cur_text_section->data + pos);
   x&=0x00ffffff;
   if(x&0x800000)
     x-=0x1000000;
@@ -328,10 +340,10 @@ int decbranch(int pos)
 /* output a symbol and patch all calls to it */
 void gsym_addr(int t, int a)
 {
-  unsigned long *x;
+  uint32_t *x;
   int lt;
   while(t) {
-    x=(unsigned long *)(cur_text_section->data + t);
+    x=(uint32_t *)(cur_text_section->data + t);
     t=decbranch(lt=t);
     if(a==lt+4)
       *x=0xE1A00000; // nop
@@ -348,14 +360,14 @@ void gsym(int t)
 }
 
 #ifdef TCC_ARM_VFP
-static unsigned long vfpr(int r)
+static uint32_t vfpr(int r)
 {
   if(r<TREG_F0 || r>TREG_F7)
     error("compiler error! register %i is no vfp register",r);
   return r-5;
 }
 #else
-static unsigned long fpr(int r)
+static uint32_t fpr(int r)
 {
   if(r<TREG_F0 || r>TREG_F3)
     error("compiler error! register %i is no fpa register",r);
@@ -363,7 +375,7 @@ static unsigned long fpr(int r)
 }
 #endif
 
-static unsigned long intr(int r)
+static uint32_t intr(int r)
 {
   if(r==4)
     return 12;
@@ -372,10 +384,10 @@ static unsigned long intr(int r)
   return r;
 }
 
-static void calcaddr(unsigned long *base,int *off,int *sgn,int maxoff,unsigned shift)
+static void calcaddr(uint32_t *base, int *off, int *sgn, int maxoff, unsigned shift)
 {
   if(*off>maxoff || *off&((1<<shift)-1)) {
-    unsigned long x,y;
+    uint32_t x, y;
     x=0xE280E000;
     if(*sgn)
       x=0xE240E000;
@@ -399,7 +411,7 @@ static void calcaddr(unsigned long *base,int *off,int *sgn,int maxoff,unsigned s
   }
 }
 
-static unsigned long mapcc(int cc)
+static uint32_t mapcc(int cc)
 {
   switch(cc)
   {
@@ -469,7 +481,7 @@ static int negcc(int cc)
 void load(int r, SValue *sv)
 {
   int v, ft, fc, fr, sign;
-  unsigned long op;
+  uint32_t op;
   SValue v1;
 
   fr = sv->r;
@@ -485,7 +497,7 @@ void load(int r, SValue *sv)
   
   v = fr & VT_VALMASK;
   if (fr & VT_LVAL) {
-    unsigned long base=0xB; // fp
+    uint32_t base = 0xB; // fp
     if(v == VT_LLOCAL) {
       v1.type.t = VT_PTR;
       v1.r = VT_LOCAL | VT_LVAL;
@@ -609,7 +621,7 @@ void store(int r, SValue *sv)
 {
   SValue v1;
   int v, ft, fc, fr, sign;
-  unsigned long op;
+  uint32_t op;
 
   fr = sv->r;
   ft = sv->type.t;
@@ -624,7 +636,7 @@ void store(int r, SValue *sv)
   
   v = fr & VT_VALMASK; 
   if (fr & VT_LVAL || fr == VT_LOCAL) {
-    unsigned long base=0xb;
+    uint32_t base = 0xb;
     if(v < VT_CONST) {
       base=intr(v);
       v=VT_LOCAL;
@@ -695,7 +707,7 @@ static void gcall_or_jmp(int is_jmp)
 {
   int r;
   if ((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST) {
-    unsigned long x;
+    uint32_t x;
     /* constant case */
     x=encbranch(ind,ind+vtop->c.ul,0);
     if(x) {
@@ -737,7 +749,7 @@ void gfunc_call(int nb_args)
     gv(RC_INT);
 #ifdef TCC_ARM_EABI
   if((vtop[-nb_args].type.ref->type.t & VT_BTYPE) == VT_STRUCT
-     && type_size(&vtop[-nb_args].type, &align) <= 4) {
+     && type_size(&vtop[-nb_args].type.ref->type, &align) <= 4) {
     SValue tmp;
     tmp=vtop[-nb_args];
     vtop[-nb_args]=vtop[-nb_args+1];
@@ -979,7 +991,7 @@ void gfunc_prolog(CType *func_type)
 /* generate function epilog */
 void gfunc_epilog(void)
 {
-  unsigned long x;
+  uint32_t x;
   int diff;
 #ifdef TCC_ARM_EABI
   if(is_float(func_vt.t)) {
@@ -1000,15 +1012,15 @@ void gfunc_epilog(void)
   if(diff > 12) {
     x=stuff_const(0xE24BD000, diff); /* sub sp,fp,# */
     if(x)
-      *(unsigned long *)(cur_text_section->data + func_sub_sp_offset) = x;
+      *(uint32_t *)(cur_text_section->data + func_sub_sp_offset) = x;
     else {
-      unsigned long addr;
+      int addr;
       addr=ind;
       o(0xE59FC004); /* ldr ip,[pc+4] */
       o(0xE04BD00C); /* sub sp,fp,ip  */
       o(0xE1A0F00E); /* mov pc,lr */
       o(diff);
-      *(unsigned long *)(cur_text_section->data + func_sub_sp_offset) = 0xE1000000|encbranch(func_sub_sp_offset,addr,1);
+      *(uint32_t *)(cur_text_section->data + func_sub_sp_offset) = 0xE1000000|encbranch(func_sub_sp_offset,addr,1);
     }
   }
 }
@@ -1032,7 +1044,7 @@ void gjmp_addr(int a)
 int gtst(int inv, int t)
 {
   int v, r;
-  unsigned long op;
+  uint32_t op;
   v = vtop->r & VT_VALMASK;
   r=ind;
   if (v == VT_CMP) {
@@ -1045,14 +1057,14 @@ int gtst(int inv, int t)
       if(!vtop->c.i)
 	vtop->c.i=t;
       else {
-	unsigned long *x;
+	uint32_t *x;
 	int p,lp;
 	if(t) {
           p = vtop->c.i;
           do {
 	    p = decbranch(lp=p);
           } while(p);
-	  x = (unsigned long *)(cur_text_section->data + lp);
+	  x = (uint32_t *)(cur_text_section->data + lp);
 	  *x &= 0xff000000;
 	  *x |= encbranch(lp,t,1);
 	}
@@ -1094,7 +1106,7 @@ int gtst(int inv, int t)
 void gen_opi(int op)
 {
   int c, func = 0;
-  unsigned long opc = 0,r,fr;
+  uint32_t opc = 0, r, fr;
   unsigned short retreg = REG_IRET;
 
   c=0;
@@ -1210,7 +1222,7 @@ void gen_opi(int op)
       vswap();
       opc=0xE0000000|(opc<<20)|(c<<16);
       if((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST) {
-	unsigned long x;
+	uint32_t x;
 	x=stuff_const(opc|0x2000000,vtop->c.i);
 	if(x) {
 	  r=intr(vtop[-1].r=get_reg_ex(RC_INT,regmask(vtop[-1].r)));
@@ -1276,7 +1288,7 @@ static int is_zero(int i)
  *    two operands are guaranted to have the same floating point type */
 void gen_opf(int op)
 {
-  unsigned long x;
+  uint32_t x;
   int fneg=0,r;
   x=0xEE000A00|T2CPR(vtop->type.t);
   switch(op) {
@@ -1364,10 +1376,10 @@ void gen_opf(int op)
 }
 
 #else
-static int is_fconst()
+static uint32_t is_fconst()
 {
   long double f;
-  int r;
+  uint32_t r;
   if((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) != VT_CONST)
     return 0;
   if (vtop->type.t == VT_FLOAT)
@@ -1406,8 +1418,7 @@ static int is_fconst()
    two operands are guaranted to have the same floating point type */
 void gen_opf(int op)
 {
-  unsigned long x;
-  int r,r2,c1,c2;
+  uint32_t x, r, r2, c1, c2;
   //fputs("gen_opf\n",stderr);
   vswap();
   c1 = is_fconst();
@@ -1570,13 +1581,14 @@ void gen_opf(int op)
 
 /* convert integers to fp 't' type. Must handle 'int', 'unsigned int'
    and 'long long' cases. */
-void gen_cvt_itof1(int t)
+ST_FUNC void gen_cvt_itof1(int t)
 {
-  int r,r2,bt;
+  uint32_t r, r2;
+  int bt;
   bt=vtop->type.t & VT_BTYPE;
   if(bt == VT_INT || bt == VT_SHORT || bt == VT_BYTE) {
 #ifndef TCC_ARM_VFP
-    unsigned int dsize=0;
+    uint32_t dsize = 0;
 #endif
     r=intr(gv(RC_INT));
 #ifdef TCC_ARM_VFP
@@ -1592,7 +1604,7 @@ void gen_cvt_itof1(int t)
       dsize=0x80;    /* flts -> fltd */
     o(0xEE000110|dsize|(r2<<16)|(r<<12)); /* flts */
     if((vtop->type.t & (VT_UNSIGNED|VT_BTYPE)) == (VT_UNSIGNED|VT_INT)) {
-      unsigned int off=0;
+      uint32_t off = 0;
       o(0xE3500000|(r<<12));        /* cmp */
       r=fpr(get_reg(RC_FLOAT));
       if(last_itod_magic) {
@@ -1652,7 +1664,8 @@ void gen_cvt_itof1(int t)
 /* convert fp to int 't' type */
 void gen_cvt_ftoi(int t)
 {
-  int r,r2,u,func=0;
+  uint32_t r, r2;
+  int u, func = 0;
   u=t&VT_UNSIGNED;
   t&=VT_BTYPE;
   r2=vtop->type.t & VT_BTYPE;
@@ -1713,7 +1726,7 @@ void gen_cvt_ftof(int t)
 {
 #ifdef TCC_ARM_VFP
   if(((vtop->type.t & VT_BTYPE) == VT_FLOAT) != ((t & VT_BTYPE) == VT_FLOAT)) {
-    int r=vfpr(gv(RC_FLOAT));
+    uint32_t r = vfpr(gv(RC_FLOAT));
     o(0xEEB70AC0|(r<<12)|r|T2CPR(vtop->type.t));
   }
 #else
@@ -1731,4 +1744,5 @@ void ggoto(void)
 
 /* end of ARM code generator */
 /*************************************************************/
-
+#endif
+/*************************************************************/

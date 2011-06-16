@@ -1,0 +1,81 @@
+From 17df020ab4a928b15fb85eb7bf061975d296082b Mon Sep 17 00:00:00 2001
+From: Romain Francoise <rfrancoise@debian.org>
+Date: Sat, 13 Mar 2010 18:07:11 +0100
+Subject: Adapt tcc to debian build system
+
+* Use CFLAGS in compilation rules
+* Delete -g from CFLAGS as dpkg-buildflags define CFLAGS with -g -O2
+  or -g -O0 depending on the content of DEB_BUILD_OPTIONS
+* Add -g in CFLAGS in configure script to keep the same compilation
+  behavior as upstream when hand-compiling (calling make outside of
+  debian/rules)
+* Delete -s from install rule as dh_strip does the stripping if
+  necessary according to DEB_BUILD_OPTIONS
+
+Origin: vendor
+Forwarded: not-needed
+Last-Update: 2011-06-16
+---
+ Makefile  |   10 +++-------
+ configure |    2 +-
+ 2 files changed, 4 insertions(+), 8 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 10b7cda..f6e49ae 100644
+--- a/Makefile
++++ b/Makefile
+@@ -5,7 +5,7 @@
+ TOP ?= .
+ include $(TOP)/config.mak
+ 
+-CFLAGS+=-g -Wall
++CFLAGS+=-Wall
+ CFLAGS_P=$(CFLAGS) -pg -static -DCONFIG_TCC_STATIC
+ LIBS_P=
+ 
+@@ -217,7 +217,7 @@ libtcc1.a : FORCE
+ lib/%/libtcc1.a : FORCE $(PROGS_CROSS)
+ 	@$(MAKE) -C lib cross TARGET=$*
+ bcheck.o : lib/bcheck.c
+-	gcc -c $< -o $@ -O2 -Wall
++	gcc -c $< -o $@ $(CFLAGS)
+ FORCE:
+ 
+ # install
+@@ -227,11 +227,7 @@ INSTALL=install
+ ifndef CONFIG_WIN32
+ install: $(PROGS) $(TCCLIBS) $(TCCDOCS)
+ 	mkdir -p "$(bindir)"
+-ifeq ($(CC),tcc)
+ 	$(INSTALL) -m755 $(PROGS) "$(bindir)"
+-else
+-	$(INSTALL) -s -m755 $(PROGS) "$(bindir)"
+-endif
+ 	mkdir -p "$(mandir)/man1"
+ 	-$(INSTALL) tcc.1 "$(mandir)/man1"
+ 	mkdir -p "$(infodir)"
+@@ -291,7 +287,7 @@ install: $(PROGS) $(TCCLIBS) $(TCCDOCS)
+ 	mkdir -p "$(tccdir)/examples"
+ 	mkdir -p "$(tccdir)/doc"
+ 	mkdir -p "$(tccdir)/libtcc"
+-	$(INSTALL) -s -m755 $(PROGS) "$(tccdir)"
++	$(INSTALL) -m755 $(PROGS) "$(tccdir)"
+ 	$(INSTALL) -m644 $(LIBTCC1) win32/lib/*.def "$(tccdir)/lib"
+ 	cp -r win32/include/. "$(tccdir)/include"
+ 	cp -r win32/examples/. "$(tccdir)/examples"
+diff --git a/configure b/configure
+index 7d2b2db..d9f7796 100755
+--- a/configure
++++ b/configure
+@@ -157,7 +157,7 @@ done
+ 
+ # Checking for CFLAGS
+ if test -z "$CFLAGS"; then
+-    CFLAGS="-O2"
++    CFLAGS="-g -O2"
+ fi
+ 
+ cc="${cross_prefix}${cc}"
+-- 
+1.7.5.4
+
