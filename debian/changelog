@@ -14,6 +14,7 @@ tcc (0.9.26+git20110616.330d2ee-1) experimental; urgency=low
 
   * debian/rules:
     + Use dpkg-buildflags to set build flags (CPPFLAGS, CFLAGS and LDFLAGS).
+    + Only call dh_auto_clean if config.mak exists.
 
  -- Thomas Preud'homme <robotux@celest.fr>  Fri, 17 Jun 2011 00:03:40 +0200
 
