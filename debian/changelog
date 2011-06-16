@@ -1,16 +1,21 @@
-tcc (0.9.25-7) unstable; urgency=low
+tcc (0.9.26+git20110616.330d2ee-1) experimental; urgency=low
 
-  * debian/patches:
+  * New upstream snapshot:
+    + Fix design of previous VLA implementation
     + Allow jumps > 32MB for -run on ARM. (Closes: #592618)
-    + Fix the design of previous VLA implementation:
-      + sizeof gives the correct result.
-      + support for VLA with multiple level (ex: int tab[n][m]).
-    + Reword patch fixing linkage problem with PLT and GOT relocation for the
-      same symbol on ARM architecture.
+
+  * Drop all patches in debian/patches except:
+    + 0001-Adapt-tcc-to-debian-build-system.patch
+    + 0002-Respect-FHS-in-documentation-and-examples.patch
+    + 0003-Fix-problem-with-PLT-and-GOT-relocs-on-armel.patch
+
+  * debian/copyright:
+    + document origin of source code.
+
   * debian/rules:
     + Use dpkg-buildflags to set build flags (CPPFLAGS, CFLAGS and LDFLAGS).
 
- -- Thomas Preud'homme <robotux@celest.fr>  Thu, 16 Jun 2011 16:17:16 +0200
+ -- Thomas Preud'homme <robotux@celest.fr>  Fri, 17 Jun 2011 00:03:40 +0200
 
 tcc (0.9.25-6) unstable; urgency=low
 
