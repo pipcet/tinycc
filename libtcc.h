@@ -31,6 +31,9 @@ LIBTCCAPI void tcc_set_error_func(TCCState *s, void *error_opaque,
 /* set/reset a warning */
 LIBTCCAPI int tcc_set_warning(TCCState *s, const char *warning_name, int value);
 
+/* set linker option */
+LIBTCCAPI const char * tcc_set_linker(TCCState *s, char *option, int multi);
+
 /*****************************/
 /* preprocessor */
 
@@ -80,7 +83,7 @@ LIBTCCAPI int tcc_add_library_path(TCCState *s, const char *pathname);
 LIBTCCAPI int tcc_add_library(TCCState *s, const char *libraryname);
 
 /* add a symbol to the compiled program */
-LIBTCCAPI int tcc_add_symbol(TCCState *s, const char *name, void *val);
+LIBTCCAPI int tcc_add_symbol(TCCState *s, const char *name, const void *val);
 
 /* output an executable, library or object file. DO NOT call
    tcc_relocate() before. */
@@ -90,16 +93,29 @@ LIBTCCAPI int tcc_output_file(TCCState *s, const char *filename);
    tcc_relocate() before. */
 LIBTCCAPI int tcc_run(TCCState *s, int argc, char **argv);
 
-/* copy code into memory passed in by the caller and do all relocations
-   (needed before using tcc_get_symbol()).
-   returns -1 on error and required size if ptr is NULL */
-LIBTCCAPI int tcc_relocate(TCCState *s1, void *ptr);
+/* Do all relocations (needed before using tcc_get_symbol())
+   Returns -1 on error. */
+LIBTCCAPI int tcc_relocate(TCCState *s1);
 
 /* return symbol value or NULL if not found */
 LIBTCCAPI void *tcc_get_symbol(TCCState *s, const char *name);
 
 /* set CONFIG_TCCDIR at runtime */
 LIBTCCAPI void tcc_set_lib_path(TCCState *s, const char *path);
+
+
+/*****************************/
+/* Miscellaneous */
+
+/* Get default target filename for this compilation */
+LIBTCCAPI const char *tcc_default_target(TCCState *s);
+
+/* Generate make dependencies for target and store them into file
+ *
+ * !target    - use default target name
+ * !filename  - use (target.o -> target.d)
+ */
+LIBTCCAPI void tcc_gen_makedeps(TCCState *s, const char *target, const char *filename);
 
 #ifdef __cplusplus
 }

@@ -6,39 +6,47 @@
 TESTS = libtest test3
 
 # these should work too
-# TESTS += test1 test2 speed
+# TESTS += test1 test2 speedtest btest weaktest
 
 # these don't work as they should
-# TESTS += test4 btest asmtest
-
+# TESTS += test4 asmtest
 
 TOP = ..
 include $(TOP)/Makefile
 
+ifdef DISABLE_STATIC
+export LD_LIBRARY_PATH:=$(CURDIR)/..
+endif
+
 # run local version of tcc with local libraries and includes
 TCC = ../tcc -B..
-RUN_TCC = $(NATIVE_TARGET) -run ../tcc.c -B..
+RUN_TCC = $(NATIVE_DEFINES) -run ../tcc.c -B..
 DISAS=objdump -d
 
 all test : $(TESTS)
 
 # make sure that tcc exists
-$(TESTS) : ../tcc
-../tcc ../libtcc.a :
-	$(MAKE) -C ..
+test1 test2 test3 test4 btest speedtest asmtest weaktest : ../tcc
+../%:
+	$(MAKE) -C .. $*
 
 # libtcc test
-libtest: libtcc_test$(EXESUF)
-	@echo ------------ $@ ------------
-	./libtcc_test lib_path=..
+ifdef LIBTCC1
+LIBTCC1:=$(TOP)/$(LIBTCC1)
+endif
 
-libtcc_test$(EXESUF): libtcc_test.c ../libtcc.a
-	$(CC) -o $@ $^ -I.. $(CFLAGS) $(LIBS)
+libtest: libtcc_test$(EXESUF) $(LIBTCC1)
+	@echo ------------ $@ ------------
+	./libtcc_test$(EXESUF) lib_path=..
+
+libtcc_test$(EXESUF): libtcc_test.c ../$(LIBTCC)
+	$(CC) -o $@ $^ -I.. $(CFLAGS) $(LIBS) $(LINK_LIBTCC)
 
 # test.ref - generate using gcc
+# copy only tcclib.h so GCC's stddef and stdarg will be used
 test.ref: tcctest.c
 	cp -u ../include/tcclib.h .
-	$(CC) -o tcctest.gcc $< -I. -w $(CFLAGS)
+	$(CC) -o tcctest.gcc $< -I. -w $(CFLAGS) -std=gnu99
 	./tcctest.gcc > $@
 
 # auto test
@@ -81,47 +89,56 @@ test4: test.ref
 	@if diff -u test.ref test4.out ; then echo "BCheck Auto Test OK"; fi
 
 # memory and bound check auto test
-BOUNDS_OK  = 1 4 8 10
-BOUNDS_FAIL= 2 5 7 9 11 12 13
+BOUNDS_OK  = 1 4 8 10 14
+BOUNDS_FAIL= 2 5 7 9 11 12 13 15
 
-btest: boundtest.c
+btest: boundtest.c ../bcheck.o
 	@echo ------------ $@ ------------
 	@for i in $(BOUNDS_OK); do \
+	   echo ; echo --- boundtest $$i ---; \
 	   if $(TCC) -b -run boundtest.c $$i ; then \
-	       /bin/true ; \
+	       echo succeded as expected; \
 	   else\
 	       echo Failed positive test $$i ; exit 1 ; \
 	   fi ;\
 	done ;\
 	for i in $(BOUNDS_FAIL); do \
+	   echo ; echo --- boundtest $$i ---; \
 	   if $(TCC) -b -run boundtest.c $$i ; then \
 	       echo Failed negative test $$i ; exit 1 ;\
 	   else\
-	       /bin/true ; \
+	       echo failed as expected; \
 	   fi ;\
 	done ;\
-	echo Bound test OK
+	echo; echo Bound test OK
 
 # speed test
-speed: ex2 ex3
+speedtest: ex2 ex3
 	@echo ------------ $@ ------------
 	time ./ex2 1238 2 3 4 10 13 4
 	time $(TCC) -run ../examples/ex2.c 1238 2 3 4 10 13 4
 	time ./ex3 35
 	time $(TCC) -run ../examples/ex3.c 35
 
+weaktest: test.ref
+	$(TCC) -c tcctest.c -o weaktest.tcc.o
+	 $(CC) -c tcctest.c -o weaktest.gcc.o -I. -w $(CFLAGS)
+	objdump -t weaktest.tcc.o | grep ' w ' | sed -e 's/.* \([a-zA-Z0-9_]*\)$$/\1/' | LC_ALL=C sort > weaktest.tcc.o.txt
+	objdump -t weaktest.gcc.o | grep ' w ' | sed -e 's/.* \([a-zA-Z0-9_]*\)$$/\1/' | LC_ALL=C sort > weaktest.gcc.o.txt
+	diff weaktest.gcc.o.txt weaktest.tcc.o.txt && echo "Weak Auto Test OK"
+
 ex%: ../examples/ex%.c
 	$(CC) -o $@ $< $(CFLAGS)
 
 # tiny assembler testing
 asmtest.ref: asmtest.S
-	$(CC) -o asmtest.ref.o -c asmtest.S
-	objdump -D asmtest.ref.o > $@
+	$(CC) -Wa,-W -o asmtest.ref.o -c asmtest.S
+	objdump -D asmtest.ref.o > asmtest.ref
 
 asmtest: asmtest.ref
 	@echo ------------ $@ ------------
 	$(TCC) -c asmtest.S
-	objdump -D asmtest.o > $@
+	objdump -D asmtest.o > asmtest.out
 	@if diff -u --ignore-matching-lines="file format" asmtest.ref asmtest.out ; then echo "ASM Auto Test OK"; fi
 
 # targets for development

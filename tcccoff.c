@@ -18,7 +18,8 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include "coff.h"
+
+#include "tcc.h"
 
 #define MAXNSCNS 255		/* MAXIMUM NUMBER OF SECTIONS         */
 #define MAX_STR_TABLE 1000000
@@ -73,7 +74,7 @@ typedef struct {
     unsigned short dummy4;
 } AUXEF;
 
-int tcc_output_coff(TCCState *s1, FILE *f)
+ST_FUNC int tcc_output_coff(TCCState *s1, FILE *f)
 {
     Section *tcc_sect;
     SCNHDR *coff_sec;
@@ -867,7 +868,7 @@ Section *FindSection(TCCState * s1, const char *sname)
     return 0;
 }
 
-int tcc_load_coff(TCCState * s1, int fd)
+ST_FUNC int tcc_load_coff(TCCState * s1, int fd)
 {
 // tktk TokenSym *ts;
 
@@ -942,7 +943,7 @@ int tcc_load_coff(TCCState * s1, int fd)
 	    if (name[0] == '_' && strcmp(name, "_main") != 0)
 		name++;
 
-	    tcc_add_symbol(s1, name, (void*)csym.n_value);
+	    tcc_add_symbol(s1, name, (void*)(uplong)csym.n_value);
 	}
 	// skip any aux records
 

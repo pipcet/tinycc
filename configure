@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # tcc configure script (c) 2003 Fabrice Bellard
-#
+
 # set temporary file name
 if test ! -z "$TMPDIR" ; then
     TMPDIR1="${TMPDIR}"
@@ -11,11 +11,13 @@ else
     TMPDIR1="/tmp"
 fi
 
-TMPC="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}.c"
-TMPO="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}.o"
-TMPE="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}"
-TMPS="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}.S"
-TMPH="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}.h"
+# bashism: TMPN="${TMPDIR1}/tcc-conf-${RANDOM}-$$-${RANDOM}.c"
+TMPN="./conftest-$$"
+
+TMPC=$TMPN.c
+TMPH=$TMPN.h
+TMPO=$TMPN.o
+TMPE=$TMPN
 
 # default parameters
 build_cross="no"
@@ -27,21 +29,23 @@ libdir=""
 tccdir=""
 includedir=""
 mandir=""
+infodir=""
 sysroot=""
 cross_prefix=""
 cc="gcc"
 host_cc="gcc"
 ar="ar"
 strip="strip"
+cygwin="no"
 cpu=`uname -m`
 case "$cpu" in
-  i386|i486|i586|i686|i86pc|BePC)
+  i386|i486|i586|i686|i86pc|BePC|i686-AT386)
     cpu="x86"
   ;;
   x86_64)
     cpu="x86-64"
   ;;
-  armv4l)
+  arm|armv4l|armv5tel|armv5tejl|armv6j|armv7a|armv7l)
     cpu="armv4l"
   ;;
   alpha)
@@ -98,13 +102,21 @@ for opt do
   ;;
   --exec-prefix=*) execprefix=`echo $opt | cut -d '=' -f 2`
   ;;
+  --tccdir=*) tccdir=`echo $opt | cut -d '=' -f 2`
+  ;;
   --bindir=*) bindir=`echo $opt | cut -d '=' -f 2`
   ;;
   --libdir=*) libdir=`echo $opt | cut -d '=' -f 2`
   ;;
   --includedir=*) includedir=`echo $opt | cut -d '=' -f 2`
   ;;
+  --sharedir=*) sharedir=`echo $opt | cut -d '=' -f 2`
+  ;;
   --mandir=*) mandir=`echo $opt | cut -d '=' -f 2`
+  ;;
+  --infodir=*) infodir=`echo $opt | cut -d '=' -f 2`
+  ;;
+  --docdir=*) docdir=`echo $opt | cut -d '=' -f 2`
   ;;
   --sysroot=*) sysroot=`echo $opt | cut -d '=' -f 2`
   ;;
@@ -124,11 +136,21 @@ for opt do
   ;;
   --enable-gprof) gprof="yes"
   ;;
-  --enable-mingw32) mingw32="yes" ; cross_prefix="i386-mingw32-"
-  ;; 
+  --enable-mingw32) mingw32="yes" ; cross_prefix="i686-pc-mingw32-" ; cpu=x86
+  ;;
+  --enable-cygwin) mingw32="yes" ; cygwin="yes" ; cross_prefix="mingw32-" ; cpu=x86
+  ;;
   --enable-cross) build_cross="yes"
   ;;
+  --disable-static) disable_static="yes"
+  ;;
+  --disable-rpath) disable_rpath="yes"
+  ;;
   --with-libgcc) use_libgcc="yes"
+  ;;
+  --with-selinux) have_selinux="yes"
+  ;;
+  --help|-h) show_help="yes"
   ;;
   esac
 done
@@ -203,7 +225,7 @@ if $cc -o $TMPO $TMPC 2> /dev/null ; then
     gcc_major="4"
 fi
 
-if test x"$1" = x"-h" -o x"$1" = x"--help" ; then
+if test x"$show_help" = "xyes" ; then
 cat << EOF
 
 Usage: configure [options]
@@ -217,53 +239,82 @@ echo "  --exec-prefix=EPREFIX    install architecture-dependent files in EPREFIX
 echo "                           [same as prefix]"
 echo "  --bindir=DIR             user executables in DIR [EPREFIX/bin]"
 echo "  --libdir=DIR             object code libraries in DIR [EPREFIX/lib]"
+echo "  --tccdir=DIR             installation directory [EPREFIX/lib/tcc]"
 echo "  --includedir=DIR         C header files in DIR [PREFIX/include]"
-echo "  --mandir=DIR             man documentation in DIR [PREFIX/man]"
-echo "  --enable-cross           build cross compilers"
+echo "  --sharedir=DIR           documentation root DIR [PREFIX]/share"
+echo "  --docdir=DIR             documentation in DIR [SHAREDIR/doc/tcc]"
+echo "  --mandir=DIR             man documentation in DIR [SHAREDIR/man]"
+echo "  --infodir=DIR            info documentation in DIR [SHAREDIR/info]"
 echo ""
 echo "Advanced options (experts only):"
 echo "  --source-path=PATH       path of source code [$source_path]"
 echo "  --cross-prefix=PREFIX    use PREFIX for compile tools [$cross_prefix]"
 echo "  --sysroot=PREFIX         prepend PREFIX to library/include paths []"
 echo "  --cc=CC                  use C compiler CC [$cc]"
-echo "  --with-libgcc            use /lib/libgcc_s.so.1 instead of libtcc1.a"
+echo "  --disable-static         make libtcc.so instead of libtcc.a"
+echo "  --disable-rpath          disable use of -rpath with the above"
+echo "  --with-libgcc            use /lib/libgcc_s.so.1 instead of libtcc.a"
+echo "  --enable-mingw32         build windows version on linux with mingw32"
+echo "  --enable-cygwin          build windows version on windows with cygwin"
+echo "                           [requires cygwin and mingw32-make]"
+echo "  --enable-cross           build cross compilers"
+echo "  --extra-cflags=          extra compiler flags"
+echo "  --extra-ldflags=         extra linker options"
+echo "  --with-selinux           use mmap instead of exec mem"
+echo "                           [requires write access to /tmp]"
 echo ""
 #echo "NOTE: The object files are build at the place where configure is launched"
 exit 1
 fi
-
+    
 if test "$mingw32" = "yes" ; then
+    if test x"$tccdir" = x""; then
+    tccdir="tcc"
+    fi
     if test -z "$prefix" ; then
-        prefix="C:/Program Files/tcc"
+    prefix="C:/Program Files/${tccdir}"
+    fi
+    if test -z "$sharedir" ; then
+    sharedir="${prefix}"
     fi
     execprefix="$prefix"
-    bindir="$prefix"
-    tccdir="$prefix"
-    docdir="$prefix/doc"
+    bindir="${prefix}"
+    tccdir="${prefix}"
+    libdir="${prefix}/lib"
+    docdir="${sharedir}/doc"
+    mandir="${sharedir}/man"
+    infodir="${sharedir}/info"
 else
     if test -z "$prefix" ; then
-        prefix="/usr/local"
+    prefix="/usr/local"
+    fi
+    if test -z "$sharedir" ; then
+    sharedir="${prefix}/share"
     fi
     if test x"$execprefix" = x""; then
-        execprefix="${prefix}"
+    execprefix="${prefix}"
+    fi
+    if test x"$libdir" = x""; then
+    libdir="${execprefix}/lib"
     fi
     if test x"$bindir" = x""; then
-        bindir="${execprefix}/bin"
+    bindir="${execprefix}/bin"
+    fi
+    if test x"$tccdir" = x""; then
+    tccdir="tcc"
     fi
     if test x"$docdir" = x""; then
-        docdir="$prefix/share/doc/tcc"
+    docdir="${sharedir}/doc/${tccdir}"
     fi
+    if test x"$mandir" = x""; then
+    mandir="${sharedir}/man"
+    fi
+    if test x"$infodir" = x""; then
+    infodir="${sharedir}/info"
+    fi
+    tccdir="${libdir}/${tccdir}"
 fi # mingw32
 
-if test x"$libdir" = x""; then
-libdir="${execprefix}/lib"
-fi
-if test x"$tccdir" = x""; then
-tccdir="${execprefix}/lib/tcc"
-fi
-if test x"$mandir" = x""; then
-mandir="${prefix}/man"
-fi
 if test x"$includedir" = x""; then
 includedir="${prefix}/include"
 fi
@@ -273,6 +324,7 @@ echo "TinyCC directory    $tccdir"
 echo "Library directory   $libdir"
 echo "Include directory   $includedir"
 echo "Manual directory    $mandir"
+echo "Info directory      $infodir"
 echo "Doc directory       $docdir"
 echo "Target root prefix  $sysroot"
 echo "Source path      $source_path"
@@ -289,14 +341,19 @@ echo "# Automatically generated by configure - do not modify" > config.mak
 echo "/* Automatically generated by configure - do not modify */" > $TMPH
 
 echo "prefix=$prefix" >> config.mak
-echo "bindir=$bindir" >> config.mak
-echo "tccdir=$tccdir" >> config.mak
-echo "libdir=$libdir" >> config.mak
-echo "includedir=$includedir" >> config.mak
-echo "mandir=$mandir" >> config.mak
-echo "docdir=$docdir" >> config.mak
+echo "bindir=\$(DESTDIR)$bindir" >> config.mak
+echo "tccdir=\$(DESTDIR)$tccdir" >> config.mak
+echo "libdir=\$(DESTDIR)$libdir" >> config.mak
+echo "ln_libdir=$libdir" >> config.mak
+echo "includedir=\$(DESTDIR)$includedir" >> config.mak
+echo "mandir=\$(DESTDIR)$mandir" >> config.mak
+echo "infodir=\$(DESTDIR)$infodir" >> config.mak
+echo "docdir=\$(DESTDIR)$docdir" >> config.mak
+
 echo "#define CONFIG_SYSROOT \"$sysroot\"" >> $TMPH
+echo "#ifndef CONFIG_TCCDIR" >> $TMPH
 echo "#define CONFIG_TCCDIR \"$tccdir\"" >> $TMPH
+echo "#endif" >> $TMPH
 echo "CC=$cc" >> config.mak
 echo "GCC_MAJOR=$gcc_major" >> config.mak
 echo "#define GCC_MAJOR $gcc_major" >> $TMPH
@@ -339,6 +396,12 @@ if test "$mingw32" = "yes" ; then
   echo "CONFIG_WIN32=yes" >> config.mak
   echo "#define CONFIG_WIN32 1" >> $TMPH
 fi
+if test "$cygwin" = "yes" ; then
+  echo "#ifndef _WIN32" >> $TMPH
+  echo "#define _WIN32" >> $TMPH
+  echo "#endif" >> $TMPH
+  echo "AR=ar" >> config.mak
+fi
 if test "$bigendian" = "yes" ; then
   echo "WORDS_BIGENDIAN=yes" >> config.mak
   echo "#define WORDS_BIGENDIAN 1" >> $TMPH
@@ -350,9 +413,19 @@ fi
 if test "$build_cross" = "yes" ; then
   echo "CONFIG_CROSS=yes" >> config.mak
 fi
+if test "$disable_static" = "yes" ; then
+  echo "DISABLE_STATIC=yes" >> config.mak
+fi
+if test "$disable_rpath" = "yes" ; then
+  echo "DISABLE_RPATH=yes" >> config.mak
+fi
 if test "$use_libgcc" = "yes" ; then
   echo "#define CONFIG_USE_LIBGCC" >> $TMPH
   echo "CONFIG_USE_LIBGCC=yes" >> config.mak
+fi
+if test "$have_selinux" = "yes" ; then
+  echo "#define HAVE_SELINUX" >> $TMPH
+  echo "HAVE_SELINUX=yes" >> config.mak
 fi
 version=`head $source_path/VERSION`
 echo "VERSION=$version" >>config.mak
@@ -379,4 +452,4 @@ else
     echo "config.h is unchanged"
 fi
 
-rm -f $TMPO $TMPC $TMPE $TMPS $TMPH
+rm -f $TMPN*
