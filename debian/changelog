@@ -18,7 +18,9 @@ tcc (0.9.26+git20110616.330d2ee-1) experimental; urgency=low
     + Use dpkg-architecture to set DEB_HOST_MULTIARCH.
     + Keep tcc directory in /usr/lib/tcc.
 
- -- Thomas Preud'homme <robotux@celest.fr>  Fri, 17 Jun 2011 00:03:40 +0200
+  * Point Vcs-* to anonscm.debian.org.
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Fri, 17 Jun 2011 14:25:07 +0200
 
 tcc (0.9.25-6) unstable; urgency=low
 
