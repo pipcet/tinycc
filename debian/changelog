@@ -1,4 +1,4 @@
-tcc (0.9.26+git20110616.330d2ee-1) experimental; urgency=low
+tcc (0.9.26~git20110616.330d2ee-1) experimental; urgency=low
 
   * New upstream snapshot:
     + Fix design of previous VLA implementation
