@@ -14,6 +14,9 @@ tcc (0.9.26~git20110616.330d2ee-1) experimental; urgency=low
     + 0004-Add-multiarch-dirs-to-linker-and-incl.-search-path.patch:
       allow to change the include and libdir search path.
 
+  * Add multiarch paths to libraries and include search path and search crt*.o
+    and ld.so files in multiarch paths only (Closes: #632089).
+
   * debian/copyright:
     + document origin of source code.
 

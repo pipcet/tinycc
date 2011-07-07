@@ -9,9 +9,14 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-export CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
-export CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
-export LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
+CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
+LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+
+# Add multiarch paths to libraries and header search paths
+CFLAGS+='-DCONFIG_TCC_LDDIR="/lib/x86_64-linux-gnu"'
+CFLAGS+='-DCONFIG_TCC_EXTRA_LDDIR="/lib"'
+CFLAGS+='-DCONFIG_TCC_INCDIR="x86_64-linux-gnu:"'
 
 DEB_HOST_MULTIARCH:=$(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
@@ -27,7 +32,7 @@ clean:
 
 build:
 	dh build
-	touch build # As recommended by policy 3.8.4 section 4.9
+	touch build # As recommended by policy §4.9
 
 %:
 	dh $@
