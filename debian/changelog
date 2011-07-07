@@ -4,10 +4,15 @@ tcc (0.9.26~git20110616.330d2ee-1) experimental; urgency=low
     + Fix design of previous VLA implementation
     + Allow jumps > 32MB for -run on ARM. (Closes: #592618)
 
-  * Drop all patches in debian/patches except:
-    + 0001-Adapt-tcc-to-debian-build-system.patch
-    + 0002-Respect-FHS-in-documentation-and-examples.patch
-    + 0003-Fix-problem-with-PLT-and-GOT-relocs-on-armel.patch
+  * debian/patches (now contains):
+    + 0001-Default-to-create-progs-with-symbols-incl.-debug.patch:
+      create unstripped program with debug infos.
+    + 0002-Make-ex1.c-and-ex4.c-be-executable-on-any-systems.patch
+    + 0003-Fix-problem-with-PLT-and-GOT-relocs-on-armel.patch:
+      makes tcc link correctly to libraries when both R_ARM_PLT32 and
+      R_ARM_GOT32 relocation to a same symbol.
+    + 0004-Add-multiarch-dirs-to-linker-and-incl.-search-path.patch:
+      allow to change the include and libdir search path.
 
   * debian/copyright:
     + document origin of source code.
