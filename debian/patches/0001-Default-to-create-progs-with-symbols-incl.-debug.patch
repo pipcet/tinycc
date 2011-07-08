@@ -1,0 +1,111 @@
+From 4fd94f69f9dc00763d0eab2ff23314f45a130671 Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
+Date: Fri, 17 Jun 2011 22:22:04 +0200
+Subject: Default to create progs with symbols (incl. debug)
+
+* Set CFLAGS entirely in configure if not already set.
+* Compile bcheck.c with the same flags as the other source files
+* Don't strip binaries by default (GB are cheap now) but provide a
+  --strip-binaries option in configure script.
+
+Origin: vendor
+Forwarded: no
+Last-Update: 2011-06-18
+Applied-Upstream: commit: 3511e6e2a8b08f306cba73805fe7622a67d74fac
+---
+ Makefile  |   12 ++++++++----
+ configure |    8 +++++++-
+ 2 files changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 10b7cda..d1dfbda 100644
+--- a/Makefile
++++ b/Makefile
+@@ -5,7 +5,6 @@
+ TOP ?= .
+ include $(TOP)/config.mak
+ 
+-CFLAGS+=-g -Wall
+ CFLAGS_P=$(CFLAGS) -pg -static -DCONFIG_TCC_STATIC
+ LIBS_P=
+ 
+@@ -217,12 +216,17 @@ libtcc1.a : FORCE
+ lib/%/libtcc1.a : FORCE $(PROGS_CROSS)
+ 	@$(MAKE) -C lib cross TARGET=$*
+ bcheck.o : lib/bcheck.c
+-	gcc -c $< -o $@ -O2 -Wall
++	gcc -c $< -o $@ $(CFLAGS)
+ FORCE:
+ 
+ # install
+ TCC_INCLUDES = stdarg.h stddef.h stdbool.h float.h varargs.h tcclib.h
+ INSTALL=install
++ifdef STRIP_BINARIES
++INSTALLBIN=$(INSTALL) -s
++else
++INSTALLBIN=$(INSTALL)
++endif
+ 
+ ifndef CONFIG_WIN32
+ install: $(PROGS) $(TCCLIBS) $(TCCDOCS)
+@@ -230,7 +234,7 @@ install: $(PROGS) $(TCCLIBS) $(TCCDOCS)
+ ifeq ($(CC),tcc)
+ 	$(INSTALL) -m755 $(PROGS) "$(bindir)"
+ else
+-	$(INSTALL) -s -m755 $(PROGS) "$(bindir)"
++	$(INSTALLBIN) -m755 $(PROGS) "$(bindir)"
+ endif
+ 	mkdir -p "$(mandir)/man1"
+ 	-$(INSTALL) tcc.1 "$(mandir)/man1"
+@@ -291,7 +295,7 @@ install: $(PROGS) $(TCCLIBS) $(TCCDOCS)
+ 	mkdir -p "$(tccdir)/examples"
+ 	mkdir -p "$(tccdir)/doc"
+ 	mkdir -p "$(tccdir)/libtcc"
+-	$(INSTALL) -s -m755 $(PROGS) "$(tccdir)"
++	$(INSTALLBIN) -m755 $(PROGS) "$(tccdir)"
+ 	$(INSTALL) -m644 $(LIBTCC1) win32/lib/*.def "$(tccdir)/lib"
+ 	cp -r win32/include/. "$(tccdir)/include"
+ 	cp -r win32/examples/. "$(tccdir)/examples"
+diff --git a/configure b/configure
+index 7d2b2db..d2049af 100755
+--- a/configure
++++ b/configure
+@@ -146,6 +146,8 @@ for opt do
+   ;;
+   --disable-rpath) disable_rpath="yes"
+   ;;
++  --strip-binaries) strip_binaries="yes"
++  ;;
+   --with-libgcc) use_libgcc="yes"
+   ;;
+   --with-selinux) have_selinux="yes"
+@@ -157,7 +159,7 @@ done
+ 
+ # Checking for CFLAGS
+ if test -z "$CFLAGS"; then
+-    CFLAGS="-O2"
++    CFLAGS="-Wall -g -O2"
+ fi
+ 
+ cc="${cross_prefix}${cc}"
+@@ -253,6 +255,7 @@ echo "  --sysroot=PREFIX         prepend PREFIX to library/include paths []"
+ echo "  --cc=CC                  use C compiler CC [$cc]"
+ echo "  --disable-static         make libtcc.so instead of libtcc.a"
+ echo "  --disable-rpath          disable use of -rpath with the above"
++echo "  --strip-binaries         strip symbol tables from resulting binaries"
+ echo "  --with-libgcc            use /lib/libgcc_s.so.1 instead of libtcc.a"
+ echo "  --enable-mingw32         build windows version on linux with mingw32"
+ echo "  --enable-cygwin          build windows version on windows with cygwin"
+@@ -419,6 +422,9 @@ fi
+ if test "$disable_rpath" = "yes" ; then
+   echo "DISABLE_RPATH=yes" >> config.mak
+ fi
++if test "$strip_binaries" = "yes" ; then
++  echo "STRIP_BINARIES=yes" >> config.mak
++fi
+ if test "$use_libgcc" = "yes" ; then
+   echo "#define CONFIG_USE_LIBGCC" >> $TMPH
+   echo "CONFIG_USE_LIBGCC=yes" >> config.mak
+-- 
+1.7.5.4
+

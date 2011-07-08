@@ -1,0 +1,55 @@
+From 96620c3e792b5d6fe038b6dde10e302652ee97b9 Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
+Date: Thu, 7 Jul 2011 12:15:43 +0200
+Subject: Make ex1.c and ex4.c be executable on any systems
+
+Use /usr/bin/env to make ex1.c and ex4.c on any systems, wherever is
+installed tcc and document in README that ex4.c can be executed.
+
+Origin: upstream, http://repo.or.cz/w/tinycc.git/commit/27a428cd0fae475d7377e1dbe218c064ee217d85
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2011-07/msg00005.html
+Last-Updated: 2011-07-07
+Applied-Upstream: commit: 27a428cd0fae475d7377e1dbe218c064ee217d85
+---
+ README         |    3 ++-
+ examples/ex1.c |    2 +-
+ examples/ex4.c |    2 +-
+ 3 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/README b/README
+index bfaab39..0ead1ee 100644
+--- a/README
++++ b/README
+@@ -65,7 +65,8 @@ operations given a list of numbers (benchmark).
+ ex3.c: compute fibonacci numbers (benchmark).
+ 
+ ex4.c: more complicated: X11 program. Very complicated test in fact
+-because standard headers are being used !
++because standard headers are being used ! As for ex1.c, can also be launched
++directly as a script: './ex4.c'.
+ 
+ ex5.c: 'hello world' with standard glibc headers.
+ 
+diff --git a/examples/ex1.c b/examples/ex1.c
+index 28139f9..87d6019 100755
+--- a/examples/ex1.c
++++ b/examples/ex1.c
+@@ -1,4 +1,4 @@
+-#! /usr/local/bin/tcc -run
++#!/usr/bin/env tcc -run
+ #include <tcclib.h>
+ 
+ int main()
+diff --git a/examples/ex4.c b/examples/ex4.c
+index b33b033..7611910 100755
+--- a/examples/ex4.c
++++ b/examples/ex4.c
+@@ -1,4 +1,4 @@
+-#!./tcc -run -L/usr/X11R6/lib -lX11
++#!/usr/bin/env tcc -run -L/usr/X11R6/lib -lX11
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <X11/Xlib.h>
+-- 
+1.7.5.4
+

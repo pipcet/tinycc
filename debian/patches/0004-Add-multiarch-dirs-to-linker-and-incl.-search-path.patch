@@ -1,0 +1,169 @@
+From 36007fa98c744472ffa3f57a2ecee8af1e2bf403 Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
+Date: Tue, 5 Jul 2011 10:47:32 +0200
+Subject: Add multiarch dirs to linker and incl. search path
+
+By default, tcc search libraries in /lib and /usr/local/lib, while
+crt*.o files are searched in /usr/lib and ld.so is searched in /lib.
+Headers are searched in /usr/local/include and /usr/include.
+
+Unfortunetely the path are hardcoded in source code. This patch allow
+tcc to change these search paths. It's then possible to make tcc search
+libraries in /lib/x86_64-linux-gnu and /usr/local/lib/x86_64-linux-gnu
+while crt*.o files are searched in /usr/lib/x86_64-linux-gnu and ld.so
+is searched in /lib/x86_64-linux-gnu. Headers are then searched in
+/usr/local/include/x86_64-linux-gnu, /usr/local/include,
+/usr/include/x86_64-linux-gnu and /usr/include.
+
+Origin: vendor
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2011-07/msg00000.html
+Last-Updated: 2011-07-07
+Applied-Upstream: commit: 31ca000d72bc48060f205d94bfffc25ffe5fd18d
+---
+ libtcc.c |   63 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ tcc.h    |   16 +++++++++-----
+ tccelf.c |    8 +++---
+ 3 files changed, 75 insertions(+), 12 deletions(-)
+
+diff --git a/libtcc.c b/libtcc.c
+index f97336e..fedd7e5 100644
+--- a/libtcc.c
++++ b/libtcc.c
+@@ -293,6 +293,33 @@ PUB_FUNC void dynarray_reset(void *pp, int *n)
+     *(void**)pp = NULL;
+ }
+ 
++/* out must not point to a valid dynarray since a new one is created */
++PUB_FUNC int tcc_split_path(const char *in, const char * const *prefixs,
++                            int nb_prefixs, char ***out)
++{
++    int i, nb_comps = 0;
++    char *path;
++    const char *end;
++    size_t size;
++
++    *out = NULL;
++    do {
++        end = in;
++        while (*end && *end != ':')
++            ++end;
++        for (i = 0; i < nb_prefixs; i++) {
++            size = (strlen(prefixs[i]) + 1) * sizeof(char)
++                   + (end - in);
++            path = tcc_malloc(size);
++            pstrcpy(path, size, prefixs[i]);
++            pstrcat(path, size, in);
++            dynarray_add((void ***) out, &nb_comps, path);
++        }
++        in = end + 1;
++    } while (*end);
++    return nb_comps;
++}
++
+ /* we use our own 'finite' function to avoid potential problems with
+    non standard math libs */
+ /* XXX: endianness dependent */
+@@ -971,6 +998,24 @@ LIBTCCAPI TCCState *tcc_new(void)
+     tcc_add_library_path(s, CONFIG_TCC_CRT_PREFIX);
+     tcc_add_library_path(s, CONFIG_SYSROOT CONFIG_TCC_LDDIR);
+     tcc_add_library_path(s, CONFIG_SYSROOT "/usr/local"CONFIG_TCC_LDDIR);
++#ifdef CONFIG_TCC_EXTRA_LDDIR
++    {
++        int i, nb_extra_lddirs, nb_prefixs;
++        char **extra_lddirs;
++        char extra_lddir_str[] = CONFIG_TCC_EXTRA_LDDIR;
++	const char lddir_prefix1[] = CONFIG_SYSROOT;
++	const char lddir_prefix2[] = CONFIG_SYSROOT "/usr/local";
++	const char * const lddir_prefixs[] = {lddir_prefix1, lddir_prefix2};
++
++        nb_prefixs = sizeof lddir_prefixs / sizeof *lddir_prefixs;
++        nb_extra_lddirs = tcc_split_path(CONFIG_TCC_EXTRA_LDDIR,
++                                         lddir_prefixs, nb_prefixs,
++                                         &extra_lddirs);
++        for (i = 0; i < nb_extra_lddirs; i++)
++            tcc_add_library_path(s, extra_lddirs[i]);
++        dynarray_reset(&extra_lddirs, &nb_extra_lddirs);
++    }
++#endif
+ #endif
+ 
+     /* no section zero */
+@@ -1282,8 +1327,22 @@ LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)
+         /* default include paths */
+         /* -isystem paths have already been handled */
+ #ifndef TCC_TARGET_PE
+-        tcc_add_sysinclude_path(s, CONFIG_SYSROOT "/usr/local/include");
+-        tcc_add_sysinclude_path(s, CONFIG_SYSROOT "/usr/include");
++        {
++            int i, nb_extra_incdirs, nb_prefixs;
++            char **extra_incdirs;
++            const char incdir_prefix1[] = CONFIG_SYSROOT "/usr/local/include";
++            const char incdir_prefix2[] = CONFIG_SYSROOT "/usr/include";
++            const char * const incdir_prefixs[] = {incdir_prefix1,
++                                                   incdir_prefix2};
++
++            nb_prefixs = sizeof incdir_prefixs / sizeof *incdir_prefixs;
++            nb_extra_incdirs = tcc_split_path(CONFIG_TCC_INCSUBDIR,
++                                              incdir_prefixs, nb_prefixs,
++                                              &extra_incdirs);
++            for (i = 0; i < nb_extra_incdirs; i++)
++                tcc_add_sysinclude_path(s, extra_incdirs[i]);
++            dynarray_reset(&extra_incdirs, &nb_extra_incdirs);
++        }
+ #endif
+         snprintf(buf, sizeof(buf), "%s/include", s->tcc_lib_path);
+         tcc_add_sysinclude_path(s, buf);
+diff --git a/tcc.h b/tcc.h
+index fcbfadc..c3c1031 100644
+--- a/tcc.h
++++ b/tcc.h
+@@ -142,12 +142,16 @@ typedef int BOOL;
+ /* path to find crt1.o, crti.o and crtn.o. Only needed when generating
+    executables or dlls */
+ 
+-#if defined(TCC_TARGET_X86_64_CENTOS)
+-# define CONFIG_TCC_CRT_PREFIX CONFIG_SYSROOT "/usr/lib64"
+-# define CONFIG_TCC_LDDIR "/lib64"
+-#else
+-# define CONFIG_TCC_CRT_PREFIX CONFIG_SYSROOT "/usr/lib"
+-# define CONFIG_TCC_LDDIR "/lib"
++#ifndef CONFIG_TCC_LDDIR
++  #if defined(TCC_TARGET_X86_64_CENTOS)
++    #define CONFIG_TCC_LDDIR "/lib64"
++  #else
++    #define CONFIG_TCC_LDDIR "/lib"
++  #endif
++#endif
++#define CONFIG_TCC_CRT_PREFIX CONFIG_SYSROOT "/usr" CONFIG_TCC_LDDIR
++#ifndef CONFIG_TCC_INCSUBDIR
++  #define CONFIG_TCC_INCSUBDIR ""
+ #endif
+ 
+ #define INCLUDE_STACK_SIZE  32
+diff --git a/tccelf.c b/tccelf.c
+index d617146..0e30c4b 100644
+--- a/tccelf.c
++++ b/tccelf.c
+@@ -1335,15 +1335,15 @@ ST_FUNC void tcc_add_linker_symbols(TCCState *s1)
+ #if defined __FreeBSD__
+ static const char elf_interp[] = "/libexec/ld-elf.so.1";
+ #elif defined __FreeBSD_kernel__
+-static char elf_interp[] = "/lib/ld.so.1";
++static char elf_interp[] = CONFIG_TCC_LDDIR"/ld.so.1";
+ #elif defined TCC_ARM_EABI
+-static const char elf_interp[] = "/lib/ld-linux.so.3";
++static const char elf_interp[] = CONFIG_TCC_LDDIR"/ld-linux.so.3";
+ #elif defined(TCC_TARGET_X86_64)
+ static const char elf_interp[] = CONFIG_TCC_LDDIR"/ld-linux-x86-64.so.2";
+ #elif defined(TCC_UCLIBC)
+-static const char elf_interp[] = "/lib/ld-uClibc.so.0";
++static const char elf_interp[] = CONFIG_TCC_LDDIR"/ld-uClibc.so.0";
+ #else
+-static const char elf_interp[] = "/lib/ld-linux.so.2";
++static const char elf_interp[] = CONFIG_TCC_LDDIR"/ld-linux.so.2";
+ #endif
+ 
+ static void tcc_output_binary(TCCState *s1, FILE *f,
+-- 
+1.7.5.4
+

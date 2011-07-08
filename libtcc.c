@@ -293,6 +293,33 @@ PUB_FUNC void dynarray_reset(void *pp, int *n)
     *(void**)pp = NULL;
 }
 
+/* out must not point to a valid dynarray since a new one is created */
+PUB_FUNC int tcc_split_path(const char *in, const char * const *prefixs,
+                            int nb_prefixs, char ***out)
+{
+    int i, nb_comps = 0;
+    char *path;
+    const char *end;
+    size_t size;
+
+    *out = NULL;
+    do {
+        end = in;
+        while (*end && *end != ':')
+            ++end;
+        for (i = 0; i < nb_prefixs; i++) {
+            size = (strlen(prefixs[i]) + 1) * sizeof(char)
+                   + (end - in);
+            path = tcc_malloc(size);
+            pstrcpy(path, size, prefixs[i]);
+            pstrcat(path, size, in);
+            dynarray_add((void ***) out, &nb_comps, path);
+        }
+        in = end + 1;
+    } while (*end);
+    return nb_comps;
+}
+
 /* we use our own 'finite' function to avoid potential problems with
    non standard math libs */
 /* XXX: endianness dependent */
@@ -971,6 +998,24 @@ LIBTCCAPI TCCState *tcc_new(void)
     tcc_add_library_path(s, CONFIG_TCC_CRT_PREFIX);
     tcc_add_library_path(s, CONFIG_SYSROOT CONFIG_TCC_LDDIR);
     tcc_add_library_path(s, CONFIG_SYSROOT "/usr/local"CONFIG_TCC_LDDIR);
+#ifdef CONFIG_TCC_EXTRA_LDDIR
+    {
+        int i, nb_extra_lddirs, nb_prefixs;
+        char **extra_lddirs;
+        char extra_lddir_str[] = CONFIG_TCC_EXTRA_LDDIR;
+	const char lddir_prefix1[] = CONFIG_SYSROOT;
+	const char lddir_prefix2[] = CONFIG_SYSROOT "/usr/local";
+	const char * const lddir_prefixs[] = {lddir_prefix1, lddir_prefix2};
+
+        nb_prefixs = sizeof lddir_prefixs / sizeof *lddir_prefixs;
+        nb_extra_lddirs = tcc_split_path(CONFIG_TCC_EXTRA_LDDIR,
+                                         lddir_prefixs, nb_prefixs,
+                                         &extra_lddirs);
+        for (i = 0; i < nb_extra_lddirs; i++)
+            tcc_add_library_path(s, extra_lddirs[i]);
+        dynarray_reset(&extra_lddirs, &nb_extra_lddirs);
+    }
+#endif
 #endif
 
     /* no section zero */
@@ -1282,8 +1327,22 @@ LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)
         /* default include paths */
         /* -isystem paths have already been handled */
 #ifndef TCC_TARGET_PE
-        tcc_add_sysinclude_path(s, CONFIG_SYSROOT "/usr/local/include");
-        tcc_add_sysinclude_path(s, CONFIG_SYSROOT "/usr/include");
+        {
+            int i, nb_extra_incdirs, nb_prefixs;
+            char **extra_incdirs;
+            const char incdir_prefix1[] = CONFIG_SYSROOT "/usr/local/include";
+            const char incdir_prefix2[] = CONFIG_SYSROOT "/usr/include";
+            const char * const incdir_prefixs[] = {incdir_prefix1,
+                                                   incdir_prefix2};
+
+            nb_prefixs = sizeof incdir_prefixs / sizeof *incdir_prefixs;
+            nb_extra_incdirs = tcc_split_path(CONFIG_TCC_INCSUBDIR,
+                                              incdir_prefixs, nb_prefixs,
+                                              &extra_incdirs);
+            for (i = 0; i < nb_extra_incdirs; i++)
+                tcc_add_sysinclude_path(s, extra_incdirs[i]);
+            dynarray_reset(&extra_incdirs, &nb_extra_incdirs);
+        }
 #endif
         snprintf(buf, sizeof(buf), "%s/include", s->tcc_lib_path);
         tcc_add_sysinclude_path(s, buf);

@@ -1,3 +1,4 @@
-0001-Adapt-tcc-to-debian-build-system.patch
-0002-Respect-FHS-in-documentation-and-examples.patch
+0001-Default-to-create-progs-with-symbols-incl.-debug.patch
+0002-Make-ex1.c-and-ex4.c-be-executable-on-any-systems.patch
 0003-Fix-problem-with-PLT-and-GOT-relocs-on-armel.patch
+0004-Add-multiarch-dirs-to-linker-and-incl.-search-path.patch
