@@ -386,6 +386,8 @@ struct TCCState {
 
     char **library_paths;
     int nb_library_paths;
+    char **syslibrary_paths;
+    int nb_syslibrary_paths;
 
     /* array of all loaded dlls (including those referenced by loaded
        dlls) */
