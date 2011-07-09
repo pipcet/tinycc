@@ -1253,7 +1253,7 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
     if (!s1->nostdlib) {
 #ifdef CONFIG_USE_LIBGCC
         tcc_add_library(s1, "c");
-        tcc_add_file(s1, CONFIG_SYSROOT CONFIG_TCC_LDDIR"/libgcc_s.so.1");
+        tcc_add_sysfile(s1, CONFIG_SYSROOT CONFIG_TCC_LDDIR"/libgcc_s.so.1");
 #else
         tcc_add_library(s1, "c");
 #ifndef WITHOUT_LIBTCC
@@ -1267,7 +1267,7 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
     }
     /* add crt end if not memory output */
     if (s1->output_type != TCC_OUTPUT_MEMORY && !s1->nostdlib) {
-        tcc_add_file(s1, CONFIG_TCC_CRT_PREFIX "/crtn.o");
+        tcc_add_sysfile(s1, CONFIG_TCC_CRT_PREFIX "/crtn.o");
     }
 }
 
@@ -1499,7 +1499,7 @@ static int elf_output_file(TCCState *s1, const char *filename)
 		/* allow override the dynamic loader */
 		const char *elfint = getenv("LD_SO");
 		if (elfint == NULL)
-		    elfint = elf_interp;
+                    elfint = elf_interp;
                 /* add interpreter section only if executable */
                 interp = new_section(s1, ".interp", SHT_PROGBITS, SHF_ALLOC);
                 interp->sh_addralign = 1;
