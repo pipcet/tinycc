@@ -211,6 +211,7 @@ static int tcc_add_dll(TCCState *s, const char *filename, int flags);
 #define AFF_PRINT_ERROR     0x0001 /* print error if file not found */
 #define AFF_REFERENCED_DLL  0x0002 /* load a referenced dll from another dll */
 #define AFF_PREPROCESS      0x0004 /* preprocess file */
+#define AFF_MULTILIB        0x0008 /* also search multilib subdir */
 static int tcc_add_file_internal(TCCState *s, const char *filename, int flags);
 
 /* tcccoff.c */
@@ -1857,9 +1858,9 @@ TCCState *tcc_new(void)
     
 #ifndef TCC_TARGET_PE
     /* default library paths */
-    tcc_add_library_path(s, CONFIG_SYSROOT "/usr/local/lib");
-    tcc_add_library_path(s, CONFIG_SYSROOT "/usr/lib");
-    tcc_add_library_path(s, CONFIG_SYSROOT "/lib");
+    tcc_add_syslibrary_path(s, CONFIG_SYSROOT "/usr/local/lib");
+    tcc_add_syslibrary_path(s, CONFIG_SYSROOT "/usr/lib");
+    tcc_add_syslibrary_path(s, CONFIG_SYSROOT "/lib");
 #endif
 
     /* no section zero */
@@ -1919,6 +1920,7 @@ void tcc_delete(TCCState *s1)
 
     /* free library paths */
     dynarray_reset(&s1->library_paths, &s1->nb_library_paths);
+    dynarray_reset(&s1->syslibrary_paths, &s1->nb_syslibrary_paths);
 
     /* free include paths */
     dynarray_reset(&s1->cached_includes, &s1->nb_cached_includes);
@@ -1941,6 +1943,17 @@ int tcc_add_sysinclude_path(TCCState *s1, const char *pathname)
 {
     char *pathname1;
     
+#ifdef CONFIG_TCC_MULTILIB_SUBDIR
+    {
+        int len;
+        char *pathname2;
+
+        len = strlen(pathname) + strlen(CONFIG_TCC_MULTILIB_SUBDIR) + 2;
+        pathname2 = tcc_malloc(len);
+        snprintf(pathname2, len, "%s/%s", pathname, CONFIG_TCC_MULTILIB_SUBDIR);
+        dynarray_add((void ***)&s1->sysinclude_paths, &s1->nb_sysinclude_paths, pathname2);
+    }
+#endif
     pathname1 = tcc_strdup(pathname);
     dynarray_add((void ***)&s1->sysinclude_paths, &s1->nb_sysinclude_paths, pathname1);
     return 0;
@@ -1952,6 +1965,9 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
     ElfW(Ehdr) ehdr;
     int fd, ret;
     BufferedFile *saved_file;
+#ifdef CONFIG_TCC_MULTILIB_SUBDIR
+    char buf[1024];
+#endif
 
     /* find source file type with extension */
     ext = tcc_fileextension(filename);
@@ -1960,6 +1976,20 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
 
     /* open the file */
     saved_file = file;
+#ifdef CONFIG_TCC_MULTILIB_SUBDIR
+    if (flags & AFF_MULTILIB) {
+        char *base;
+
+        base = tcc_basename(filename);
+        snprintf(buf, sizeof(buf), "%.*s/%s/%s", (int) (base - filename - 1),
+                 filename, CONFIG_TCC_MULTILIB_SUBDIR, base);
+        file = tcc_open(s1, buf);
+        if (file) {
+            filename = buf;
+            goto file_opened;
+        }
+    }
+#endif
     file = tcc_open(s1, filename);
     if (!file) {
         if (flags & AFF_PRINT_ERROR) {
@@ -1969,6 +1999,9 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
         goto fail1;
     }
 
+#ifdef CONFIG_TCC_MULTILIB_SUBDIR
+file_opened:
+#endif
     if (flags & AFF_PREPROCESS) {
         ret = tcc_preprocess(s1);
     } else if (!ext[0] || !PATHCMP(ext, "c")) {
@@ -2062,12 +2095,22 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
     goto the_end;
 }
 
-int tcc_add_file(TCCState *s, const char *filename)
+int tcc_add_file2(TCCState *s, const char *filename, int flags)
 {
     if (s->output_type == TCC_OUTPUT_PREPROCESS)
-        return tcc_add_file_internal(s, filename, AFF_PRINT_ERROR | AFF_PREPROCESS);
+        return tcc_add_file_internal(s, filename, AFF_PRINT_ERROR | AFF_PREPROCESS | flags);
     else
-        return tcc_add_file_internal(s, filename, AFF_PRINT_ERROR);
+        return tcc_add_file_internal(s, filename, AFF_PRINT_ERROR | flags);
+}
+
+int tcc_add_file(TCCState *s, const char *filename)
+{
+    return tcc_add_file2(s, filename, 0);
+}
+
+int tcc_add_sysfile(TCCState *s, const char *filename)
+{
+    return tcc_add_file2(s, filename, AFF_MULTILIB);
 }
 
 int tcc_add_library_path(TCCState *s, const char *pathname)
@@ -2076,6 +2119,26 @@ int tcc_add_library_path(TCCState *s, const char *pathname)
     
     pathname1 = tcc_strdup(pathname);
     dynarray_add((void ***)&s->library_paths, &s->nb_library_paths, pathname1);
+    return 0;
+}
+
+int tcc_add_syslibrary_path(TCCState *s, const char *pathname)
+{
+    char *pathname1;
+
+#ifdef CONFIG_TCC_MULTILIB_SUBDIR
+    {
+        int len;
+        char *pathname2;
+
+        len = strlen(pathname) + strlen(CONFIG_TCC_MULTILIB_SUBDIR) + 2;
+        pathname2 = tcc_malloc(len);
+        snprintf(pathname2, len, "%s/%s", pathname, CONFIG_TCC_MULTILIB_SUBDIR);
+        dynarray_add((void ***)&s->syslibrary_paths, &s->nb_syslibrary_paths, pathname2);
+    }
+#endif
+    pathname1 = tcc_strdup(pathname);
+    dynarray_add((void ***)&s->syslibrary_paths, &s->nb_syslibrary_paths, pathname1);
     return 0;
 }
 
@@ -2092,6 +2155,14 @@ static int tcc_add_dll(TCCState *s, const char *filename, int flags)
         if (tcc_add_file_internal(s, buf, flags) == 0)
             return 0;
     }
+#ifdef CONFIG_TCC_MULTILIB_SUBDIR
+    for(i = 0; i < s->nb_syslibrary_paths; i++) {
+        snprintf(buf, sizeof(buf), "%s/%s",
+                 s->syslibrary_paths[i], filename);
+        if (tcc_add_file_internal(s, buf, flags) == 0)
+            return 0;
+    }
+#endif
     return -1;
 }
 
@@ -2119,6 +2190,14 @@ int tcc_add_library(TCCState *s, const char *libraryname)
         if (tcc_add_file_internal(s, buf, 0) == 0)
             return 0;
     }
+#ifdef CONFIG_TCC_MULTILIB_SUBDIR
+    for (i = 0; i < s->nb_syslibrary_paths; i++) {
+        snprintf(buf, sizeof(buf), "%s/lib%s.a",
+                 s->syslibrary_paths[i], libraryname);
+        if (tcc_add_file_internal(s, buf, 0) == 0)
+            return 0;
+    }
+#endif
     return -1;
 }
 
@@ -2185,8 +2264,8 @@ int tcc_set_output_type(TCCState *s, int output_type)
     if ((output_type == TCC_OUTPUT_EXE || output_type == TCC_OUTPUT_DLL) &&
         !s->nostdlib) {
         if (output_type != TCC_OUTPUT_DLL)
-            tcc_add_file(s, CONFIG_TCC_CRT_PREFIX "/crt1.o");
-        tcc_add_file(s, CONFIG_TCC_CRT_PREFIX "/crti.o");
+            tcc_add_sysfile(s, CONFIG_TCC_CRT_PREFIX "/crt1.o");
+        tcc_add_sysfile(s, CONFIG_TCC_CRT_PREFIX "/crti.o");
     }
 #endif
 
