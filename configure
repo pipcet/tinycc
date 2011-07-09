@@ -26,6 +26,7 @@ prefix=""
 execprefix=""
 bindir=""
 libdir=""
+multilib_subdir=""
 tccdir=""
 includedir=""
 mandir=""
@@ -107,6 +108,8 @@ for opt do
   --bindir=*) bindir=`echo $opt | cut -d '=' -f 2`
   ;;
   --libdir=*) libdir=`echo $opt | cut -d '=' -f 2`
+  ;;
+  --multilib-subdir=*) multilib_subdir=`echo $opt | cut -d '=' -f 2`
   ;;
   --includedir=*) includedir=`echo $opt | cut -d '=' -f 2`
   ;;
@@ -252,6 +255,7 @@ echo "Advanced options (experts only):"
 echo "  --source-path=PATH       path of source code [$source_path]"
 echo "  --cross-prefix=PREFIX    use PREFIX for compile tools [$cross_prefix]"
 echo "  --sysroot=PREFIX         prepend PREFIX to library/include paths []"
+echo "  --multilib_subdir=DIR    multilib subdirectory in DIR []"
 echo "  --cc=CC                  use C compiler CC [$cc]"
 echo "  --disable-static         make libtcc.so instead of libtcc.a"
 echo "  --disable-rpath          disable use of -rpath with the above"
@@ -322,21 +326,22 @@ if test x"$includedir" = x""; then
 includedir="${prefix}/include"
 fi
 
-echo "Binary  directory   $bindir"
-echo "TinyCC directory    $tccdir"
-echo "Library directory   $libdir"
-echo "Include directory   $includedir"
-echo "Manual directory    $mandir"
-echo "Info directory      $infodir"
-echo "Doc directory       $docdir"
-echo "Target root prefix  $sysroot"
-echo "Source path      $source_path"
-echo "C compiler       $cc"
-echo "CPU              $cpu"
-echo "Big Endian       $bigendian"
-echo "gprof enabled    $gprof"
-echo "cross compilers  $build_cross"
-echo "use libgcc       $use_libgcc"
+echo "Binary  directory      $bindir"
+echo "TinyCC directory       $tccdir"
+echo "Library directory      $libdir"
+echo "Multilib subdirectory  $multilib_subdir"
+echo "Include directory      $includedir"
+echo "Manual directory       $mandir"
+echo "Info directory         $infodir"
+echo "Doc directory          $docdir"
+echo "Target root prefix     $sysroot"
+echo "Source path            $source_path"
+echo "C compiler             $cc"
+echo "CPU                    $cpu"
+echo "Big Endian             $bigendian"
+echo "gprof enabled          $gprof"
+echo "cross compilers        $build_cross"
+echo "use libgcc             $use_libgcc"
 
 echo "Creating config.mak and config.h"
 
@@ -357,6 +362,9 @@ echo "#define CONFIG_SYSROOT \"$sysroot\"" >> $TMPH
 echo "#ifndef CONFIG_TCCDIR" >> $TMPH
 echo "#define CONFIG_TCCDIR \"$tccdir\"" >> $TMPH
 echo "#endif" >> $TMPH
+if test -n "$multilib_subdir" ; then
+  echo "#define CONFIG_TCC_MULTILIB_SUBDIR \"$multilib_subdir\"" >> $TMPH
+fi
 echo "CC=$cc" >> config.mak
 echo "GCC_MAJOR=$gcc_major" >> config.mak
 echo "#define GCC_MAJOR $gcc_major" >> $TMPH
