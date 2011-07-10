@@ -24,3 +24,4 @@
 0024-Add-support-of-asm-label-for-functions.patch
 0025-Add-support-of-asm-label-for-variables.patch
 0026-Add-support-for-__REDIRECT_NTH-needed-with-eglibc.patch
+0027-Search-system-files-and-library-in-multilib-path.patch

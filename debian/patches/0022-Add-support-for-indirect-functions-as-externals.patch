@@ -78,5 +78,5 @@ index 956899e..96c641e 100644
                              put_got_entry(s1, R_JMP_SLOT, sym->st_size, 
                                            sym->st_info, 
 -- 
-1.7.2.3
+1.7.5.4
 

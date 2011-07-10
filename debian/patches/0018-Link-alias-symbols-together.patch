@@ -56,5 +56,5 @@ index f256575..e7e2541 100644
                                                offset, R_COPY, index);
                                  offset += esym->st_size;
 -- 
-1.7.2.3
+1.7.5.4
 
