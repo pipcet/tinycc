@@ -1,3 +1,9 @@
+tcc (0.9.25-8) unstable; urgency=low
+
+  * Modify debian/rules to use patch added in 0.9.25-7 (Closes: #632089).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Mon, 11 Jul 2011 14:22:57 +0200
+
 tcc (0.9.25-7) unstable; urgency=medium (fix #632089)
 
   * Search system files and library in multilib path (Closes: #632089).
