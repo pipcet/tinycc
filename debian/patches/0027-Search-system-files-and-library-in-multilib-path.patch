@@ -1,4 +1,4 @@
-From c8523d5623a739d093d42fc0bba3b652eb27eb09 Mon Sep 17 00:00:00 2001
+From 4e1749d9be4dd7da305830ca60929a11504d3613 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Sat, 9 Jul 2011 12:04:15 +0200
 Subject: Search system files and library in multilib path
@@ -10,14 +10,14 @@ interpreter if available on local system, normal elf interpreter else.
 Origin: vendor
 Bug-Debian: http://bugs.debian.org/632089
 Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2011-07/msg00016.html
-Last-Updated: 2011-07-10
+Last-Updated: 2011-07-11
 ---
- configure |   38 +++++++++++++++----------
- libtcc.c  |   90 +++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
+ configure |   38 +++++++++++++++---------
+ libtcc.c  |   95 +++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
  libtcc.h  |    8 +++++
  tcc.h     |    2 +
- tccelf.c  |   45 +++++++++++++++++++++++-------
- 5 files changed, 149 insertions(+), 34 deletions(-)
+ tccelf.c  |   45 ++++++++++++++++++++++-------
+ 5 files changed, 154 insertions(+), 34 deletions(-)
 
 diff --git a/configure b/configure
 index 2dad1e6..ef9e51d 100755
@@ -97,7 +97,7 @@ index 2dad1e6..ef9e51d 100755
  echo "GCC_MAJOR=$gcc_major" >> config.mak
  echo "#define GCC_MAJOR $gcc_major" >> $TMPH
 diff --git a/libtcc.c b/libtcc.c
-index dc9c885..0fa49eb 100644
+index dc9c885..d192203 100644
 --- a/libtcc.c
 +++ b/libtcc.c
 @@ -211,6 +211,7 @@ static int tcc_add_dll(TCCState *s, const char *filename, int flags);
@@ -147,26 +147,38 @@ index dc9c885..0fa49eb 100644
      pathname1 = tcc_strdup(pathname);
      dynarray_add((void ***)&s1->sysinclude_paths, &s1->nb_sysinclude_paths, pathname1);
      return 0;
-@@ -1960,6 +1973,18 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
+@@ -1952,6 +1965,9 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
+     ElfW(Ehdr) ehdr;
+     int fd, ret;
+     BufferedFile *saved_file;
++#ifdef CONFIG_TCC_MULTILIB_SUBDIR
++    char buf[1024];
++#endif
+ 
+     /* find source file type with extension */
+     ext = tcc_fileextension(filename);
+@@ -1960,6 +1976,20 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
  
      /* open the file */
      saved_file = file;
 +#ifdef CONFIG_TCC_MULTILIB_SUBDIR
 +    if (flags & AFF_MULTILIB) {
-+        char *base, buf[1024];
++        char *base;
 +
 +        base = tcc_basename(filename);
 +        snprintf(buf, sizeof(buf), "%.*s/%s/%s", (int) (base - filename - 1),
 +                 filename, CONFIG_TCC_MULTILIB_SUBDIR, base);
 +        file = tcc_open(s1, buf);
-+        if (file)
++        if (file) {
++            filename = buf;
 +            goto file_opened;
++        }
 +    }
 +#endif
      file = tcc_open(s1, filename);
      if (!file) {
          if (flags & AFF_PRINT_ERROR) {
-@@ -1969,6 +1994,9 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
+@@ -1969,6 +1999,9 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
          goto fail1;
      }
  
@@ -176,7 +188,7 @@ index dc9c885..0fa49eb 100644
      if (flags & AFF_PREPROCESS) {
          ret = tcc_preprocess(s1);
      } else if (!ext[0] || !PATHCMP(ext, "c")) {
-@@ -2062,12 +2090,22 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
+@@ -2062,12 +2095,22 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
      goto the_end;
  }
  
@@ -202,7 +214,7 @@ index dc9c885..0fa49eb 100644
  }
  
  int tcc_add_library_path(TCCState *s, const char *pathname)
-@@ -2079,6 +2117,26 @@ int tcc_add_library_path(TCCState *s, const char *pathname)
+@@ -2079,6 +2122,26 @@ int tcc_add_library_path(TCCState *s, const char *pathname)
      return 0;
  }
  
@@ -229,7 +241,7 @@ index dc9c885..0fa49eb 100644
  /* find and load a dll. Return non zero if not found */
  /* XXX: add '-rpath' option support ? */
  static int tcc_add_dll(TCCState *s, const char *filename, int flags)
-@@ -2092,6 +2150,14 @@ static int tcc_add_dll(TCCState *s, const char *filename, int flags)
+@@ -2092,6 +2155,14 @@ static int tcc_add_dll(TCCState *s, const char *filename, int flags)
          if (tcc_add_file_internal(s, buf, flags) == 0)
              return 0;
      }
@@ -244,7 +256,7 @@ index dc9c885..0fa49eb 100644
      return -1;
  }
  
-@@ -2119,6 +2185,14 @@ int tcc_add_library(TCCState *s, const char *libraryname)
+@@ -2119,6 +2190,14 @@ int tcc_add_library(TCCState *s, const char *libraryname)
          if (tcc_add_file_internal(s, buf, 0) == 0)
              return 0;
      }
@@ -259,7 +271,7 @@ index dc9c885..0fa49eb 100644
      return -1;
  }
  
-@@ -2185,8 +2259,8 @@ int tcc_set_output_type(TCCState *s, int output_type)
+@@ -2185,8 +2264,8 @@ int tcc_set_output_type(TCCState *s, int output_type)
      if ((output_type == TCC_OUTPUT_EXE || output_type == TCC_OUTPUT_DLL) &&
          !s->nostdlib) {
          if (output_type != TCC_OUTPUT_DLL)

@@ -1965,6 +1965,9 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
     ElfW(Ehdr) ehdr;
     int fd, ret;
     BufferedFile *saved_file;
+#ifdef CONFIG_TCC_MULTILIB_SUBDIR
+    char buf[1024];
+#endif
 
     /* find source file type with extension */
     ext = tcc_fileextension(filename);
@@ -1975,14 +1978,16 @@ static int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
     saved_file = file;
 #ifdef CONFIG_TCC_MULTILIB_SUBDIR
     if (flags & AFF_MULTILIB) {
-        char *base, buf[1024];
+        char *base;
 
         base = tcc_basename(filename);
         snprintf(buf, sizeof(buf), "%.*s/%s/%s", (int) (base - filename - 1),
                  filename, CONFIG_TCC_MULTILIB_SUBDIR, base);
         file = tcc_open(s1, buf);
-        if (file)
+        if (file) {
+            filename = buf;
             goto file_opened;
+        }
     }
 #endif
     file = tcc_open(s1, filename);
