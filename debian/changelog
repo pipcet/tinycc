@@ -3,6 +3,8 @@ tcc (0.9.25-8) unstable; urgency=low
   * Modify debian/rules to use patch added in 0.9.25-7 (Closes: #632089).
   * Get DEB_HOST_MULTIARCH from dpkg-architecture to ensure it is set when
     calling debian/rules manually.
+  * Fix build failure on i386: array_test should not define any parameter.
+  * Make patch for multilib consistent with regards to the filenames opened.
 
  -- Thomas Preud'homme <robotux@celest.fr>  Mon, 11 Jul 2011 14:22:57 +0200
 
