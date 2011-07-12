@@ -142,16 +142,12 @@ typedef int BOOL;
 /* path to find crt1.o, crti.o and crtn.o. Only needed when generating
    executables or dlls */
 
-#ifndef CONFIG_TCC_LDDIR
-  #if defined(TCC_TARGET_X86_64_CENTOS)
-    #define CONFIG_TCC_LDDIR "/lib64"
-  #else
-    #define CONFIG_TCC_LDDIR "/lib"
-  #endif
-#endif
-#define CONFIG_TCC_CRT_PREFIX CONFIG_SYSROOT "/usr" CONFIG_TCC_LDDIR
-#ifndef CONFIG_TCC_INCSUBDIR
-  #define CONFIG_TCC_INCSUBDIR ""
+#if defined(TCC_TARGET_X86_64_CENTOS)
+# define CONFIG_TCC_CRT_PREFIX CONFIG_SYSROOT "/usr/lib64"
+# define CONFIG_TCC_LDDIR "/lib64"
+#else
+# define CONFIG_TCC_CRT_PREFIX CONFIG_SYSROOT "/usr/lib"
+# define CONFIG_TCC_LDDIR "/lib"
 #endif
 
 #define INCLUDE_STACK_SIZE  32
@@ -427,6 +423,8 @@ struct TCCState {
 
     char **library_paths;
     int nb_library_paths;
+    char **syslibrary_paths;
+    int nb_syslibrary_paths;
 
     /* array of all loaded dlls (including those referenced by loaded
        dlls) */
@@ -904,6 +902,7 @@ ST_DATA void *rt_prog_main;
 #define AFF_PRINT_ERROR     0x0001 /* print error if file not found */
 #define AFF_REFERENCED_DLL  0x0002 /* load a referenced dll from another dll */
 #define AFF_PREPROCESS      0x0004 /* preprocess file */
+#define AFF_MULTILIB        0x0008 /* also search multilib subdir */
 
 /* public functions currently used by the tcc main function */
 PUB_FUNC char *pstrcpy(char *buf, int buf_size, const char *s);
@@ -961,6 +960,8 @@ ST_FUNC int tcc_open(TCCState *s1, const char *filename);
 ST_FUNC void tcc_close(void);
 
 ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags);
+ST_FUNC int tcc_add_sysfile(TCCState *s, const char *filename);
+ST_FUNC int tcc_add_syslibrary_path(TCCState *s, const char *pathname);
 ST_FUNC int tcc_add_dll(TCCState *s, const char *filename, int flags);
 PUB_FUNC int tcc_set_flag(TCCState *s, const char *flag_name, int value);
 PUB_FUNC void tcc_print_stats(TCCState *s, int64_t total_time);

@@ -1253,7 +1253,7 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
     if (!s1->nostdlib) {
 #ifdef CONFIG_USE_LIBGCC
         tcc_add_library(s1, "c");
-        tcc_add_file(s1, CONFIG_SYSROOT CONFIG_TCC_LDDIR"/libgcc_s.so.1");
+        tcc_add_sysfile(s1, CONFIG_SYSROOT CONFIG_TCC_LDDIR"/libgcc_s.so.1");
 #else
         tcc_add_library(s1, "c");
 #ifndef WITHOUT_LIBTCC
@@ -1267,7 +1267,7 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
     }
     /* add crt end if not memory output */
     if (s1->output_type != TCC_OUTPUT_MEMORY && !s1->nostdlib) {
-        tcc_add_file(s1, CONFIG_TCC_CRT_PREFIX "/crtn.o");
+        tcc_add_sysfile(s1, CONFIG_TCC_CRT_PREFIX "/crtn.o");
     }
 }
 
@@ -1332,19 +1332,25 @@ ST_FUNC void tcc_add_linker_symbols(TCCState *s1)
 }
 
 /* name of ELF interpreter */
-#if defined __FreeBSD__
-static const char elf_interp[] = "/libexec/ld-elf.so.1";
-#elif defined __FreeBSD_kernel__
-static char elf_interp[] = CONFIG_TCC_LDDIR"/ld.so.1";
-#elif defined TCC_ARM_EABI
-static const char elf_interp[] = CONFIG_TCC_LDDIR"/ld-linux.so.3";
-#elif defined(TCC_TARGET_X86_64)
-static const char elf_interp[] = CONFIG_TCC_LDDIR"/ld-linux-x86-64.so.2";
-#elif defined(TCC_UCLIBC)
-static const char elf_interp[] = CONFIG_TCC_LDDIR"/ld-uClibc.so.0";
+#ifdef CONFIG_TCC_MULTILIB_SUBDIR
+#define MULTILIB_SUBDIR CONFIG_TCC_MULTILIB_SUBDIR
 #else
-static const char elf_interp[] = CONFIG_TCC_LDDIR"/ld-linux.so.2";
+#define MULTILIB_SUBDIR ""
 #endif
+#if defined __FreeBSD__
+static char elf_interp[] = "/libexec/"MULTILIB_SUBDIR"/ld-elf.so.1";
+#elif defined __FreeBSD_kernel__
+static char elf_interp[] = "/lib/"MULTILIB_SUBDIR"/ld.so.1";
+#elif defined TCC_ARM_EABI
+static char elf_interp[] = "/lib/"MULTILIB_SUBDIR"/ld-linux.so.3";
+#elif defined(TCC_TARGET_X86_64)
+static char elf_interp[] = CONFIG_TCC_LDDIR"/"MULTILIB_SUBDIR"/ld-linux-x86-64.so.2";
+#elif defined(TCC_UCLIBC)
+static char elf_interp[] = "/lib/"MULTILIB_SUBDIR"/ld-uClibc.so.0";
+#else
+static char elf_interp[] = "/lib/"MULTILIB_SUBDIR"/ld-linux.so.2";
+#endif
+#undef MULTILIB_SUBDIR
 
 static void tcc_output_binary(TCCState *s1, FILE *f,
                               const int *section_order)
@@ -1498,8 +1504,25 @@ static int elf_output_file(TCCState *s1, const char *filename)
                 char *ptr;
 		/* allow override the dynamic loader */
 		const char *elfint = getenv("LD_SO");
-		if (elfint == NULL)
-		    elfint = elf_interp;
+		if (elfint == NULL) {
+#ifdef CONFIG_TCC_MULTILIB_SUBDIR
+                    int ret;
+
+                    ret = tcc_open(s1, elf_interp);
+                    if (ret >= 0)
+                        tcc_close();
+                    else {
+                        char *base, *p;
+
+                        base = tcc_basename(elf_interp);
+                        p = base - 1;
+                        while (p[-1] != '/')
+                            --p;
+                        pstrcpy(p, strlen(elf_interp), base);
+                    }
+#endif
+                    elfint = elf_interp;
+                }
                 /* add interpreter section only if executable */
                 interp = new_section(s1, ".interp", SHT_PROGBITS, SHF_ALLOC);
                 interp->sh_addralign = 1;

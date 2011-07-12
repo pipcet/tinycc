@@ -1,4 +1,5 @@
 0001-Default-to-create-progs-with-symbols-incl.-debug.patch
 0002-Make-ex1.c-and-ex4.c-be-executable-on-any-systems.patch
 0003-Fix-problem-with-PLT-and-GOT-relocs-on-armel.patch
-0004-Add-multiarch-dirs-to-linker-and-incl.-search-path.patch
+0004-Search-system-files-and-library-in-multilib-path.patch
+0005-Fix-array_test-test-take-no-parameter.patch
