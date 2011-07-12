@@ -19,7 +19,7 @@ override_dh_auto_clean:
 	[ ! -f config.mak ] || dh_auto_clean
 
 override_dh_auto_configure:
-	dh_auto_configure -- --libdir=/usr/lib/$(DEB_HOST_MULTIARCH) --tccdir=../tcc
+	dh_auto_configure -- --libdir=/usr/lib/$(DEB_HOST_MULTIARCH) --tccdir=../tcc --multilib-subdir=$(DEB_HOST_MULTIARCH)
 
 clean:
 	rm -f build
