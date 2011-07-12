@@ -4,20 +4,11 @@ tcc (0.9.26~git20110616.330d2ee-1) experimental; urgency=low
     + Fix design of previous VLA implementation
     + Allow jumps > 32MB for -run on ARM. (Closes: #592618)
 
-  * debian/patches (now contains):
-    + 0001-Default-to-create-progs-with-symbols-incl.-debug.patch:
+  * debian/patches:
+    + Remove all merged patches
+    + Add 0001-Default-to-create-progs-with-symbols-incl.-debug.patch:
       create unstripped program with debug infos.
-    + 0002-Make-ex1.c-and-ex4.c-be-executable-on-any-systems.patch
-    + 0003-Fix-problem-with-PLT-and-GOT-relocs-on-armel.patch:
-      makes tcc link correctly to libraries when both R_ARM_PLT32 and
-      R_ARM_GOT32 relocation to a same symbol.
-    + 0004-Search-system-files-and-library-in-multilib-path.patch:
-      make tcc search for system files in multiarch directories.
-    + 0005-Fix-array_test-test-take-no-parameter.patch:
-      fix test failure due to unexpected parameter in array_test.
-
-  * Add multiarch paths to libraries and include search path and search crt*.o
-    and ld.so files in multiarch paths only (Closes: #632089).
+    + Add 0002-Make-ex1.c-and-ex4.c-be-executable-on-any-systems.patch
 
   * debian/copyright:
     + document origin of source code.
@@ -25,12 +16,27 @@ tcc (0.9.26~git20110616.330d2ee-1) experimental; urgency=low
   * debian/rules:
     + Use dpkg-buildflags to set build flags (CPPFLAGS, CFLAGS and LDFLAGS).
     + Only call dh_auto_clean if config.mak exists.
-    + Use dpkg-architecture to set DEB_HOST_MULTIARCH.
     + Keep tcc directory in /usr/lib/tcc.
 
   * Point Vcs-* to anonscm.debian.org.
 
- -- Thomas Preud'homme <robotux@celest.fr>  Fri, 17 Jun 2011 14:25:07 +0200
+ -- Thomas Preud'homme <robotux@celest.fr>  Tue, 12 Jul 2011 16:59:57 +0200
+
+tcc (0.9.25-8) unstable; urgency=low
+
+  * Modify debian/rules to use patch added in 0.9.25-7 (Closes: #632089).
+  * Get DEB_HOST_MULTIARCH from dpkg-architecture to ensure it is set when
+    calling debian/rules manually.
+  * Fix build failure on i386: array_test should not define any parameter.
+  * Make patch for multilib consistent with regards to the filenames opened.
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Mon, 11 Jul 2011 14:22:57 +0200
+
+tcc (0.9.25-7) unstable; urgency=medium (fix #632089)
+
+  * Search system files and library in multilib path (Closes: #632089).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Sun, 10 Jul 2011 17:22:36 +0200
 
 tcc (0.9.25-6) unstable; urgency=low
 
