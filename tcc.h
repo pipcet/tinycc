@@ -819,8 +819,7 @@ enum tcc_token {
   #define strtoll (long long)strtol
 #endif
 #elif defined(TCC_UCLIBC) || defined(__FreeBSD__) \
-    || defined(__FreeBSD_kernel__) || defined(__DragonFly__) \
-    || defined(__OpenBSD__)
+    || defined(__DragonFly__) || defined(__OpenBSD__)
 /* currently incorrect */
 static inline long double strtold(const char *nptr, char **endptr)
 {

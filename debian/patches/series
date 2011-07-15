@@ -3,3 +3,4 @@
 0003-Fix-problem-with-PLT-and-GOT-relocs-on-armel.patch
 0004-Search-system-files-and-library-in-multilib-path.patch
 0005-Fix-array_test-test-take-no-parameter.patch
+0006-Don-t-define-strtold-and-strtof-on-Debian-kFreeBSD.patch
