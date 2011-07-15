@@ -1,3 +1,9 @@
+tcc (0.9.26~git20110616.330d2ee-2) experimental; urgency=low
+
+  * Don't define strtof and strtold on Debian GNU/kFreeBSD (fix FTBFS).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Fri, 15 Jul 2011 18:16:26 +0200
+
 tcc (0.9.26~git20110616.330d2ee-1) experimental; urgency=low
 
   * New upstream snapshot:
