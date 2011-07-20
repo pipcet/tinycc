@@ -2,8 +2,9 @@ tcc (0.9.25-9) unstable; urgency=low
 
   * Stop exporting tcc_add_file2(), tcc_add_sysfile() and
     tcc_add_syslibrary_path() functions added for multiarch transitions.
+  * Use any-i386 and any-amd64 instead of hardcoded list of architectures.
 
- -- Thomas Preud'homme <robotux@celest.fr>  Sun, 24 Jul 2011 20:30:06 +0200
+ -- Thomas Preud'homme <robotux@celest.fr>  Sun, 24 Jul 2011 21:27:09 +0200
 
 tcc (0.9.25-8) unstable; urgency=low
 
