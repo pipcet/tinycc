@@ -1,3 +1,10 @@
+tcc (0.9.25-9) unstable; urgency=low
+
+  * Stop exporting tcc_add_file2(), tcc_add_sysfile() and
+    tcc_add_syslibrary_path() functions added for multiarch transitions.
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Sun, 24 Jul 2011 20:30:06 +0200
+
 tcc (0.9.25-8) unstable; urgency=low
 
   * Modify debian/rules to use patch added in 0.9.25-7 (Closes: #632089).
