@@ -53,11 +53,6 @@ LIBTCCAPI void tcc_undefine_symbol(TCCState *s, const char *sym);
    script). Return -1 if error. */
 LIBTCCAPI int tcc_add_file(TCCState *s, const char *filename);
 
-/* add a system file (either a C file, dll, an object, a library or an
-   ld script). This file will also be searched in multilib subdir.
-   Return -1 if error. */
-LIBTCCAPI int tcc_add_sysfile(TCCState *s, const char *filename);
-
 /* compile a string containing a C source. Return non zero if
    error. */
 LIBTCCAPI int tcc_compile_string(TCCState *s, const char *buf);
@@ -80,9 +75,6 @@ LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type);
 
 /* equivalent to -Lpath option */
 LIBTCCAPI int tcc_add_library_path(TCCState *s, const char *pathname);
-
-/* Each system library path is searched with and without multilib subdir */
-LIBTCCAPI int tcc_add_syslibrary_path(TCCState *s, const char *pathname);
 
 /* the library name is the same as the argument of the '-l' option */
 LIBTCCAPI int tcc_add_library(TCCState *s, const char *libraryname);

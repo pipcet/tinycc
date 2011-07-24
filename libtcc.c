@@ -239,6 +239,16 @@ static int tcc_assemble(TCCState *s1, int do_preprocess);
 static void asm_instr(void);
 static void asm_global_instr(void);
 
+/* libtcc.c (extra function added for Debian multiarch transition */
+
+/* add a system file (either a C file, dll, an object, a library or an
+   ld script). This file will also be searched in multilib subdir.
+   Return -1 if error. */
+static int tcc_add_sysfile(TCCState *s, const char *filename);
+
+/* Each system library path is searched with and without multilib subdir */
+static int tcc_add_syslibrary_path(TCCState *s, const char *pathname);
+
 /********************************************************/
 /* global variables */
 
@@ -2095,7 +2105,7 @@ file_opened:
     goto the_end;
 }
 
-int tcc_add_file2(TCCState *s, const char *filename, int flags)
+static int tcc_add_file2(TCCState *s, const char *filename, int flags)
 {
     if (s->output_type == TCC_OUTPUT_PREPROCESS)
         return tcc_add_file_internal(s, filename, AFF_PRINT_ERROR | AFF_PREPROCESS | flags);
@@ -2108,7 +2118,7 @@ int tcc_add_file(TCCState *s, const char *filename)
     return tcc_add_file2(s, filename, 0);
 }
 
-int tcc_add_sysfile(TCCState *s, const char *filename)
+static int tcc_add_sysfile(TCCState *s, const char *filename)
 {
     return tcc_add_file2(s, filename, AFF_MULTILIB);
 }
@@ -2122,7 +2132,7 @@ int tcc_add_library_path(TCCState *s, const char *pathname)
     return 0;
 }
 
-int tcc_add_syslibrary_path(TCCState *s, const char *pathname)
+static int tcc_add_syslibrary_path(TCCState *s, const char *pathname)
 {
     char *pathname1;
 
