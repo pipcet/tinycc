@@ -1,0 +1,55 @@
+From 395d73251f2de6d3d74fe503c341c10391cd1081 Mon Sep 17 00:00:00 2001
+From: Joe Soroka <gits@joesoroka.com>
+Date: Sat, 30 Jul 2011 22:57:53 +0200
+Subject: Don't accept VLA outside functions
+
+Since no code should be generated outside a function, consider only
+fixed size array via expr_const when outside a function since gexpr()
+can generate code (e.g. ternary operator in expr_cond with const_wanted
+unset).
+
+Origin: upstream, http://repo.or.cz/w/tinycc.git/commit/9b52e16a50e7ed86b4fec6736cd32421fa90785a
+Forwarded: http://repo.or.cz/w/tinycc.git/commit/9b52e16a50e7ed86b4fec6736cd32421fa90785a
+Last-Updated: 2011-07-31
+---
+ tccgen.c        |    6 +++---
+ tests/tcctest.c |    2 ++
+ 2 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/tccgen.c b/tccgen.c
+index 2ce6820..b02b154 100644
+--- a/tccgen.c
++++ b/tccgen.c
+@@ -3162,13 +3162,13 @@ static void post_type(CType *type, AttributeDef *ad)
+         n = -1;
+         t1 = 0;
+         if (tok != ']') {
+-            gexpr();
++            if (!local_stack || nocode_wanted)
++                 vpushi(expr_const());
++            else gexpr();
+             if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST) {
+                 n = vtop->c.i;
+                 if (n < 0)
+                     error("invalid array size");
+-            } else if (!local_stack) {
+-                error("expected constant expression (variably modified array at file scope)");
+             } else {
+                 if (!is_integer_btype(vtop->type.t & VT_BTYPE))
+                     error("size of variable length array should be an integer");
+diff --git a/tests/tcctest.c b/tests/tcctest.c
+index 1ca2f6b..fcdf35a 100644
+--- a/tests/tcctest.c
++++ b/tests/tcctest.c
+@@ -2076,6 +2076,8 @@ void *bounds_checking_is_enabled()
+     return (ca != cp + 1) ? cp : NULL;
+ }
+ 
++typedef int constant_negative_array_size_as_compile_time_assertion_idiom[(1 ? 2 : 0) - 1];
++
+ void c99_vla_test(int size1, int size2)
+ {
+ #if defined __i386__ || defined __x86_64__
+-- 
+1.7.5.4
+

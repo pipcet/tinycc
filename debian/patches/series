@@ -4,4 +4,4 @@
 0004-Search-system-files-and-library-in-multilib-path.patch
 0005-Fix-array_test-test-take-no-parameter.patch
 0006-Don-t-define-strtold-and-strtof-on-Debian-kFreeBSD.patch
-0007-Force-const.-expr.-in-expr_cond-outside-function.patch
+0007-Don-t-accept-VLA-outside-functions.patch
