@@ -1,0 +1,32 @@
+From 7e0a385534fef1ce1d697802b1a31c55da3482d4 Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
+Date: Sat, 30 Jul 2011 22:57:53 +0200
+Subject: Force const. expr. in expr_cond outside function
+
+Since no code should be generated outside a function, force expr_cond to
+only consider constant expression when outside a function since the
+generic code path in expr_cond can generate some code.
+
+Origin: vendor
+Forwarded: http://repo.or.cz/w/tinycc.git/commit/b2f5ee9b2de40e26ba3d92cf3950be6da7766b7d
+Last-Updated: 2011-07-31
+---
+ tccgen.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/tccgen.c b/tccgen.c
+index 2ce6820..d61e921 100644
+--- a/tccgen.c
++++ b/tccgen.c
+@@ -4034,7 +4034,7 @@ static void expr_cond(void)
+     SValue sv;
+     CType type, type1, type2;
+ 
+-    if (const_wanted) {
++    if (const_wanted || (cur_text_section == NULL)) {
+         expr_lor_const();
+         if (tok == '?') {
+             CType boolean;
+-- 
+1.7.5.4
+
