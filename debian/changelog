@@ -1,8 +1,10 @@
 tcc (0.9.26~git20110616.330d2ee-3) experimental; urgency=low
 
   * Use any-i386 and any-amd64 instead of hardcoded list of architectures.
+  * Fix Hurd FTBFS by forcing expr_cond to only consider constant expression
+    outside functions.
 
- -- Thomas Preud'homme <robotux@celest.fr>  Wed, 20 Jul 2011 15:52:00 +0200
+ -- Thomas Preud'homme <robotux@celest.fr>  Sun, 31 Jul 2011 13:49:20 +0200
 
 tcc (0.9.26~git20110616.330d2ee-2) experimental; urgency=low
 
