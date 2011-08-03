@@ -1,6 +1,7 @@
 tcc (0.9.26~git20110616.330d2ee-4) experimental; urgency=low
 
   * Replace old patch fixing Hurd FTBFS by the one accepted upstream.
+  * Insert missing changelog for tcc 0.9.25-9.
 
  -- Thomas Preud'homme <robotux@celest.fr>  Sun, 31 Jul 2011 21:43:49 +0200
 
@@ -11,6 +12,14 @@ tcc (0.9.26~git20110616.330d2ee-3) experimental; urgency=low
     outside functions.
 
  -- Thomas Preud'homme <robotux@celest.fr>  Sun, 31 Jul 2011 13:49:20 +0200
+
+tcc (0.9.25-9) unstable; urgency=low
+
+  * Stop exporting tcc_add_file2(), tcc_add_sysfile() and
+    tcc_add_syslibrary_path() functions added for multiarch transitions.
+  * Use any-i386 and any-amd64 instead of hardcoded list of architectures.
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Sun, 24 Jul 2011 21:27:09 +0200
 
 tcc (0.9.26~git20110616.330d2ee-2) experimental; urgency=low
 
