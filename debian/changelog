@@ -1,3 +1,10 @@
+tcc (0.9.25-10) unstable; urgency=medium
+
+  * Stop wrongly using multiarch dynamic loader as elf interpreter, eg. back
+    to use /lib64/ld-linux-x86-64.so.2 for amd64 (Closes: #636541).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Wed, 03 Aug 2011 18:04:35 +0200
+
 tcc (0.9.26~git20110616.330d2ee-4) experimental; urgency=low
 
   * Replace old patch fixing Hurd FTBFS by the one accepted upstream.
