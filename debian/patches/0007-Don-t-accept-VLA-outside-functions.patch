@@ -1,4 +1,4 @@
-From 395d73251f2de6d3d74fe503c341c10391cd1081 Mon Sep 17 00:00:00 2001
+From 27c101303e81dd46c4a52ca2f95c384d6a0c554a Mon Sep 17 00:00:00 2001
 From: Joe Soroka <gits@joesoroka.com>
 Date: Sat, 30 Jul 2011 22:57:53 +0200
 Subject: Don't accept VLA outside functions

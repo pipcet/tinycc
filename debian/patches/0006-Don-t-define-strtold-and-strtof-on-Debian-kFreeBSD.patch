@@ -1,4 +1,4 @@
-From ecaabab3b9e24ba94442dc2401e876592dc4c4e6 Mon Sep 17 00:00:00 2001
+From dfe24629f982fab7300995faddd771dd5ca22b4f Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Fri, 15 Jul 2011 18:13:56 +0200
 Subject: Don't define strtold and strtof on Debian kFreeBSD
