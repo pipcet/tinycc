@@ -1,4 +1,4 @@
-From 13018d64cd93a2273c4284cdef6c89d8e64419e3 Mon Sep 17 00:00:00 2001
+From 1e1846b574fa32c0976e78fea3bde27df66644b2 Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <thomas.preudhomme@celest.fr>
 Date: Mon, 11 Jul 2011 16:06:07 +0200
 Subject: Fix array_test: test take no parameter
