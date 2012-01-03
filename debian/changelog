@@ -1,3 +1,11 @@
+tcc (0.9.25-11) unstable; urgency=medium
+
+  * Change ELF interpreter from /lib/ld-linux-x86-64.so.2 — contrary to what
+    announces previous entry — to /lib64/ld-linux-x86-64.so.2
+    (Closes: #653941).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Tue, 03 Jan 2012 15:53:32 +0100
+
 tcc (0.9.25-10) unstable; urgency=medium
 
   * Stop wrongly using multiarch dynamic loader as elf interpreter, eg. back
