@@ -72,6 +72,3 @@ index 5b38f28..c2d0666 100755
  fi
  
  cc="${cross_prefix}${cc}"
--- 
-1.7.5.4
-

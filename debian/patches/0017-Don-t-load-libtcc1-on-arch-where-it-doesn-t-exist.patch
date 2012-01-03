@@ -46,6 +46,3 @@ index 9d66512..f256575 100644
      }
      /* add crt end if not memory output */
      if (s1->output_type != TCC_OUTPUT_MEMORY && !s1->nostdlib) {
--- 
-1.7.5.4
-

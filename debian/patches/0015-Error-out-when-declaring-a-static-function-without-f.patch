@@ -29,6 +29,3 @@ index 5fa9f43..fee07ae 100644
                  /* if old style function prototype, we accept a
                     declaration list */
                  sym = type.ref;
--- 
-1.7.5.4
-

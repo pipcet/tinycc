@@ -1,0 +1,30 @@
+From bcdf938c355c20a49a82ccd3aeec36048298081c Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <robotux@celest.fr>
+Date: Tue, 3 Jan 2012 15:49:02 +0100
+Subject: Use /lib64/ld-linux-x86-64.so.2 as ELF interpreter
+
+On Debian, dynamic linker is now at /lib64/ld-linux-x86-64.so.2
+Not that upstream code now detect whether the dynamic linker reside in
+/lib or /lib64.
+
+Origin: vendor
+Bug-Debian: http://bugs.debian.org/653941
+Forwarded: not-needed
+Last-Update: 2012-01-03
+---
+ tccelf.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/tccelf.c b/tccelf.c
+index ede5566..26ffe09 100644
+--- a/tccelf.c
++++ b/tccelf.c
+@@ -1286,7 +1286,7 @@ static char elf_interp[] = "/lib/ld.so";
+ #elif defined TCC_ARM_EABI
+ static char elf_interp[] = "/lib/ld-linux.so.3";
+ #elif defined(TCC_TARGET_X86_64)
+-static char elf_interp[] = "/lib/ld-linux-x86-64.so.2";
++static char elf_interp[] = "/lib64/ld-linux-x86-64.so.2";
+ #elif defined(TCC_UCLIBC)
+ static char elf_interp[] = "/lib/ld-uClibc.so.0";
+ #else

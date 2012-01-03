@@ -42,6 +42,3 @@ index be9c4cc..4986d26 100644
  #include "libtcc.h"
  
  /* parser debug */
--- 
-1.7.5.4
-

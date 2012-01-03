@@ -202,6 +202,3 @@ index f9568af..03eaf46 100644
                      } else {
                          type.t |= (btype.t & VT_STATIC); /* Retain "static". */
                          if (type.t & VT_STATIC)
--- 
-1.7.5.4
-

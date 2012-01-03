@@ -1286,7 +1286,7 @@ static char elf_interp[] = "/lib/ld.so";
 #elif defined TCC_ARM_EABI
 static char elf_interp[] = "/lib/ld-linux.so.3";
 #elif defined(TCC_TARGET_X86_64)
-static char elf_interp[] = "/lib/ld-linux-x86-64.so.2";
+static char elf_interp[] = "/lib64/ld-linux-x86-64.so.2";
 #elif defined(TCC_UCLIBC)
 static char elf_interp[] = "/lib/ld-uClibc.so.0";
 #else

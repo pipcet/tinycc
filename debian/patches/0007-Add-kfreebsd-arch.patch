@@ -149,6 +149,3 @@ index 5463c5f..11ee951 100644
  		if (s->sh_type == SHT_DYNSYM)
  		    patch_dynsym_undef(s1, s);
  #endif
--- 
-1.7.5.4
-

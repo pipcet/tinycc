@@ -55,6 +55,3 @@ index f256575..e7e2541 100644
                                  put_elf_reloc(s1->dynsym, bss_section, 
                                                offset, R_COPY, index);
                                  offset += esym->st_size;
--- 
-1.7.5.4
-

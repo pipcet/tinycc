@@ -163,6 +163,3 @@ index 11ee951..c5e5046 100644
          }
          t = ld_next(s1, filename, sizeof(filename));
          if (t == ',') {
--- 
-1.7.5.4
-

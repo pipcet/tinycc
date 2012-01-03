@@ -72,6 +72,3 @@ index bd9204b..f3cc538 100644
    fi
    echo "$result: $src"  >> tcc.sum
  done
--- 
-1.7.5.4
-

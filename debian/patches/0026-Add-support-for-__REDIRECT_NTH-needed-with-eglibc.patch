@@ -30,6 +30,3 @@ index 4508f9f..dc9c885 100644
      
  #ifndef TCC_TARGET_PE
      /* default library paths */
--- 
-1.7.5.4
-

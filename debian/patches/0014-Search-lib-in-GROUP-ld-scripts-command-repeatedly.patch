@@ -152,6 +152,3 @@ index c5e5046..9d66512 100644
              if (ret)
                  return ret;
          } else if (!strcmp(cmd, "OUTPUT_FORMAT") ||
--- 
-1.7.5.4
-

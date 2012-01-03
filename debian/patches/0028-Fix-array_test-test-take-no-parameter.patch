@@ -29,6 +29,3 @@ index a2d481a..3f39cd9 100644
  
      printf("array:\n");
      printf("sizeof(a) = %d\n", sizeof(a));
--- 
-1.7.5.4
-

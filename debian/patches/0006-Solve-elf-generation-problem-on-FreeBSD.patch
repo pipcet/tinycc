@@ -273,6 +273,3 @@ index 4020e24..5463c5f 100644
                  while (offset < s->sh_offset) {
                      fputc(0, f);
                      offset++;
--- 
-1.7.5.4
-

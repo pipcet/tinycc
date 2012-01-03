@@ -114,6 +114,3 @@ index 7be7760..1521228 100755
  echo "docdir=$docdir" >> config.mak
  echo "#define CONFIG_SYSROOT \"$sysroot\"" >> $TMPH
  echo "#define CONFIG_TCCDIR \"$tccdir\"" >> $TMPH
--- 
-1.7.5.4
-

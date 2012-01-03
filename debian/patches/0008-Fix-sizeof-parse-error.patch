@@ -79,6 +79,3 @@ index b4b5d59..5fa9f43 100644
          size = type_size(&type, &align);
          if (t == TOK_SIZEOF) {
              if (size < 0)
--- 
-1.7.5.4
-
