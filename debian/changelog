@@ -1,3 +1,9 @@
+tcc (0.9.25-12) unstable; urgency=medium
+
+  * Correct size_t and ptrdiff_t type on amd64 (Closes: #654436).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Wed, 04 Jan 2012 11:30:56 +0100
+
 tcc (0.9.25-11) unstable; urgency=medium
 
   * Change ELF interpreter from /lib/ld-linux-x86-64.so.2 — contrary to what
