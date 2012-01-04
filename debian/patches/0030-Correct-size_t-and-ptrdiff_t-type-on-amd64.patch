@@ -1,0 +1,34 @@
+From d727f68878133b656b458d72cea087d3bff36cda Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <robotux@celest.fr>
+Date: Tue, 3 Jan 2012 22:06:30 +0100
+Subject: Correct size_t and ptrdiff_t type on amd64
+
+Define size_t and ptrdiff_t to unsigned int and int respectively on
+amd64, as required by the ABI.
+
+Bug-Debian: http://bugs.debian.org/654436
+Origin: vendor
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2012-01/msg00008.html
+Last-Update: 2012-01-04
+---
+ libtcc.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/libtcc.c b/libtcc.c
+index eaa0bdf..ca2b88e 100644
+--- a/libtcc.c
++++ b/libtcc.c
+@@ -1855,8 +1855,13 @@ TCCState *tcc_new(void)
+     tcc_define_symbol(s, "__TINYC__", NULL);
+ 
+     /* tiny C & gcc defines */
++#ifdef TCC_TARGET_X86_64
++    tcc_define_symbol(s, "__SIZE_TYPE__", "unsigned long");
++    tcc_define_symbol(s, "__PTRDIFF_TYPE__", "long");
++#else
+     tcc_define_symbol(s, "__SIZE_TYPE__", "unsigned int");
+     tcc_define_symbol(s, "__PTRDIFF_TYPE__", "int");
++#endif
+ #ifdef TCC_TARGET_PE
+     tcc_define_symbol(s, "__WCHAR_TYPE__", "unsigned short");
+ #else

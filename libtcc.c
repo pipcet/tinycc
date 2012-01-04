@@ -1855,8 +1855,13 @@ TCCState *tcc_new(void)
     tcc_define_symbol(s, "__TINYC__", NULL);
 
     /* tiny C & gcc defines */
+#ifdef TCC_TARGET_X86_64
+    tcc_define_symbol(s, "__SIZE_TYPE__", "unsigned long");
+    tcc_define_symbol(s, "__PTRDIFF_TYPE__", "long");
+#else
     tcc_define_symbol(s, "__SIZE_TYPE__", "unsigned int");
     tcc_define_symbol(s, "__PTRDIFF_TYPE__", "int");
+#endif
 #ifdef TCC_TARGET_PE
     tcc_define_symbol(s, "__WCHAR_TYPE__", "unsigned short");
 #else
