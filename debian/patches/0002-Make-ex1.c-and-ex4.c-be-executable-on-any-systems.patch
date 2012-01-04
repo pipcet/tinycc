@@ -50,6 +50,3 @@ index b33b033..7611910 100755
  #include <stdlib.h>
  #include <stdio.h>
  #include <X11/Xlib.h>
--- 
-1.7.5.4
-

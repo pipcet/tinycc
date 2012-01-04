@@ -5,3 +5,4 @@
 0005-Fix-array_test-test-take-no-parameter.patch
 0006-Don-t-define-strtold-and-strtof-on-Debian-kFreeBSD.patch
 0007-Don-t-accept-VLA-outside-functions.patch
+0008-Fix-linkage-of-named-file-in-loader-script.patch

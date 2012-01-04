@@ -106,6 +106,3 @@ index 7d2b2db..d2049af 100755
  if test "$use_libgcc" = "yes" ; then
    echo "#define CONFIG_USE_LIBGCC" >> $TMPH
    echo "CONFIG_USE_LIBGCC=yes" >> config.mak
--- 
-1.7.5.4
-

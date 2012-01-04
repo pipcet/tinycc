@@ -50,6 +50,3 @@ index 1ca2f6b..fcdf35a 100644
  void c99_vla_test(int size1, int size2)
  {
  #if defined __i386__ || defined __x86_64__
--- 
-1.7.5.4
-

@@ -27,6 +27,3 @@ index d8b4400..1edf31b 100644
  /* currently incorrect */
  static inline long double strtold(const char *nptr, char **endptr)
  {
--- 
-1.7.5.4
-

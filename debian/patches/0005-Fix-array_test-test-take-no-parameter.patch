@@ -30,6 +30,3 @@ index 8d558e3..1ca2f6b 100644
  
      printf("array:\n");
      printf("sizeof(a) = %d\n", sizeof(a));
--- 
-1.7.5.4
-

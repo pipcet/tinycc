@@ -341,6 +341,3 @@ index d617146..359af5a 100644
                  /* add interpreter section only if executable */
                  interp = new_section(s1, ".interp", SHT_PROGBITS, SHF_ALLOC);
                  interp->sh_addralign = 1;
--- 
-1.7.5.4
-
