@@ -1,3 +1,9 @@
+tcc (0.9.25-13) unstable; urgency=low
+
+  * Fix linkage of named file in loader script (Closes: #654528).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Wed, 04 Jan 2012 16:50:01 +0100
+
 tcc (0.9.25-12) unstable; urgency=medium
 
   * Correct size_t and ptrdiff_t type on amd64 (Closes: #654436).
