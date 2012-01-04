@@ -28,3 +28,4 @@
 0028-Fix-array_test-test-take-no-parameter.patch
 0029-Use-lib64-ld-linux-x86-64.so.2-as-ELF-interpreter.patch
 0030-Correct-size_t-and-ptrdiff_t-type-on-amd64.patch
+0031-Fix-linkage-of-named-file-in-loader-script.patch
