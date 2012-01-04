@@ -1,3 +1,10 @@
+tcc (0.9.26~git20110616.330d2ee-5) experimental; urgency=low
+
+  * Incorporate the fix in sid for linkage of named file in loader script
+    (Closes: #654528).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Wed, 04 Jan 2012 17:23:31 +0100
+
 tcc (0.9.25-13) unstable; urgency=low
 
   * Fix linkage of named file in loader script (Closes: #654528).
