@@ -18,10 +18,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if defined NOTALLINONE || defined TCC_USE_LIBTCC
-#include "tcc.h"
-#else
+#ifdef ONE_SOURCE
 #include "libtcc.c"
+#else
+#include "tcc.h"
 #endif
 
 static char **files;
@@ -30,10 +30,11 @@ static int multiple_files;
 static int print_search_dirs;
 static int output_type;
 static int reloc_output;
-static const char *outfile;
+static char *outfile;
 static int do_bench = 0;
 static int gen_deps;
 static const char *deps_outfile;
+static const char *m_option;
 
 #define TCC_OPTION_HAS_ARG 0x0001
 #define TCC_OPTION_NOSEP   0x0002 /* cannot have space before option and arg */
@@ -216,79 +217,61 @@ static int expand_args(char ***pargv, const char *str)
     return argc;
 }
 
-#if defined(TCC_TARGET_X86_64) || defined (TCC_TARGET_I386)
-
+/* re-execute the i386/x86_64 cross-compilers with tcc -m32/-m64: */
+#if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
 #ifdef _WIN32
-#define CAST (const char * const *)
+#include <process.h>
+static int execvp_win32(const char *prog, char **argv)
+{
+    int ret = spawnvp(P_NOWAIT, prog, (char const*const*)argv);
+    if (-1 == ret)
+        return ret;
+    cwait(&ret, ret, WAIT_CHILD);
+    exit(ret);
+}
+#define execvp execvp_win32
+#endif
+static void exec_other_tcc(TCCState *s, char **argv, const char *optarg)
+{
+    char child_path[4096], *child_name; const char *target;
+    switch (atoi(optarg)) {
+#ifdef TCC_TARGET_I386
+        case 32: break;
+        case 64: target = "x86_64";
 #else
-#define CAST (char * const *)
+        case 64: break;
+        case 32: target = "i386";
 #endif
-
-#if defined(TCC_TARGET_X86_64)
-#define ARG 32
-#define CHILD "i386"
-#elif defined (TCC_TARGET_I386)
-#define ARG 64
-#define CHILD "x86_64"
+            pstrcpy(child_path, sizeof child_path - 40, argv[0]);
+            child_name = tcc_basename(child_path);
+            strcpy(child_name, target);
+#ifdef TCC_TARGET_PE
+            strcat(child_name, "-win32");
 #endif
-
-static char *ssuffix(const char *oldname, const char sep)
-{
-    char *p, *name = tcc_strdup(oldname);
-    p = strchr(name, sep);
-    if (p)
-        return p + 1;
-    /* prefix "win32-" when file extension is present */
-    if (*tcc_fileextension(name)){
-        name = tcc_realloc(name, strlen(oldname + 7));
-        sprintf(name, "win32-%s", oldname);
-    }
-    return name;
-}
-
-static void exec_other_tcc(TCCState *s, int argc,
-    char **argv,const char *optarg, int optind)
-{
-    char child_path[4096],child_name[4096];
-    char *parent,*child_tcc;
-    int opt = atoi(optarg);
-    if (strlen(argv[0]) > 4000)
-        error("-m%i unsafe path length", ARG);
-    switch (opt) {
-        case ARG + 1: /* oops we called ourselves */
-            error("-m%i cross compiler not installed", ARG);
+            strcat(child_name, "-tcc");
+            if (strcmp(argv[0], child_path)) {
+                if (s->verbose > 0)
+                    printf("tcc: using '%s'\n", child_name), fflush(stdout);
+                execvp(argv[0] = child_path, argv);
+            }
+            tcc_error("'%s' not found", child_name);
+        case 0: /* ignore -march etc. */
             break;
-        case ARG:
-        {
-            parent = tcc_basename(argv[0]);
-            child_tcc = ssuffix(parent,'-');
-            sprintf(child_name, CHILD "-%s", child_tcc);
-            tcc_free(child_tcc);
-            if (strcmp(parent, child_name)) {
-                /* child_path = dirname */
-                pstrcpy(child_path, parent - argv[0] + 1, argv[0]);
-                child_tcc = strchr(child_path, 0);
-                strcpy(child_tcc, child_name);
-                if (0 < s->verbose)
-                    printf("%s -m%i -> %s\n",
-                         parent, ARG, child_path);
-                sprintf(argv[optind],"-m%i", ARG + 1); /* no loop */
-                execvp(child_path, CAST argv);
-                sprintf(child_tcc,"tcc%s",tcc_fileextension(parent));
-                execvp(child_path, CAST argv);
-                error("-m%i cross compiler not found", ARG);
-            } else error("-m%i unsupported configuration", ARG);
-        }
-        case 96 ^  ARG     : break;
-        case 96 ^ (ARG + 1): break;
         default:
-            warning("usupported option \"-m%s\"",optarg);
+            tcc_warning("unsupported option \"-m%s\"", optarg);
     }
 }
-#undef CAST
-#undef ARG
-#undef CHILD
 #endif
+
+static void parse_option_D(TCCState *s1, const char *optarg)
+{
+    char *sym = tcc_strdup(optarg);
+    char *value = strchr(sym, '=');
+    if (value)
+        *value++ = '\0';
+    tcc_define_symbol(s1, sym, value);
+    tcc_free(sym);
+}
 
 static int parse_args(TCCState *s, int argc, char **argv)
 {
@@ -300,7 +283,7 @@ static int parse_args(TCCState *s, int argc, char **argv)
 
     was_pthread = 0; /* is set if commandline contains -pthread key */
 
-    optind = 0;
+    optind = 1;
     while (optind < argc) {
 
         r = argv[optind++];
@@ -318,7 +301,7 @@ static int parse_args(TCCState *s, int argc, char **argv)
             for(;;) {
                 p1 = popt->name;
                 if (p1 == NULL)
-                    error("invalid option -- '%s'", r);
+                    tcc_error("invalid option -- '%s'", r);
                 r1 = r + 1;
                 for(;;) {
                     if (*p1 == '\0')
@@ -336,7 +319,7 @@ static int parse_args(TCCState *s, int argc, char **argv)
                     optarg = r1;
                 } else {
                     if (optind >= argc)
-                        error("argument to '%s' is missing", r);
+                        tcc_error("argument to '%s' is missing", r);
                     optarg = argv[optind++];
                 }
             } else {
@@ -351,19 +334,10 @@ static int parse_args(TCCState *s, int argc, char **argv)
 
             case TCC_OPTION_I:
                 if (tcc_add_include_path(s, optarg) < 0)
-                    error("too many include paths");
+                    tcc_error("too many include paths");
                 break;
             case TCC_OPTION_D:
-                {
-                    char *sym, *value;
-                    sym = (char *)optarg;
-                    value = strchr(sym, '=');
-                    if (value) {
-                        *value = '\0';
-                        value++;
-                    }
-                    tcc_define_symbol(s, sym, value);
-                }
+                parse_option_D(s, optarg);
                 break;
             case TCC_OPTION_U:
                 tcc_undefine_symbol(s, optarg);
@@ -374,12 +348,6 @@ static int parse_args(TCCState *s, int argc, char **argv)
             case TCC_OPTION_B:
                 /* set tcc utilities path (mainly for tcc development) */
                 tcc_set_lib_path(s, optarg);
-                /* append /include and add it as -isystem, as gcc does */
-                r = tcc_strdup(optarg);
-                r = tcc_realloc(r, strlen(r) + 8 + 1);
-                strcat(r, "/include");
-                tcc_add_sysinclude_path(s, r);
-                tcc_free(r);
                 break;
             case TCC_OPTION_l:
                 dynarray_add((void ***)&files, &nb_files, r);
@@ -387,14 +355,14 @@ static int parse_args(TCCState *s, int argc, char **argv)
                 break;
             case TCC_OPTION_pthread:
                 was_pthread = 1;
-                tcc_define_symbol(s, "_REENTRANT", "1");
+                parse_option_D(s, "_REENTRANT");
                 break;
             case TCC_OPTION_bench:
                 do_bench = 1;
                 break;
 #ifdef CONFIG_TCC_BACKTRACE
             case TCC_OPTION_bt:
-                set_num_callers(atoi(optarg));
+                tcc_set_num_callers(atoi(optarg));
                 break;
 #endif
 #ifdef CONFIG_TCC_BCHECK
@@ -419,14 +387,12 @@ static int parse_args(TCCState *s, int argc, char **argv)
             case TCC_OPTION_soname:
                 s->soname = optarg;
                 break;
-#if defined(TCC_TARGET_X86_64) || defined (TCC_TARGET_I386)
             case TCC_OPTION_m:
-                    exec_other_tcc(s, argc+1, argv-1, optarg, optind);
+                m_option = optarg;
                 break;
-#endif
             case TCC_OPTION_o:
                 multiple_files = 1;
-                outfile = optarg;
+                outfile = tcc_strdup(optarg);
                 break;
             case TCC_OPTION_r:
                 /* generate a .o merging several output files */
@@ -446,22 +412,19 @@ static int parse_args(TCCState *s, int argc, char **argv)
                 print_search_dirs = 1;
                 break;
             case TCC_OPTION_run:
-                {
-                    int argc1;
-                    char **argv1;
-                    argc1 = expand_args(&argv1, optarg);
-                    if (argc1 > 0) {
-                        parse_args(s, argc1, argv1);
-                    }
-                    multiple_files = 0;
-                    output_type = TCC_OUTPUT_MEMORY;
+            {
+                int argc1;
+                char **argv1;
+                argc1 = expand_args(&argv1, optarg);
+                if (argc1 > 0) {
+                    parse_args(s, argc1, argv1);
                 }
+                multiple_files = 0;
+                output_type = TCC_OUTPUT_MEMORY;
                 break;
+            }
             case TCC_OPTION_v:
-                do {
-                    if (0 == s->verbose++)
-                        printf("tcc version %s\n", TCC_VERSION);
-                } while (*optarg++ == 'v');
+                do ++s->verbose; while (*optarg++ == 'v');
                 break;
             case TCC_OPTION_f:
                 if (tcc_set_flag(s, optarg, 1) < 0 && s->warn_unsupported)
@@ -479,10 +442,8 @@ static int parse_args(TCCState *s, int argc, char **argv)
                 s->rdynamic = 1;
                 break;
             case TCC_OPTION_Wl:
-                {
-                    if ((r = (char *) tcc_set_linker(s, (char *)optarg, TRUE)))
-                        error("unsupported linker option '%s'", r);
-                }
+                if ((r = (char *) tcc_set_linker(s, (char *)optarg, TRUE)))
+                    tcc_error("unsupported linker option '%s'", r);
                 break;
             case TCC_OPTION_E:
                 output_type = TCC_OUTPUT_PREPROCESS;
@@ -498,20 +459,18 @@ static int parse_args(TCCState *s, int argc, char **argv)
             default:
                 if (s->warn_unsupported) {
                 unsupported_option:
-                    warning("unsupported option '%s'", r);
+                    tcc_warning("unsupported option '%s'", r);
                 }
                 break;
             }
         }
     }
     /* fixme: these options could be different on your platform */
-    if (was_pthread
-        && output_type != TCC_OUTPUT_OBJ)
-    {
+    if (was_pthread && output_type != TCC_OUTPUT_OBJ) {
         dynarray_add((void ***)&files, &nb_files, "-lpthread");
         nb_libraries++;
     }
-    return optind + 1;
+    return optind;
 }
 
 int main(int argc, char **argv)
@@ -520,6 +479,7 @@ int main(int argc, char **argv)
     TCCState *s;
     int nb_objfiles, ret, optind;
     int64_t start_time = 0;
+    const char *default_file = NULL;
 
     s = tcc_new();
 
@@ -531,14 +491,25 @@ int main(int argc, char **argv)
     nb_libraries = 0;
     reloc_output = 0;
     print_search_dirs = 0;
+    m_option = NULL;
     ret = 0;
 
-    optind = parse_args(s, argc - 1, argv + 1);
+    optind = parse_args(s, argc, argv);
+
+#if defined TCC_TARGET_X86_64 || defined TCC_TARGET_I386
+    if (m_option)
+        exec_other_tcc(s, argv, m_option);
+#endif
+
     if (print_search_dirs) {
         /* enough for Linux kernel */
         printf("install: %s/\n", s->tcc_lib_path);
         return 0;
     }
+
+    if (s->verbose)
+        printf("tcc version %s\n", TCC_VERSION);
+
     if (optind == 0 || nb_files == 0) {
         if (optind && s->verbose)
             return 0;
@@ -557,19 +528,18 @@ int main(int argc, char **argv)
     if (output_type == TCC_OUTPUT_OBJ && !reloc_output) {
         /* accepts only a single input file */
         if (nb_objfiles != 1)
-            error("cannot specify multiple files with -c");
+            tcc_error("cannot specify multiple files with -c");
         if (nb_libraries != 0)
-            error("cannot specify libraries with -c");
+            tcc_error("cannot specify libraries with -c");
     }
     
-
     if (output_type == TCC_OUTPUT_PREPROCESS) {
         if (!outfile) {
             s->outfile = stdout;
         } else {
             s->outfile = fopen(outfile, "w");
             if (!s->outfile)
-                error("could not open '%s'", outfile);
+                tcc_error("could not open '%s'", outfile);
         }
     }
 
@@ -587,7 +557,7 @@ int main(int argc, char **argv)
         filename = files[i];
         if (filename[0] == '-' && filename[1] == 'l') {
             if (tcc_add_library(s, filename + 2) < 0) {
-                error_noabort("cannot find %s", filename);
+                tcc_error_noabort("cannot find %s", filename);
                 ret = 1;
             }
         } else {
@@ -595,6 +565,8 @@ int main(int argc, char **argv)
                 printf("-> %s\n", filename);
             if (tcc_add_file(s, filename) < 0)
                 ret = 1;
+            if (!default_file)
+                default_file = filename;
         }
     }
 
@@ -605,17 +577,15 @@ int main(int argc, char **argv)
         if (do_bench)
             tcc_print_stats(s, getclock_us() - start_time);
 
-        if (s->output_type == TCC_OUTPUT_MEMORY)
+        if (s->output_type == TCC_OUTPUT_MEMORY) {
             ret = tcc_run(s, argc - optind, argv + optind);
-        else {
-            if (s->output_type == TCC_OUTPUT_PREPROCESS) {
-                if (outfile)
-                    fclose(s->outfile);
-            } else {
-                ret = tcc_output_file(s, outfile ? outfile : tcc_default_target(s));
-                ret = ret ? 1 : 0;
-            }
-
+        } else if (s->output_type == TCC_OUTPUT_PREPROCESS) {
+             if (s->outfile)
+                fclose(s->outfile);
+        } else {
+            if (!outfile)
+                outfile = tcc_default_target(s, default_file);
+            ret = !!tcc_output_file(s, outfile);
             /* dump collected dependencies */
             if (gen_deps && !ret)
                 tcc_gen_makedeps(s, outfile, deps_outfile);
@@ -623,6 +593,7 @@ int main(int argc, char **argv)
     }
 
     tcc_delete(s);
+    tcc_free(outfile);
 
 #ifdef MEM_DEBUG
     if (do_bench) {

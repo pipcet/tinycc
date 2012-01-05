@@ -376,7 +376,7 @@ static int pe_find_import(TCCState * s1, ElfW(Sym) *sym)
 {
     char buffer[200];
     const char *s, *p;
-    int sym_index, n = 0;
+    int sym_index = 0, n = 0;
 
     do {
         s = pe_export_name(s1, sym);
@@ -595,7 +595,7 @@ static int pe_write(struct pe_info *pe)
 
     op = fopen(pe->filename, "wb");
     if (NULL == op) {
-        error_noabort("could not write '%s': %s", pe->filename, strerror(errno));
+        tcc_error_noabort("could not write '%s': %s", pe->filename, strerror(errno));
         return -1;
     }
 
@@ -686,6 +686,8 @@ static int pe_write(struct pe_info *pe)
     pe_header.filehdr.NumberOfSections = pe->sec_count;
     pe_header.opthdr.SizeOfHeaders = pe->sizeofheaders;
     pe_header.opthdr.ImageBase = pe->imagebase;
+    if (pe->s1->pe_stack_size)
+        pe_header.opthdr.SizeOfStackReserve = pe->s1->pe_stack_size;
     if (PE_DLL == pe->type)
         pe_header.filehdr.Characteristics = CHARACTERISTICS_DLL;
     else if (PE_GUI != pe->type)
@@ -724,38 +726,20 @@ static int pe_write(struct pe_info *pe)
 /*----------------------------------------------------------------------------*/
 
 #if defined(TCC_TARGET_X86_64)
-#define ELFW_R_(type) ELF64_R_##type
-#define ElfW_Rel ElfW(Rela)
-
 #define REL_TYPE_DIRECT R_X86_64_64
 #define R_XXX_THUNKFIX R_X86_64_PC32
 #define R_XXX_RELATIVE R_X86_64_RELATIVE
 
-#define ELFW_ST_BIND ELF64_ST_BIND
-#define ELFW_ST_TYPE ELF64_ST_TYPE
-#define ELFW_ST_INFO ELF64_ST_INFO
 #elif defined(TCC_TARGET_I386)
-#define ELFW_R_(type) ELF32_R_##type
-#define ElfW_Rel ElfW(Rel)
-
 #define REL_TYPE_DIRECT R_386_32
 #define R_XXX_THUNKFIX R_386_32
 #define R_XXX_RELATIVE R_386_RELATIVE
 
-#define ELFW_ST_BIND ELF32_ST_BIND
-#define ELFW_ST_TYPE ELF32_ST_TYPE
-#define ELFW_ST_INFO ELF32_ST_INFO
 #elif defined(TCC_TARGET_ARM)
-#define ELFW_R_(type) ELF32_R_##type
-#define ElfW_Rel ElfW(Rel)
-
 #define REL_TYPE_DIRECT R_ARM_ABS32
 #define R_XXX_THUNKFIX R_ARM_ABS32
 #define R_XXX_RELATIVE R_ARM_RELATIVE
 
-#define ELFW_ST_BIND ELF32_ST_BIND
-#define ELFW_ST_TYPE ELF32_ST_TYPE
-#define ELFW_ST_INFO ELF32_ST_INFO
 #endif
 /*----------------------------------------------------------------------------*/
 
@@ -857,7 +841,7 @@ static void pe_build_imports(struct pe_info *pe)
                         v = (ADDR3264)GetProcAddress(dllref->handle, name);
                     }
                     if (!v)
-                        error_noabort("undefined symbol '%s'", name);
+                        tcc_error_noabort("undefined symbol '%s'", name);
                 }
 #endif
             } else {
@@ -957,7 +941,7 @@ static void pe_build_exports(struct pe_info *pe)
     strcpy(tcc_fileextension(buf), ".def");
     op = fopen(buf, "w");
     if (NULL == op) {
-        error_noabort("could not create '%s': %s", buf, strerror(errno));
+        tcc_error_noabort("could not create '%s': %s", buf, strerror(errno));
     } else {
         fprintf(op, "LIBRARY %s\n\nEXPORTS\n", dllname);
         if (pe->s1->verbose)
@@ -1001,7 +985,7 @@ static void pe_build_reloc (struct pe_info *pe)
 
     for(;;) {
         if (rel < rel_end) {
-            int type = ELFW_R_(TYPE)(rel->r_info);
+            int type = ELFW(R_TYPE)(rel->r_info);
             addr = rel->r_offset + s->sh_addr;
             ++ rel;
             if (type != REL_TYPE_DIRECT)
@@ -1183,8 +1167,8 @@ static void pe_relocate_rva (struct pe_info *pe, Section *s)
     ElfW_Rel *rel, *rel_end;
     rel_end = (ElfW_Rel *)(sr->data + sr->data_offset);
     for(rel = (ElfW_Rel *)sr->data; rel < rel_end; rel++) {
-        if (ELFW_R_(TYPE)(rel->r_info) == R_XXX_RELATIVE) {
-            int sym_index = ELFW_R_(SYM)(rel->r_info);
+        if (ELFW(R_TYPE)(rel->r_info) == R_XXX_RELATIVE) {
+            int sym_index = ELFW(R_SYM)(rel->r_info);
             DWORD addr = s->sh_addr;
             if (sym_index) {
                 ElfW(Sym) *sym = (ElfW(Sym) *)symtab_section->data + sym_index;
@@ -1228,7 +1212,7 @@ static int pe_check_symbols(struct pe_info *pe)
         if (sym->st_shndx == SHN_UNDEF) {
 
             const char *name = symtab_section->link->data + sym->st_name;
-            unsigned type = ELFW_ST_TYPE(sym->st_info);
+            unsigned type = ELFW(ST_TYPE)(sym->st_info);
             int imp_sym = pe_find_import(pe->s1, sym);
             struct import_symbol *is;
 
@@ -1272,7 +1256,7 @@ static int pe_check_symbols(struct pe_info *pe)
                     sprintf(buffer, "IAT.%s", name);
                     is->iat_index = put_elf_sym(
                         symtab_section, 0, sizeof(DWORD),
-                        ELFW_ST_INFO(STB_GLOBAL, STT_OBJECT),
+                        ELFW(ST_INFO)(STB_GLOBAL, STT_OBJECT),
                         0, SHN_UNDEF, buffer);
 #ifdef TCC_TARGET_ARM
                     put_elf_reloc(symtab_section, text_section,
@@ -1303,11 +1287,11 @@ static int pe_check_symbols(struct pe_info *pe)
             }
 
         not_found:
-            error_noabort("undefined symbol '%s'", name);
+            tcc_error_noabort("undefined symbol '%s'", name);
             ret = -1;
 
         } else if (pe->s1->rdynamic
-                   && ELFW_ST_BIND(sym->st_info) != STB_LOCAL) {
+                   && ELFW(ST_BIND)(sym->st_info) != STB_LOCAL) {
             /* if -rdynamic option, then export all non local symbols */
             sym->st_other |= 1;
         }
@@ -1406,8 +1390,8 @@ static void pe_print_section(FILE * f, Section * s)
                     (unsigned)sym->st_name,
                     (unsigned)sym->st_value,
                     (unsigned)sym->st_size,
-                    (unsigned)ELFW_ST_BIND(sym->st_info),
-                    (unsigned)ELFW_ST_TYPE(sym->st_info),
+                    (unsigned)ELFW(ST_BIND)(sym->st_info),
+                    (unsigned)ELFW(ST_TYPE)(sym->st_info),
                     (unsigned)sym->st_other,
                     (unsigned)sym->st_shndx,
                     name);
@@ -1415,12 +1399,12 @@ static void pe_print_section(FILE * f, Section * s)
         } else if (s->sh_type == SHT_RELX) {
             ElfW_Rel *rel = (ElfW_Rel *) (p + i);
             ElfW(Sym) *sym =
-                (ElfW(Sym) *) s->link->data + ELFW_R_(SYM)(rel->r_info);
+                (ElfW(Sym) *) s->link->data + ELFW(R_SYM)(rel->r_info);
             const char *name = s->link->link->data + sym->st_name;
             fprintf(f, "  %04X   %02X   %04X  \"%s\"",
                     (unsigned)rel->r_offset,
-                    (unsigned)ELFW_R_(TYPE)(rel->r_info),
-                    (unsigned)ELFW_R_(SYM)(rel->r_info),
+                    (unsigned)ELFW(R_TYPE)(rel->r_info),
+                    (unsigned)ELFW(R_SYM)(rel->r_info),
                     name);
         } else {
             fprintf(f, "   ");
@@ -1503,7 +1487,7 @@ ST_FUNC int pe_putimport(TCCState *s1, int dllindex, const char *name, const voi
         s1->dynsymtab_section,
         (uplong)value,
         dllindex, /* st_size */
-        ELFW_ST_INFO(STB_GLOBAL, STT_NOTYPE),
+        ELFW(ST_INFO)(STB_GLOBAL, STT_NOTYPE),
         0,
         value ? SHN_ABS : SHN_UNDEF,
         name
@@ -1675,71 +1659,67 @@ ST_FUNC int pe_load_file(struct TCCState *s1, const char *filename, int fd)
     return ret;
 }
 
-ST_FUNC int pe_add_dll(struct TCCState *s, const char *libname)
-{
-    static const char *pat[] = {
-        "%s.def", "lib%s.def", "%s.dll", "lib%s.dll", NULL
-    };
-    const char **p = pat;
-    do {
-        char buf[MAX_PATH];
-        snprintf(buf, sizeof(buf), *p, libname);
-        if (tcc_add_dll(s, buf, 0) == 0)
-            return 0;
-    } while (*++p);
-    return -1;
-}
-
 /* ------------------------------------------------------------- */
 #ifdef TCC_TARGET_X86_64
-ST_FUNC void pe_add_unwind_data(unsigned start, unsigned end, unsigned stack)
+static unsigned pe_add_uwwind_info(TCCState *s1)
 {
-    static const char uw_info[] = {
-        0x01, // UBYTE: 3 Version , UBYTE: 5 Flags
-        0x04, // UBYTE Size of prolog
-        0x02, // UBYTE Count of unwind codes
-        0x05, // UBYTE: 4 Frame Register (rbp), UBYTE: 4 Frame Register offset (scaled)
-        // USHORT * n Unwind codes array
-        // 0x0b, 0x01, 0xff, 0xff, // stack size
-        0x04, 0x03, // set frame ptr (mov rsp -> rbp)
-        0x01, 0x50  // push reg (rbp)
-    };
-
-    struct pe_uw *pe_uw = &tcc_state->pe_unwind;
-
-    Section *uw, *pd;
-    WORD *p1;
-    DWORD *p2;
-    unsigned o2;
-
-    uw = data_section;
-    pd = pe_uw->pdata;
-    if (NULL == pd)
-    {
-        pe_uw->pdata = pd = find_section(tcc_state, ".pdata");
-        pe_uw->pdata->sh_addralign = 4;
-        section_ptr_add(uw, -uw->data_offset & 3);
-        pe_uw->offs_1 = uw->data_offset;
-        p1 = section_ptr_add(uw, sizeof uw_info);
-        /* use one common entry for all functions */
-        memcpy(p1, uw_info, sizeof uw_info);
-        pe_uw->sym_1 = put_elf_sym(symtab_section, 0, 0, 0, 0, text_section->sh_num, NULL);
-        pe_uw->sym_2 = put_elf_sym(symtab_section, 0, 0, 0, 0, uw->sh_num, NULL);
+    if (NULL == s1->uw_pdata) {
+        s1->uw_pdata = find_section(tcc_state, ".pdata");
+        s1->uw_pdata->sh_addralign = 4;
+        s1->uw_sym = put_elf_sym(symtab_section, 0, 0, 0, 0, text_section->sh_num, NULL);
     }
 
-    o2 = pd->data_offset;
-    p2 = section_ptr_add(pd, 3 * sizeof (DWORD));
+    if (0 == s1->uw_offs) {
+        /* As our functions all have the same stackframe, we use one entry for all */
+        static const unsigned char uw_info[] = {
+            0x01, // UBYTE: 3 Version , UBYTE: 5 Flags
+            0x04, // UBYTE Size of prolog
+            0x02, // UBYTE Count of unwind codes
+            0x05, // UBYTE: 4 Frame Register (rbp), UBYTE: 4 Frame Register offset (scaled)
+            // USHORT * n Unwind codes array
+            // 0x0b, 0x01, 0xff, 0xff, // stack size
+            0x04, 0x03, // set frame ptr (mov rsp -> rbp)
+            0x01, 0x50  // push reg (rbp)
+        };
+
+        Section *s = text_section;
+        unsigned char *p;
+
+        section_ptr_add(s, -s->data_offset & 3); /* align */
+        s1->uw_offs = s->data_offset;
+        p = section_ptr_add(s, sizeof uw_info);
+        memcpy(p, uw_info, sizeof uw_info);
+    }
+
+    return s1->uw_offs;
+}
+
+ST_FUNC void pe_add_unwind_data(unsigned start, unsigned end, unsigned stack)
+{
+    TCCState *s1 = tcc_state;
+    Section *pd;
+    unsigned o, n, d;
+    struct /* _RUNTIME_FUNCTION */ {
+      DWORD BeginAddress;
+      DWORD EndAddress;
+      DWORD UnwindData;
+    } *p;
+
+    d = pe_add_uwwind_info(s1);
+    pd = s1->uw_pdata;
+    o = pd->data_offset;
+    p = section_ptr_add(pd, sizeof *p);
+
     /* record this function */
-    p2[0] = start;
-    p2[1] = end;
-    p2[2] = pe_uw->offs_1;
+    p->BeginAddress = start;
+    p->EndAddress = end;
+    p->UnwindData = d;
+
     /* put relocations on it */
-    put_elf_reloc(symtab_section, pd, o2,   R_X86_64_RELATIVE, pe_uw->sym_1);
-    put_elf_reloc(symtab_section, pd, o2+4, R_X86_64_RELATIVE, pe_uw->sym_1);
-    put_elf_reloc(symtab_section, pd, o2+8, R_X86_64_RELATIVE, pe_uw->sym_2);
+    for (n = o + sizeof *p; o < n; o += sizeof p->BeginAddress)
+        put_elf_reloc(symtab_section, pd, o,  R_X86_64_RELATIVE, s1->uw_sym);
 }
 #endif
-
 /* ------------------------------------------------------------- */
 #ifdef TCC_TARGET_X86_64
 #define PE_STDSYM(n,s) n
@@ -1781,7 +1761,7 @@ static void pe_add_runtime_ex(TCCState *s1, struct pe_info *pe)
     if (start_symbol)
         add_elf_sym(symtab_section,
             0, 0,
-            ELFW_ST_INFO(STB_GLOBAL, STT_NOTYPE), 0,
+            ELFW(ST_INFO)(STB_GLOBAL, STT_NOTYPE), 0,
             SHN_UNDEF, start_symbol);
 
     if (0 == s1->nostdlib) {
@@ -1794,7 +1774,7 @@ static void pe_add_runtime_ex(TCCState *s1, struct pe_info *pe)
                 if (PE_DLL != pe_type && PE_GUI != pe_type)
                     break;
             } else if (tcc_add_library(s1, p) < 0)
-                error_noabort("cannot find library: %s", p);
+                tcc_error_noabort("cannot find library: %s", p);
         }
     }
 
@@ -1807,7 +1787,7 @@ static void pe_add_runtime_ex(TCCState *s1, struct pe_info *pe)
             /* for -run GUI's, put '_runwinmain' instead of 'main' */
             add_elf_sym(symtab_section,
                     addr, 0,
-                    ELFW_ST_INFO(STB_GLOBAL, STT_NOTYPE), 0,
+                    ELFW(ST_INFO)(STB_GLOBAL, STT_NOTYPE), 0,
                     text_section->sh_num, "main");
     }
 
@@ -1891,7 +1871,7 @@ ST_FUNC int pe_output_file(TCCState * s1, const char *filename)
         tcc_free(pe.sec_info);
     } else {
 #ifndef TCC_IS_NATIVE
-        error_noabort("-run supported only on native platform");
+        tcc_error_noabort("-run supported only on native platform");
 #endif
         pe.thunk = data_section;
         pe_build_imports(&pe);

@@ -18,7 +18,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define NEED_FLOAT_TYPES
 #include "tcc.h"
 
 /********************************************************/
@@ -33,15 +32,9 @@ ST_DATA int tcc_ext = 1;
 /* XXX: get rid of this ASAP */
 ST_DATA struct TCCState *tcc_state;
 
-#ifdef CONFIG_TCC_BACKTRACE
-ST_DATA int num_callers = 6;
-ST_DATA const char **rt_bound_error_msg;
-ST_DATA void *rt_prog_main;
-#endif
-
 /********************************************************/
 
-#ifndef NOTALLINONE
+#ifdef ONE_SOURCE
 #include "tccpp.c"
 #include "tccgen.c"
 #include "tccelf.c"
@@ -70,17 +63,17 @@ ST_DATA void *rt_prog_main;
 #ifdef TCC_TARGET_PE
 #include "tccpe.c"
 #endif
-#endif /* ALL_IN_ONE */
+#endif /* ONE_SOURCE */
 
 /********************************************************/
 #ifndef CONFIG_TCC_ASM
 ST_FUNC void asm_instr(void)
 {
-    error("inline asm() not supported");
+    tcc_error("inline asm() not supported");
 }
 ST_FUNC void asm_global_instr(void)
 {
-    error("inline asm() not supported");
+    tcc_error("inline asm() not supported");
 }
 #endif
 
@@ -110,6 +103,13 @@ static void tcc_set_lib_path_w32(TCCState *s)
         p--;
     *p = 0;
     tcc_set_lib_path(s, path);
+}
+
+static void tcc_add_systemdir(TCCState *s)
+{
+    char buf[1000];
+    GetSystemDirectory(buf, sizeof buf);
+    tcc_add_library_path(s, normalize_slashes(buf));
 }
 
 #ifndef CONFIG_TCC_STATIC
@@ -160,11 +160,18 @@ PUB_FUNC char *pstrcat(char *buf, int buf_size, const char *s)
     return buf;
 }
 
+PUB_FUNC char *pstrncpy(char *out, const char *in, size_t num)
+{
+    memcpy(out, in, num);
+    out[num] = '\0';
+    return out;
+}
+
 /* extract the basename of a file */
 PUB_FUNC char *tcc_basename(const char *name)
 {
     char *p = strchr(name, 0);
-    while (p > name && !IS_PATHSEP(p[-1]))
+    while (p > name && !IS_DIRSEP(p[-1]))
         --p;
     return p;
 }
@@ -206,7 +213,7 @@ PUB_FUNC void *tcc_malloc(unsigned long size)
     void *ptr;
     ptr = malloc(size);
     if (!ptr && size)
-        error("memory full");
+        tcc_error("memory full");
 #ifdef MEM_DEBUG
     mem_cur_size += malloc_usable_size(ptr);
     if (mem_cur_size > mem_max_size)
@@ -276,7 +283,7 @@ PUB_FUNC void dynarray_add(void ***ptab, int *nb_ptr, void *data)
             nb_alloc = nb * 2;
         pp = tcc_realloc(pp, nb_alloc * sizeof(void *));
         if (!pp)
-            error("memory full");
+            tcc_error("memory full");
         *ptab = pp;
     }
     pp[nb++] = data;
@@ -293,13 +300,27 @@ PUB_FUNC void dynarray_reset(void *pp, int *n)
     *(void**)pp = NULL;
 }
 
-/* we use our own 'finite' function to avoid potential problems with
-   non standard math libs */
-/* XXX: endianness dependent */
-ST_FUNC int ieee_finite(double d)
+static void tcc_split_path(TCCState *s, void ***p_ary, int *p_nb_ary, const char *in)
 {
-    int *p = (int *)&d;
-    return ((unsigned)((p[1] | 0x800fffff) + 1)) >> 31;
+    const char *p;
+    do {
+        int c;
+        CString str;
+
+        cstr_new(&str);
+        for (p = in; c = *p, c != '\0' && c != PATHSEP; ++p) {
+            if (c == '{' && p[1] && p[2] == '}') {
+                c = p[1], p += 2;
+                if (c == 'B')
+                    cstr_cat(&str, s->tcc_lib_path);
+            } else {
+                cstr_ccat(&str, c);
+            }
+        }
+        cstr_ccat(&str, '\0');
+        dynarray_add(p_ary, p_nb_ary, str.data);
+        in = p+1;
+    } while (*p);
 }
 
 /********************************************************/
@@ -357,7 +378,7 @@ ST_FUNC void section_realloc(Section *sec, unsigned long new_size)
         size = size * 2;
     data = tcc_realloc(sec->data, size);
     if (!data)
-        error("memory full");
+        tcc_error("memory full");
     memset(data + sec->data_allocated, 0, size - sec->data_allocated);
     sec->data = data;
     sec->data_allocated = size;
@@ -588,7 +609,7 @@ LIBTCCAPI void tcc_set_error_func(TCCState *s, void *error_opaque,
 }
 
 /* error without aborting current compilation */
-PUB_FUNC void error_noabort(const char *fmt, ...)
+PUB_FUNC void tcc_error_noabort(const char *fmt, ...)
 {
     TCCState *s1 = tcc_state;
     va_list ap;
@@ -598,7 +619,7 @@ PUB_FUNC void error_noabort(const char *fmt, ...)
     va_end(ap);
 }
 
-PUB_FUNC void error(const char *fmt, ...)
+PUB_FUNC void tcc_error(const char *fmt, ...)
 {
     TCCState *s1 = tcc_state;
     va_list ap;
@@ -615,12 +636,7 @@ PUB_FUNC void error(const char *fmt, ...)
     }
 }
 
-PUB_FUNC void expect(const char *msg)
-{
-    error("%s expected", msg);
-}
-
-PUB_FUNC void warning(const char *fmt, ...)
+PUB_FUNC void tcc_warning(const char *fmt, ...)
 {
     TCCState *s1 = tcc_state;
     va_list ap;
@@ -774,7 +790,7 @@ static int tcc_compile(TCCState *s1)
         if (tok != TOK_EOF)
             expect("declaration");
         if (pvtop != vtop)
-            warning("internal compiler error: vstack leak? (%d)", vtop - pvtop);
+            tcc_warning("internal compiler error: vstack leak? (%d)", vtop - pvtop);
 
         /* end of translation unit info */
         if (s1->do_debug) {
@@ -968,9 +984,9 @@ LIBTCCAPI TCCState *tcc_new(void)
     
 #ifndef TCC_TARGET_PE
     /* default library paths */
-    tcc_add_library_path(s, CONFIG_TCC_CRT_PREFIX);
-    tcc_add_library_path(s, CONFIG_SYSROOT CONFIG_TCC_LDDIR);
-    tcc_add_library_path(s, CONFIG_SYSROOT "/usr/local"CONFIG_TCC_LDDIR);
+    tcc_add_library_path(s, CONFIG_TCC_LIBPATHS);
+    /* paths for crt objects */
+    tcc_split_path(s, (void ***)&s->crt_paths, &s->nb_crt_paths, CONFIG_TCC_CRTPREFIX);
 #endif
 
     /* no section zero */
@@ -1036,17 +1052,16 @@ LIBTCCAPI void tcc_delete(TCCState *s1)
 
     /* free library paths */
     dynarray_reset(&s1->library_paths, &s1->nb_library_paths);
+    dynarray_reset(&s1->crt_paths, &s1->nb_crt_paths);
 
     /* free include paths */
     dynarray_reset(&s1->cached_includes, &s1->nb_cached_includes);
     dynarray_reset(&s1->include_paths, &s1->nb_include_paths);
     dynarray_reset(&s1->sysinclude_paths, &s1->nb_sysinclude_paths);
 
-    tcc_free(s1->tcc_lib_path);
-
-    dynarray_reset(&s1->input_files, &s1->nb_input_files);
-    dynarray_reset(&s1->input_libs, &s1->nb_input_libs);
     dynarray_reset(&s1->target_deps, &s1->nb_target_deps);
+
+    tcc_free(s1->tcc_lib_path);
 
 #ifdef HAVE_SELINUX
     munmap (s1->write_mem, s1->mem_size);
@@ -1057,21 +1072,15 @@ LIBTCCAPI void tcc_delete(TCCState *s1)
     tcc_free(s1);
 }
 
-LIBTCCAPI int tcc_add_include_path(TCCState *s1, const char *pathname)
+LIBTCCAPI int tcc_add_include_path(TCCState *s, const char *pathname)
 {
-    char *pathname1;
-    
-    pathname1 = tcc_strdup(pathname);
-    dynarray_add((void ***)&s1->include_paths, &s1->nb_include_paths, pathname1);
+    tcc_split_path(s, (void ***)&s->include_paths, &s->nb_include_paths, pathname);
     return 0;
 }
 
-LIBTCCAPI int tcc_add_sysinclude_path(TCCState *s1, const char *pathname)
+LIBTCCAPI int tcc_add_sysinclude_path(TCCState *s, const char *pathname)
 {
-    char *pathname1;
-    
-    pathname1 = tcc_strdup(pathname);
-    dynarray_add((void ***)&s1->sysinclude_paths, &s1->nb_sysinclude_paths, pathname1);
+    tcc_split_path(s, (void ***)&s->sysinclude_paths, &s->nb_sysinclude_paths, pathname);
     return 0;
 }
 
@@ -1096,7 +1105,7 @@ ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
     ret = tcc_open(s1, filename);
     if (ret < 0) {
         if (flags & AFF_PRINT_ERROR)
-            error_noabort("file '%s' not found", filename);
+            tcc_error_noabort("file '%s' not found", filename);
         return ret;
     }
 
@@ -1134,7 +1143,7 @@ ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
     size = read(fd, &ehdr, sizeof(ehdr));
     lseek(fd, 0, SEEK_SET);
     if (size <= 0) {
-        error_noabort("could not read header");
+        tcc_error_noabort("could not read header");
         goto the_end;
     }
 
@@ -1165,7 +1174,7 @@ ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
             goto the_end;
         }
 #endif
-        error_noabort("unrecognized ELF file");
+        tcc_error_noabort("unrecognized ELF file");
         goto the_end;
     }
 
@@ -1189,7 +1198,7 @@ ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
     ret = tcc_load_ldscript(s1);
 #endif
     if (ret < 0)
-        error_noabort("unrecognized file type");
+        tcc_error_noabort("unrecognized file type");
 
 the_end:
     tcc_close();
@@ -1198,8 +1207,6 @@ the_end:
 
 LIBTCCAPI int tcc_add_file(TCCState *s, const char *filename)
 {
-    dynarray_add((void ***)&s->input_files, &s->nb_input_files, tcc_strdup(filename));
-
     if (s->output_type == TCC_OUTPUT_PREPROCESS)
         return tcc_add_file_internal(s, filename, AFF_PRINT_ERROR | AFF_PREPROCESS);
     else
@@ -1208,54 +1215,57 @@ LIBTCCAPI int tcc_add_file(TCCState *s, const char *filename)
 
 LIBTCCAPI int tcc_add_library_path(TCCState *s, const char *pathname)
 {
-    char *pathname1;
-    
-    pathname1 = tcc_strdup(pathname);
-    dynarray_add((void ***)&s->library_paths, &s->nb_library_paths, pathname1);
+    tcc_split_path(s, (void ***)&s->library_paths, &s->nb_library_paths, pathname);
     return 0;
 }
 
-/* find and load a dll. Return non zero if not found */
-/* XXX: add '-rpath' option support ? */
-ST_FUNC int tcc_add_dll(TCCState *s, const char *filename, int flags)
+static int tcc_add_library_internal(TCCState *s, const char *fmt,
+    const char *filename, int flags, char **paths, int nb_paths)
 {
     char buf[1024];
     int i;
 
-    for(i = 0; i < s->nb_library_paths; i++) {
-        snprintf(buf, sizeof(buf), "%s/%s", 
-                 s->library_paths[i], filename);
+    for(i = 0; i < nb_paths; i++) {
+        snprintf(buf, sizeof(buf), fmt, paths[i], filename);
         if (tcc_add_file_internal(s, buf, flags) == 0)
             return 0;
     }
     return -1;
 }
 
+#ifndef TCC_TARGET_PE
+/* find and load a dll. Return non zero if not found */
+/* XXX: add '-rpath' option support ? */
+ST_FUNC int tcc_add_dll(TCCState *s, const char *filename, int flags)
+{
+    return tcc_add_library_internal(s, "%s/%s", filename, flags,
+        s->library_paths, s->nb_library_paths);
+}
+#endif
+
+ST_FUNC int tcc_add_crt(TCCState *s, const char *filename)
+{
+    if (-1 == tcc_add_library_internal(s, "%s/%s",
+        filename, 0, s->crt_paths, s->nb_crt_paths))
+        tcc_error_noabort("file '%s' not found", filename);
+    return 0;
+}
+
 /* the library name is the same as the argument of the '-l' option */
 LIBTCCAPI int tcc_add_library(TCCState *s, const char *libraryname)
 {
-    char buf[1024];
-    int i;
-
-    dynarray_add((void ***)&s->input_libs, &s->nb_input_libs, tcc_strdup(libraryname));
-    
-    /* first we look for the dynamic library if not static linking */
-    if (!s->static_link) {
 #ifdef TCC_TARGET_PE
-        if (pe_add_dll(s, libraryname) == 0)
-            return 0;
+    const char *libs[] = { "%s/%s.def", "%s/lib%s.def", "%s/%s.dll", "%s/lib%s.dll", "%s/lib%s.a", NULL };
+    const char **pp = s->static_link ? libs + 4 : libs;
 #else
-        snprintf(buf, sizeof(buf), "lib%s.so", libraryname);
-        if (tcc_add_dll(s, buf, 0) == 0)
-            return 0;
+    const char *libs[] = { "%s/lib%s.so", "%s/lib%s.a", NULL };
+    const char **pp = s->static_link ? libs + 1 : libs;
 #endif
-    }
-    /* then we look for the static library */
-    for(i = 0; i < s->nb_library_paths; i++) {
-        snprintf(buf, sizeof(buf), "%s/lib%s.a", 
-                 s->library_paths[i], libraryname);
-        if (tcc_add_file_internal(s, buf, 0) == 0)
+    while (*pp) {
+        if (0 == tcc_add_library_internal(s, *pp,
+            libraryname, 0, s->library_paths, s->nb_library_paths))
             return 0;
+        ++pp;
     }
     return -1;
 }
@@ -1274,23 +1284,12 @@ LIBTCCAPI int tcc_add_symbol(TCCState *s, const char *name, const void *val)
 
 LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)
 {
-    char buf[1024];
-
     s->output_type = output_type;
 
     if (!s->nostdinc) {
         /* default include paths */
         /* -isystem paths have already been handled */
-#ifndef TCC_TARGET_PE
-        tcc_add_sysinclude_path(s, CONFIG_SYSROOT "/usr/local/include");
-        tcc_add_sysinclude_path(s, CONFIG_SYSROOT "/usr/include");
-#endif
-        snprintf(buf, sizeof(buf), "%s/include", s->tcc_lib_path);
-        tcc_add_sysinclude_path(s, buf);
-#ifdef TCC_TARGET_PE
-        snprintf(buf, sizeof(buf), "%s/include/winapi", s->tcc_lib_path);
-        tcc_add_sysinclude_path(s, buf);
-#endif
+        tcc_add_sysinclude_path(s, CONFIG_TCC_SYSINCLUDEPATHS);
     }
 
     /* if bound checking, then add corresponding sections */
@@ -1322,29 +1321,20 @@ LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)
         put_stabs("", 0, 0, 0, 0);
     }
 
+#ifdef TCC_TARGET_PE
+    tcc_add_library_path(s, CONFIG_TCC_LIBPATHS);
+# ifdef _WIN32
+    tcc_add_systemdir(s);
+# endif
+#else
     /* add libc crt1/crti objects */
-#ifndef TCC_TARGET_PE
     if ((output_type == TCC_OUTPUT_EXE || output_type == TCC_OUTPUT_DLL) &&
         !s->nostdlib) {
         if (output_type != TCC_OUTPUT_DLL)
-            tcc_add_file(s, CONFIG_TCC_CRT_PREFIX "/crt1.o");
-        tcc_add_file(s, CONFIG_TCC_CRT_PREFIX "/crti.o");
+            tcc_add_crt(s, "crt1.o");
+        tcc_add_crt(s, "crti.o");
     }
 #endif
-
-#ifdef TCC_TARGET_PE
-#ifdef CONFIG_TCC_CROSSLIB
-    snprintf(buf, sizeof(buf), "%s/" CONFIG_TCC_CROSSLIB, s->tcc_lib_path);
-    tcc_add_library_path(s, buf);
-#endif
-    snprintf(buf, sizeof(buf), "%s/lib", s->tcc_lib_path);
-    tcc_add_library_path(s, buf);
-#ifdef _WIN32
-    if (GetSystemDirectory(buf, sizeof buf))
-        tcc_add_library_path(s, buf);
-#endif
-#endif
-
     return 0;
 }
 
@@ -1387,6 +1377,12 @@ ST_FUNC int set_flag(TCCState *s, const FlagDef *flags, int nb_flags,
         value = !value;
     *(int *)((uint8_t *)s + p->offset) = value;
     return 0;
+}
+
+/* enable debug */
+LIBTCCAPI void tcc_enable_debug(TCCState *s)
+{
+    s->do_debug = 1;
 }
 
 /* set/reset a warning */
@@ -1492,23 +1488,17 @@ PUB_FUNC const char * tcc_set_linker(TCCState *s, char *option, int multi)
         end = NULL;
         if (link_option(option, "Bsymbolic", &p)) {
             s->symbolic = TRUE;
-#ifdef TCC_TARGET_PE
-        } else if (link_option(option, "file-alignment=", &p)) {
-            s->pe_file_align = strtoul(p, &end, 16);
-#endif
         } else if (link_option(option, "fini=", &p)) {
             s->fini_symbol = p;
             if (s->warn_unsupported)
-                warning("ignoring -fini %s", p);
-
+                tcc_warning("ignoring -fini %s", p);
         } else if (link_option(option, "image-base=", &p)) {
             s->text_addr = strtoul(p, &end, 16);
             s->has_text_addr = 1;
         } else if (link_option(option, "init=", &p)) {
             s->init_symbol = p;
             if (s->warn_unsupported)
-                warning("ignoring -init %s", p);
-
+                tcc_warning("ignoring -init %s", p);
         } else if (link_option(option, "oformat=", &p)) {
 #if defined(TCC_TARGET_PE)
             if (strstart(p, "pe-", NULL)) {
@@ -1540,6 +1530,10 @@ PUB_FUNC const char * tcc_set_linker(TCCState *s, char *option, int multi)
             s->soname = p;
             multi = 0;
 #ifdef TCC_TARGET_PE
+        } else if (link_option(option, "file-alignment=", &p)) {
+            s->pe_file_align = strtoul(p, &end, 16);
+        } else if (link_option(option, "stack=", &p)) {
+            s->pe_stack_size = strtoul(p, &end, 10);
         } else if (link_option(option, "subsystem=", &p)) {
 #if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64)
             if (!strcmp(p, "native")) {
@@ -1609,25 +1603,16 @@ LIBTCCAPI void tcc_set_lib_path(TCCState *s, const char *path)
     s->tcc_lib_path = tcc_strdup(path);
 }
 
-PUB_FUNC void set_num_callers(int n)
+PUB_FUNC char *tcc_default_target(TCCState *s, const char *default_file)
 {
-#ifdef CONFIG_TCC_BACKTRACE
-    num_callers = n;
-#endif
-}
-
-
-LIBTCCAPI const char *tcc_default_target(TCCState *s)
-{
-    /* FIXME will break in multithreaded case */
-    static char outfile_default[1024];
-
+    char buf[1024];
     char *ext;
-    const char *name =
-        strcmp(s->input_files[0], "-") == 0 ? "a"
-                                            : tcc_basename(s->input_files[0]);
-    pstrcpy(outfile_default, sizeof(outfile_default), name);
-    ext = tcc_fileextension(outfile_default);
+    const char *name = "a";
+
+    if (default_file && strcmp(default_file, "-"))
+        name = tcc_basename(default_file);
+    pstrcpy(buf, sizeof(buf), name);
+    ext = tcc_fileextension(buf);
 #ifdef TCC_TARGET_PE
     if (s->output_type == TCC_OUTPUT_DLL)
         strcpy(ext, ".dll");
@@ -1641,20 +1626,17 @@ LIBTCCAPI const char *tcc_default_target(TCCState *s)
         && *ext)
         strcpy(ext, ".o");
     else
-        pstrcpy(outfile_default, sizeof(outfile_default), "a.out");
+        pstrcpy(buf, sizeof(buf), "a.out");
 
-    return outfile_default;
+    return tcc_strdup(buf);
 }
 
 
-LIBTCCAPI void tcc_gen_makedeps(TCCState *s, const char *target, const char *filename)
+PUB_FUNC void tcc_gen_makedeps(TCCState *s, const char *target, const char *filename)
 {
     FILE *depout;
     char buf[1024], *ext;
     int i;
-
-    if (!target)
-        target = tcc_default_target(s);
 
     if (!filename) {
         /* compute filename automatically
@@ -1671,7 +1653,7 @@ LIBTCCAPI void tcc_gen_makedeps(TCCState *s, const char *target, const char *fil
     /* XXX return err codes instead of error() ? */
     depout = fopen(filename, "w");
     if (!depout)
-        error("could not open '%s'", filename);
+        tcc_error("could not open '%s'", filename);
 
     fprintf(depout, "%s : \\\n", target);
     for (i=0; i<s->nb_target_deps; ++i)
