@@ -44,14 +44,16 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include <process.h>
 #include <sys/timeb.h>
 #include <io.h> /* open, close etc. */
 #include <direct.h> /* getcwd */
 #define inline __inline
 #define inp next_inp
 #ifdef _WIN64
-#define uplong unsigned long long
+# define uplong unsigned long long
+#endif
+#ifdef LIBTCC_AS_DLL
+# define LIBTCCAPI __declspec(dllexport)
 #endif
 #endif
 
@@ -133,22 +135,78 @@
 #define CONFIG_TCC_BACKTRACE
 #endif
 
+/* ------------ path configuration ------------ */
+
+#ifndef CONFIG_SYSROOT
+# define CONFIG_SYSROOT ""
+#endif
+
+#ifndef CONFIG_TCC_LDDIR
+# if defined(TCC_TARGET_X86_64_CENTOS)
+#  define CONFIG_TCC_LDDIR "/lib64"
+# else
+#  define CONFIG_TCC_LDDIR "/lib"
+# endif
+#endif
+
+/* path to find crt1.o, crti.o and crtn.o */
+#ifndef CONFIG_TCC_CRTPREFIX
+# define CONFIG_TCC_CRTPREFIX CONFIG_SYSROOT "/usr" CONFIG_TCC_LDDIR
+#endif
+
+/* Below: {B} is substituted by CONFIG_TCCDIR (rsp. -B option) */
+
+/* system include paths */
+#ifndef CONFIG_TCC_SYSINCLUDEPATHS
+# ifdef TCC_TARGET_PE
+#  define CONFIG_TCC_SYSINCLUDEPATHS "{B}/include;{B}/include/winapi"
+# else
+#  define CONFIG_TCC_SYSINCLUDEPATHS \
+        CONFIG_SYSROOT "/usr/local/include" \
+    ":" CONFIG_SYSROOT "/usr/include" \
+    ":" "{B}/include"
+# endif
+#endif
+
+/* library search paths */
+#ifndef CONFIG_TCC_LIBPATHS
+# ifdef TCC_TARGET_PE
+#  define CONFIG_TCC_LIBPATHS "{B}/lib"
+# else
+#  define CONFIG_TCC_LIBPATHS \
+        CONFIG_SYSROOT "/usr" CONFIG_TCC_LDDIR \
+    ":" CONFIG_SYSROOT CONFIG_TCC_LDDIR \
+    ":" CONFIG_SYSROOT "/usr/local" CONFIG_TCC_LDDIR
+# endif
+#endif
+
+/* name of ELF interpreter */
+#ifndef CONFIG_TCC_ELFINTERP
+# if defined __FreeBSD__
+#  define CONFIG_TCC_ELFINTERP "/libexec/ld-elf.so.1"
+# elif defined __FreeBSD_kernel__
+#  define CONFIG_TCC_ELFINTERP CONFIG_TCC_LDDIR"/ld.so.1"
+# elif defined TCC_ARM_EABI
+#  define CONFIG_TCC_ELFINTERP CONFIG_TCC_LDDIR"/ld-linux.so.3"
+# elif defined(TCC_TARGET_X86_64)
+#  define CONFIG_TCC_ELFINTERP CONFIG_TCC_LDDIR"/ld-linux-x86-64.so.2"
+# elif defined(TCC_UCLIBC)
+#  define CONFIG_TCC_ELFINTERP CONFIG_TCC_LDDIR"/ld-uClibc.so.0"
+# else
+#  define CONFIG_TCC_ELFINTERP CONFIG_TCC_LDDIR"/ld-linux.so.2"
+# endif
+#endif
+
+/* library to use with CONFIG_USE_LIBGCC instead of libtcc1.a */
+#define TCC_LIBGCC CONFIG_SYSROOT CONFIG_TCC_LDDIR "/libgcc_s.so.1"
+
+/* -------------------------------------------- */
+
 #define FALSE 0
 #define false 0
 #define TRUE 1
 #define true 1
 typedef int BOOL;
-
-/* path to find crt1.o, crti.o and crtn.o. Only needed when generating
-   executables or dlls */
-
-#if defined(TCC_TARGET_X86_64_CENTOS)
-# define CONFIG_TCC_CRT_PREFIX CONFIG_SYSROOT "/usr/lib64"
-# define CONFIG_TCC_LDDIR "/lib64"
-#else
-# define CONFIG_TCC_CRT_PREFIX CONFIG_SYSROOT "/usr/lib"
-# define CONFIG_TCC_LDDIR "/lib"
-#endif
 
 #define INCLUDE_STACK_SIZE  32
 #define IFDEF_STACK_SIZE    64
@@ -423,8 +481,8 @@ struct TCCState {
 
     char **library_paths;
     int nb_library_paths;
-    char **syslibrary_paths;
-    int nb_syslibrary_paths;
+    char **crt_paths;
+    int nb_crt_paths;
 
     /* array of all loaded dlls (including those referenced by loaded
        dlls) */
@@ -531,12 +589,6 @@ struct TCCState {
     /* output file for preprocessing */
     FILE *outfile;
 
-    /* input files and libraries for this compilation */
-    char **input_files;
-    int nb_input_files;
-    char **input_libs;
-    int nb_input_libs;
-
     /* automatically collected dependencies for this compilation */
     char **target_deps;
     int nb_target_deps;
@@ -563,10 +615,12 @@ struct TCCState {
     /* PE info */
     int pe_subsystem;
     unsigned long pe_file_align;
-    struct pe_uw {
-        Section *pdata;
-        int sym_1, sym_2, offs_1;
-    } pe_unwind;
+    unsigned long pe_stack_size;
+#ifdef TCC_TARGET_X86_64
+    Section *uw_pdata;
+    int uw_sym;
+    unsigned uw_offs;
+#endif
 #endif
 
 #ifndef TCC_TARGET_PE
@@ -579,14 +633,15 @@ struct TCCState {
 };
 
 /* The current value can be: */
-#define VT_VALMASK   0x00ff
-#define VT_CONST     0x00f0  /* constant in vc 
+#define VT_VALMASK   0x003f
+#define VT_CONST     0x0030  /* constant in vc
                               (must be first non register value) */
-#define VT_LLOCAL    0x00f1  /* lvalue, offset on stack */
-#define VT_LOCAL     0x00f2  /* offset on stack */
-#define VT_CMP       0x00f3  /* the value is stored in processor flags (in vc) */
-#define VT_JMP       0x00f4  /* value is the consequence of jmp true (even) */
-#define VT_JMPI      0x00f5  /* value is the consequence of jmp false (odd) */
+#define VT_LLOCAL    0x0031  /* lvalue, offset on stack */
+#define VT_LOCAL     0x0032  /* offset on stack */
+#define VT_CMP       0x0033  /* the value is stored in processor flags (in vc) */
+#define VT_JMP       0x0034  /* value is the consequence of jmp true (even) */
+#define VT_JMPI      0x0035  /* value is the consequence of jmp false (odd) */
+#define VT_REF       0x0040  /* value is pointer to structure rather than address */
 #define VT_LVAL      0x0100  /* var is an lvalue */
 #define VT_SYM       0x0200  /* a symbol value is added */
 #define VT_MUSTCAST  0x0400  /* value must be casted to be correct (used for
@@ -818,17 +873,6 @@ enum tcc_token {
   #define strtof (float)strtod
   #define strtoll (long long)strtol
 #endif
-#elif defined(TCC_UCLIBC) || defined(__FreeBSD__) \
-    || defined(__DragonFly__) || defined(__OpenBSD__)
-/* currently incorrect */
-static inline long double strtold(const char *nptr, char **endptr)
-{
-    return (long double)strtod(nptr, endptr);
-}
-static inline float strtof(const char *nptr, char **endptr)
-{
-    return (float)strtod(nptr, endptr);
-}
 #else
 /* XXX: need to define this to use them in non ISOC99 context */
 extern float strtof (const char *__nptr, char **__endptr);
@@ -836,13 +880,19 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #endif
 
 #ifdef _WIN32
-#define IS_PATHSEP(c) (c == '/' || c == '\\')
-#define IS_ABSPATH(p) (IS_PATHSEP(p[0]) || (p[0] && p[1] == ':' && IS_PATHSEP(p[2])))
+#define IS_DIRSEP(c) (c == '/' || c == '\\')
+#define IS_ABSPATH(p) (IS_DIRSEP(p[0]) || (p[0] && p[1] == ':' && IS_DIRSEP(p[2])))
 #define PATHCMP stricmp
 #else
-#define IS_PATHSEP(c) (c == '/')
-#define IS_ABSPATH(p) IS_PATHSEP(p[0])
+#define IS_DIRSEP(c) (c == '/')
+#define IS_ABSPATH(p) IS_DIRSEP(p[0])
 #define PATHCMP strcmp
+#endif
+
+#ifdef TCC_TARGET_PE
+#define PATHSEP ';'
+#else
+#define PATHSEP ':'
 #endif
 
 /* space exlcuding newline */
@@ -871,9 +921,11 @@ static inline int toup(int c)
     return (c >= 'a' && c <= 'z') ? c - 'a' + 'A' : c;
 }
 
-#define PUB_FUNC 
+#ifndef PUB_FUNC
+# define PUB_FUNC
+#endif
 
-#ifndef NOTALLINONE
+#ifdef ONE_SOURCE
 #define ST_INLN static inline
 #define ST_FUNC static
 #define ST_DATA static
@@ -893,7 +945,7 @@ ST_DATA int tcc_ext;
 ST_DATA struct TCCState *tcc_state;
 
 #ifdef CONFIG_TCC_BACKTRACE
-ST_DATA int num_callers;
+ST_DATA int rt_num_callers;
 ST_DATA const char **rt_bound_error_msg;
 ST_DATA void *rt_prog_main;
 #endif
@@ -901,11 +953,11 @@ ST_DATA void *rt_prog_main;
 #define AFF_PRINT_ERROR     0x0001 /* print error if file not found */
 #define AFF_REFERENCED_DLL  0x0002 /* load a referenced dll from another dll */
 #define AFF_PREPROCESS      0x0004 /* preprocess file */
-#define AFF_MULTILIB        0x0008 /* also search multilib subdir */
 
 /* public functions currently used by the tcc main function */
 PUB_FUNC char *pstrcpy(char *buf, int buf_size, const char *s);
 PUB_FUNC char *pstrcat(char *buf, int buf_size, const char *s);
+PUB_FUNC char *pstrncpy(char *out, const char *in, size_t num);
 PUB_FUNC char *tcc_basename(const char *name);
 PUB_FUNC char *tcc_fileextension (const char *name);
 PUB_FUNC void tcc_free(void *ptr);
@@ -921,10 +973,9 @@ PUB_FUNC char *tcc_strdup(const char *str);
 PUB_FUNC void tcc_memstats(void);
 PUB_FUNC void dynarray_add(void ***ptab, int *nb_ptr, void *data);
 PUB_FUNC void dynarray_reset(void *pp, int *n);
-PUB_FUNC void error_noabort(const char *fmt, ...);
-PUB_FUNC void error(const char *fmt, ...);
-PUB_FUNC void expect(const char *msg);
-PUB_FUNC void warning(const char *fmt, ...);
+PUB_FUNC void tcc_error_noabort(const char *fmt, ...);
+PUB_FUNC void tcc_error(const char *fmt, ...);
+PUB_FUNC void tcc_warning(const char *fmt, ...);
 
 /* other utilities */
 ST_INLN void cstr_ccat(CString *cstr, int ch);
@@ -959,14 +1010,18 @@ ST_FUNC int tcc_open(TCCState *s1, const char *filename);
 ST_FUNC void tcc_close(void);
 
 ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags);
-ST_FUNC int tcc_add_sysfile(TCCState *s, const char *filename);
-ST_FUNC int tcc_add_syslibrary_path(TCCState *s, const char *pathname);
+ST_FUNC int tcc_add_crt(TCCState *s, const char *filename);
+#ifndef TCC_TARGET_PE
 ST_FUNC int tcc_add_dll(TCCState *s, const char *filename, int flags);
+#endif
+
 PUB_FUNC int tcc_set_flag(TCCState *s, const char *flag_name, int value);
 PUB_FUNC void tcc_print_stats(TCCState *s, int64_t total_time);
-PUB_FUNC void set_num_callers(int n);
-
-ST_FUNC int ieee_finite(double d);
+PUB_FUNC char *tcc_default_target(TCCState *s, const char *default_file);
+PUB_FUNC void tcc_gen_makedeps(TCCState *s, const char *target, const char *filename);
+#ifdef CONFIG_TCC_BACKTRACE
+PUB_FUNC void tcc_set_num_callers(int n);
+#endif
 
 /* ------------ tccpp.c ------------ */
 
@@ -1021,6 +1076,7 @@ ST_FUNC void preprocess_init(TCCState *s1);
 ST_FUNC void preprocess_new();
 ST_FUNC int tcc_preprocess(TCCState *s1);
 ST_FUNC void skip(int c);
+ST_FUNC void expect(const char *msg);
 
 /* ------------ tccgen.c ------------ */
 
@@ -1062,6 +1118,7 @@ ST_DATA int last_line_num, last_ind, func_ind; /* debug last line number and pc 
 ST_DATA char *funcname;
 
 ST_INLN int is_float(int t);
+ST_FUNC int ieee_finite(double d);
 ST_FUNC void test_lvalue(void);
 ST_FUNC void swap(int *p, int *q);
 ST_FUNC void vpushi(int v);
@@ -1148,6 +1205,24 @@ ST_INLN void inp(void);
 ST_FUNC int handle_eob(void);
 #endif
 
+#ifdef TCC_TARGET_X86_64
+# define ELFCLASSW ELFCLASS64
+# define ElfW(type) Elf##64##_##type
+# define ELFW(type) ELF##64##_##type
+# define ElfW_Rel ElfW(Rela)
+# define SHT_RELX SHT_RELA
+# define REL_SECTION_FMT ".rela%s"
+/* XXX: DLL with PLT would only work with x86-64 for now */
+# define TCC_OUTPUT_DLL_WITH_PLT
+#else
+# define ELFCLASSW ELFCLASS32
+# define ElfW(type) Elf##32##_##type
+# define ELFW(type) ELF##32##_##type
+# define ElfW_Rel ElfW(Rel)
+# define SHT_RELX SHT_REL
+# define REL_SECTION_FMT ".rel%s"
+#endif
+
 /* ------------ xxx-gen.c ------------ */
 
 ST_FUNC void gsym_addr(int t, int a);
@@ -1229,7 +1304,6 @@ ST_FUNC void asm_clobber(uint8_t *clobber_regs, const char *str);
 /* ------------ tccpe.c -------------- */
 #ifdef TCC_TARGET_PE
 ST_FUNC int pe_load_file(struct TCCState *s1, const char *filename, int fd);
-ST_FUNC int pe_add_dll(struct TCCState *s, const char *libraryname);
 ST_FUNC int pe_output_file(TCCState * s1, const char *filename);
 ST_FUNC int pe_putimport(TCCState *s1, int dllindex, const char *name, const void *value);
 ST_FUNC SValue *pe_getimport(SValue *sv, SValue *v2);
@@ -1277,7 +1351,7 @@ ST_DATA const int reg_classes[NB_REGS];
 
 /********************************************************/
 #undef ST_DATA
-#ifndef NOTALLINONE
+#ifdef ONE_SOURCE
 #define ST_DATA static
 #else
 #define ST_DATA

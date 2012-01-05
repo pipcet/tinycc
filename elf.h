@@ -348,6 +348,17 @@ typedef struct
 #define SHF_EXECINSTR   (1 << 2)        /* Executable */
 #define SHF_MASKPROC    0xf0000000      /* Processor-specific */
 
+#define SHF_MERGE       0x10
+#define SHF_STRINGS     0x20
+#define SHF_INFO_LINK   0x40
+#define SHF_LINK_ORDER  0x80
+#define SHF_OS_NONCONFORMING 0x100
+#define SHF_GROUP       0x200
+#define SHF_TLS         0x400
+#define SHF_MASKOS      0x0ff00000
+#define SHF_ORDERED     0x40000000
+#define SHF_EXCLUDE     0x80000000
+
 /* Symbol table entry.  */
 
 typedef struct
@@ -1711,15 +1722,5 @@ typedef Elf32_Addr Elf32_Conflict;
 
 #define R_C60HI16      0x55       // high 16 bit MVKH embedded
 #define R_C60LO16      0x54       // low 16 bit MVKL embedded
-
-#ifdef TCC_TARGET_X86_64
-#define TCC_ELFCLASS ELFCLASS64
-#define ElfW(type) Elf##64##_##type
-#define ELFW(type) ELF##64##_##type
-#else
-#define TCC_ELFCLASS ELFCLASS32
-#define ElfW(type) Elf##32##_##type
-#define ELFW(type) ELF##32##_##type
-#endif
 
 #endif  /* elf.h */

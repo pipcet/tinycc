@@ -1,8 +1,0 @@
-0001-Default-to-create-progs-with-symbols-incl.-debug.patch
-0002-Make-ex1.c-and-ex4.c-be-executable-on-any-systems.patch
-0003-Fix-problem-with-PLT-and-GOT-relocs-on-armel.patch
-0004-Search-system-files-and-library-in-multilib-path.patch
-0005-Fix-array_test-test-take-no-parameter.patch
-0006-Don-t-define-strtold-and-strtof-on-Debian-kFreeBSD.patch
-0007-Don-t-accept-VLA-outside-functions.patch
-0008-Fix-linkage-of-named-file-in-loader-script.patch

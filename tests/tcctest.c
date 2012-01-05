@@ -103,6 +103,10 @@ int isid(int c);
 #define HIGHLOW "hello"
 #define LOW LOW ", world"
 
+static int onetwothree = 123;
+#define onetwothree4 onetwothree
+#define onetwothree xglue(onetwothree,4)
+
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
 #ifdef C99_MACROS
@@ -154,6 +158,8 @@ void macro_test(void)
     printf("s3=%s\n", str("c"));
     printf("s4=%s\n", str(a1));
     printf("B3=%d\n", B3);
+
+    printf("onetwothree=%d\n", onetwothree);
 
 #ifdef A
     printf("A defined\n");
@@ -290,13 +296,12 @@ static void print_num(char *fn, int line, int num) {
 
 void recursive_macro_test(void)
 {
-#if 0 /* doesnt work yet */
+
 #define ELF32_ST_TYPE(val)              ((val) & 0xf)
 #define ELF32_ST_INFO(bind, type)       (((bind) << 4) + ((type) & 0xf))
 #define STB_WEAK        2               /* Weak symbol */
 #define ELFW(type) ELF##32##_##type
     printf("%d\n", ELFW(ST_INFO)(STB_WEAK, ELFW(ST_TYPE)(123)));
-#endif
 
 #define WRAP(x) x
     
@@ -1296,6 +1301,8 @@ struct complexinit2 {
 	int b[];
 };
 
+struct complexinit2 cix20;
+
 struct complexinit2 cix21 = {
 	.a = 3000,
 	.b = { 3001, 3002, 3003 }
@@ -1405,7 +1412,7 @@ void init_test(void)
 	cix[0].b[1].a, cix[0].b[1].b,
 	cix[0].b[2].a, cix[0].b[2].b);
     printf("cix2: %d %d\n", cix21.b[2], cix22.b[5]);
-    printf("sizeof cix21 %d, sizeof cix22 %d\n", sizeof cix21, sizeof cix22);
+    printf("sizeof cix20 %d, cix21 %d, sizeof cix22 %d\n", sizeof cix20, sizeof cix21, sizeof cix22);
 }
 
 
@@ -2442,8 +2449,8 @@ int some_lib_func(void);
 int dummy_impl_of_slf(void) { return 444; }
 int some_lib_func(void) __attribute__((weak, alias("dummy_impl_of_slf")));
 
-int weak_toolate() { return 0; }
 int weak_toolate() __attribute__((weak));
+int weak_toolate() { return 0; }
 
 void __attribute__((weak)) weak_test(void)
 {

@@ -3,14 +3,12 @@
 @rem ----------------------------------------------------
 
 echo>..\config.h #define TCC_VERSION "0.9.25"
-echo>>..\config.h #define CONFIG_TCCDIR "."
-echo>>..\config.h #define CONFIG_SYSROOT ""
 
 @if _%PROCESSOR_ARCHITEW6432%_==_AMD64_ goto x86_64
 @if _%PROCESSOR_ARCHITECTURE%_==_AMD64_ goto x86_64
 
 @set target=-DTCC_TARGET_PE -DTCC_TARGET_I386
-@set CC=gcc -Os -s
+@set CC=gcc -Os -s -fno-strict-aliasing
 @set AR=ar
 @set P=32
 @goto tools
@@ -18,7 +16,7 @@ echo>>..\config.h #define CONFIG_SYSROOT ""
 :x86_64
 @set target=-DTCC_TARGET_PE -DTCC_TARGET_X86_64
 @rem mingw 64 has an ICE with -Os
-@set CC=x86_64-pc-mingw32-gcc -O0 -s
+@set CC=x86_64-pc-mingw32-gcc -O0 -s -fno-strict-aliasing
 @set AR=x86_64-pc-mingw32-ar
 @set P=64
 
@@ -29,11 +27,14 @@ echo>>..\config.h #define CONFIG_SYSROOT ""
 :libtcc
 if not exist libtcc\nul mkdir libtcc
 copy ..\libtcc.h libtcc\libtcc.h
-%CC% %target% -fno-strict-aliasing ../libtcc.c -c -o libtcc.o
+%CC% %target% -DONE_SOURCE ../libtcc.c -c -o libtcc.o
 %AR% rcs libtcc/libtcc.a libtcc.o
+:libtcc.dll
+%CC% %target% -shared -DLIBTCC_AS_DLL -DONE_SOURCE ../libtcc.c -o libtcc.dll
+tiny_impdef libtcc.dll -o lib/libtcc.def
 
 :tcc
-%CC% %target% -fno-strict-aliasing ../tcc.c -o tcc.exe -DTCC_USE_LIBTCC -ltcc -Llibtcc
+%CC% %target% ../tcc.c -o tcc.exe -ltcc -Llibtcc
 
 :copy_std_includes
 copy ..\include\*.h include
@@ -60,3 +61,7 @@ tiny_libmaker lib/libtcc1.a libtcc1.o alloca86_64.o crt1.o wincrt1.o dllcrt1.o d
 
 :the_end
 del *.o
+
+:libtcc_test
+.\tcc -v -I libtcc -ltcc ../tests/libtcc_test.c
+.\libtcc_test

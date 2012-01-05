@@ -20,6 +20,12 @@
 
 #include "tcc.h"
 
+#ifdef CONFIG_TCC_BACKTRACE
+ST_DATA int rt_num_callers = 6;
+ST_DATA const char **rt_bound_error_msg;
+ST_DATA void *rt_prog_main;
+#endif
+
 #ifdef _WIN32
 #define ucontext_t CONTEXT
 #endif
@@ -30,11 +36,15 @@ static int rt_get_caller_pc(uplong *paddr, ucontext_t *uc, int level);
 static void rt_error(ucontext_t *uc, const char *fmt, ...);
 static int tcc_relocate_ex(TCCState *s1, void *ptr);
 
+#ifdef _WIN64
+static void win64_add_function_table(TCCState *s1);
+#endif
+
 /* ------------------------------------------------------------- */
 /* Do all relocations (needed before using tcc_get_symbol())
    Returns -1 on error. */
 
-int tcc_relocate(TCCState *s1)
+LIBTCCAPI int tcc_relocate(TCCState *s1)
 {
     int ret;
 #ifdef HAVE_SELINUX
@@ -48,13 +58,13 @@ int tcc_relocate(TCCState *s1)
     s1->write_mem = mmap (NULL, ret, PROT_READ|PROT_WRITE,
         MAP_SHARED, fd, 0);
     if(s1->write_mem == MAP_FAILED){
-        error("/tmp not writeable");
+        tcc_error("/tmp not writeable");
         return -1;
     }
     s1->runtime_mem = mmap (NULL, ret, PROT_READ|PROT_EXEC,
         MAP_SHARED, fd, 0);
     if(s1->runtime_mem == MAP_FAILED){
-        error("/tmp not executable");
+        tcc_error("/tmp not executable");
         return -1;
     }
     ret = tcc_relocate_ex(s1, s1->write_mem);
@@ -69,9 +79,10 @@ int tcc_relocate(TCCState *s1)
 }
 
 /* launch the compiled program with the given arguments */
-int tcc_run(TCCState *s1, int argc, char **argv)
+LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
 {
     int (*prog_main)(int, char **);
+    int ret;
 
     if (tcc_relocate(s1) < 0)
         return -1;
@@ -79,37 +90,29 @@ int tcc_run(TCCState *s1, int argc, char **argv)
     prog_main = tcc_get_symbol_err(s1, "main");
 
 #ifdef CONFIG_TCC_BACKTRACE
-    if (s1->do_debug)
+    if (s1->do_debug) {
         set_exception_handler();
+        rt_prog_main = prog_main;
+    }
 #endif
 
 #ifdef CONFIG_TCC_BCHECK
     if (s1->do_bounds_check) {
         void (*bound_init)(void);
         void (*bound_exit)(void);
-        int ret;
         /* set error function */
         rt_bound_error_msg = tcc_get_symbol_err(s1, "__bound_error_msg");
-        rt_prog_main = prog_main;
         /* XXX: use .init section so that it also work in binary ? */
         bound_init = tcc_get_symbol_err(s1, "__bound_init");
         bound_exit = tcc_get_symbol_err(s1, "__bound_exit");
         bound_init();
         ret = (*prog_main)(argc, argv);
         bound_exit();
-        return ret;
-    }
+    } else
 #endif
-
-#ifdef TCC_TARGET_PE
-    {
-      unsigned char *p = tcc_get_symbol(s1, "tinyc_no_getbp");
-      if (p) *p = 0;
-    }
-#endif
-    return (*prog_main)(argc, argv);
+        ret = (*prog_main)(argc, argv);
+    return ret;
 }
-
 
 /* relocate code. Return -1 on error, required size if ptr is NULL,
    otherwise copy code into buffer passed by the caller */
@@ -189,6 +192,10 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr)
     set_pages_executable(s1->runtime_plt_and_got,
                          s1->runtime_plt_and_got_offset);
 #endif
+
+#ifdef _WIN64
+    win64_add_function_table(s1);
+#endif
     return 0;
 }
 
@@ -212,28 +219,43 @@ static void set_pages_executable(void *ptr, unsigned long length)
 /* ------------------------------------------------------------- */
 #ifdef CONFIG_TCC_BACKTRACE
 
+PUB_FUNC void tcc_set_num_callers(int n)
+{
+    rt_num_callers = n;
+}
+
 /* print the position in the source file of PC value 'pc' by reading
    the stabs debug information */
-static uplong rt_printline(uplong wanted_pc)
+static uplong rt_printline(uplong wanted_pc, const char *msg)
 {
-    Stab_Sym *sym, *sym_end;
     char func_name[128], last_func_name[128];
-    unsigned long func_addr, last_pc, pc;
+    uplong func_addr, last_pc, pc;
     const char *incl_files[INCLUDE_STACK_SIZE];
     int incl_index, len, last_line_num, i;
     const char *str, *p;
 
-    fprintf(stderr, "0x%08lx:", (unsigned long)wanted_pc);
+    Stab_Sym *stab_sym = NULL, *stab_sym_end, *sym;
+    int stab_len = 0;
+    char *stab_str = NULL;
+
+    if (stab_section) {
+        stab_len = stab_section->data_offset;
+        stab_sym = (Stab_Sym *)stab_section->data;
+        stab_str = stabstr_section->data;
+    }
 
     func_name[0] = '\0';
     func_addr = 0;
     incl_index = 0;
     last_func_name[0] = '\0';
-    last_pc = 0xffffffff;
+    last_pc = (uplong)-1;
     last_line_num = 1;
-    sym = (Stab_Sym *)stab_section->data + 1;
-    sym_end = (Stab_Sym *)(stab_section->data + stab_section->data_offset);
-    while (sym < sym_end) {
+
+    if (!stab_sym)
+        goto no_stabs;
+
+    stab_sym_end = (Stab_Sym*)((char*)stab_sym + stab_len);
+    for (sym = stab_sym + 1; sym < stab_sym_end; ++sym) {
         switch(sym->n_type) {
             /* function start or end */
         case N_FUN:
@@ -245,7 +267,7 @@ static uplong rt_printline(uplong wanted_pc)
                 func_name[0] = '\0';
                 func_addr = 0;
             } else {
-                str = stabstr_section->data + sym->n_strx;
+                str = stab_str + sym->n_strx;
                 p = strchr(str, ':');
                 if (!p) {
                     pstrcpy(func_name, sizeof(func_name), str);
@@ -271,7 +293,7 @@ static uplong rt_printline(uplong wanted_pc)
             break;
             /* include files */
         case N_BINCL:
-            str = stabstr_section->data + sym->n_strx;
+            str = stab_str + sym->n_strx;
         add_incl:
             if (incl_index < INCLUDE_STACK_SIZE) {
                 incl_files[incl_index++] = str;
@@ -285,7 +307,7 @@ static uplong rt_printline(uplong wanted_pc)
             if (sym->n_strx == 0) {
                 incl_index = 0; /* end of translation unit */
             } else {
-                str = stabstr_section->data + sym->n_strx;
+                str = stab_str + sym->n_strx;
                 /* do not add path */
                 len = strlen(str);
                 if (len > 0 && str[len - 1] != '/')
@@ -293,11 +315,12 @@ static uplong rt_printline(uplong wanted_pc)
             }
             break;
         }
-        sym++;
     }
 
+no_stabs:
     /* second pass: we try symtab symbols (no line number info) */
     incl_index = 0;
+    if (symtab_section)
     {
         ElfW(Sym) *sym, *sym_end;
         int type;
@@ -319,20 +342,28 @@ static uplong rt_printline(uplong wanted_pc)
         }
     }
     /* did not find any info: */
-    fprintf(stderr, " ???\n");
+    fprintf(stderr, "%s %p ???\n", msg, (void*)wanted_pc);
+    fflush(stderr);
     return 0;
  found:
-    if (last_func_name[0] != '\0') {
+    i = incl_index;
+    if (i > 0)
+        fprintf(stderr, "%s:%d: ", incl_files[--i], last_line_num);
+    fprintf(stderr, "%s %p", msg, (void*)wanted_pc);
+    if (last_func_name[0] != '\0')
         fprintf(stderr, " %s()", last_func_name);
-    }
-    if (incl_index > 0) {
-        fprintf(stderr, " (%s:%d",
-                incl_files[incl_index - 1], last_line_num);
-        for(i = incl_index - 2; i >= 0; i--)
-            fprintf(stderr, ", included from %s", incl_files[i]);
+    if (--i >= 0) {
+        fprintf(stderr, " (included from ");
+        for (;;) {
+            fprintf(stderr, "%s", incl_files[i]);
+            if (--i < 0)
+                break;
+            fprintf(stderr, ", ");
+        }
         fprintf(stderr, ")");
     }
     fprintf(stderr, "\n");
+    fflush(stderr);
     return func_addr;
 }
 
@@ -343,24 +374,19 @@ static void rt_error(ucontext_t *uc, const char *fmt, ...)
     uplong pc;
     int i;
 
-    va_start(ap, fmt);
     fprintf(stderr, "Runtime error: ");
+    va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
+    va_end(ap);
     fprintf(stderr, "\n");
 
-    for(i=0;i<num_callers;i++) {
+    for(i=0;i<rt_num_callers;i++) {
         if (rt_get_caller_pc(&pc, uc, i) < 0)
             break;
-        if (i == 0)
-            fprintf(stderr, "at ");
-        else
-            fprintf(stderr, "by ");
-        pc = rt_printline(pc);
+        pc = rt_printline(pc, i ? "by" : "at");
         if (pc == (uplong)rt_prog_main && pc)
             break;
     }
-    exit(255);
-    va_end(ap);
 }
 
 /* ------------------------------------------------------------- */
@@ -558,18 +584,27 @@ static int rt_get_caller_pc(unsigned long *paddr,
 
 static long __stdcall cpu_exception_handler(EXCEPTION_POINTERS *ex_info)
 {
-    CONTEXT *uc = ex_info->ContextRecord;
-/*
     EXCEPTION_RECORD *er = ex_info->ExceptionRecord;
-    printf("CPU exception: code=%08lx addr=%p\n",
-	er->ExceptionCode, er->ExceptionAddress);
-*/
-    if (rt_bound_error_msg && *rt_bound_error_msg)
-	rt_error(uc, *rt_bound_error_msg);
-    else
-	rt_error(uc, "dereferencing invalid pointer");
-    exit(255);
-    //return EXCEPTION_CONTINUE_SEARCH;
+    CONTEXT *uc = ex_info->ContextRecord;
+    switch (er->ExceptionCode) {
+    case EXCEPTION_ACCESS_VIOLATION:
+        if (rt_bound_error_msg && *rt_bound_error_msg)
+            rt_error(uc, *rt_bound_error_msg);
+        else
+	    rt_error(uc, "access violation");
+        break;
+    case EXCEPTION_STACK_OVERFLOW:
+        rt_error(uc, "stack overflow");
+        break;
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:
+        rt_error(uc, "division by zero");
+        break;
+    default:
+        rt_error(uc, "exception caught");
+        break;
+    }
+    exit(-1);
+    return EXCEPTION_CONTINUE_SEARCH;
 }
 
 /* Generate a stack backtrace when a CPU exception occurs. */
@@ -579,34 +614,40 @@ static void set_exception_handler(void)
 }
 
 #ifdef _WIN64
-#define Eip Rip
-#define Ebp Rbp
+static void win64_add_function_table(TCCState *s1)
+{
+    RtlAddFunctionTable(
+        (RUNTIME_FUNCTION*)(uplong)s1->uw_pdata->sh_addr,
+        s1->uw_pdata->data_offset / sizeof (RUNTIME_FUNCTION),
+        (uplong)text_section->sh_addr
+        );
+}
 #endif
 
 /* return the PC at frame level 'level'. Return non zero if not found */
 static int rt_get_caller_pc(uplong *paddr, CONTEXT *uc, int level)
 {
-    uplong fp;
+    uplong fp, pc;
     int i;
-
-    if (level == 0) {
-	*paddr = uc->Eip;
-	return 0;
-    } else {
-	fp = uc->Ebp;
-	for(i=1;i<level;i++) {
+#ifdef _WIN64
+    pc = uc->Rip;
+    fp = uc->Rbp;
+#else
+    pc = uc->Eip;
+    fp = uc->Ebp;
+#endif
+    if (level > 0) {
+        for(i=1;i<level;i++) {
 	    /* XXX: check address validity with program info */
 	    if (fp <= 0x1000 || fp >= 0xc0000000)
 		return -1;
 	    fp = ((uplong*)fp)[0];
 	}
-	*paddr = ((uplong*)fp)[1];
-	return 0;
+        pc = ((uplong*)fp)[1];
     }
+    *paddr = pc;
+    return 0;
 }
-
-#undef Eip
-#undef Ebp
 
 #endif /* _WIN32 */
 #endif /* CONFIG_TCC_BACKTRACE */
@@ -620,12 +661,12 @@ static int rt_get_caller_pc(uplong *paddr, CONTEXT *uc, int level)
 #define RTLD_DEFAULT    NULL
 
 /* dummy function for profiling */
-void *dlopen(const char *filename, int flag)
+ST_FUNC void *dlopen(const char *filename, int flag)
 {
     return NULL;
 }
 
-void dlclose(void *p)
+ST_FUNC void dlclose(void *p)
 {
 }
 /*
@@ -652,7 +693,7 @@ static TCCSyms tcc_syms[] = {
     { NULL, NULL },
 };
 
-void *resolve_sym(TCCState *s1, const char *symbol)
+ST_FUNC void *resolve_sym(TCCState *s1, const char *symbol)
 {
     TCCSyms *p;
     p = tcc_syms;
@@ -666,7 +707,7 @@ void *resolve_sym(TCCState *s1, const char *symbol)
 
 #elif !defined(_WIN32)
 
-void *resolve_sym(TCCState *s1, const char *sym)
+ST_FUNC void *resolve_sym(TCCState *s1, const char *sym)
 {
     return dlsym(RTLD_DEFAULT, sym);
 }
