@@ -4,10 +4,12 @@ tcc (0.9.26~git20120104.83d57c0-1) experimental; urgency=low
     + Make tcc search crt*.o files at the right location (Closes: #654631).
     + Incorporate the fix for linkage of named file in loader script
       (Closes: #654528).
+  * debian/control:
+    + Convert libtcc-dev to multiarch.
   * debian/rules:
     + Adapt to the new upstream build system.
 
- -- Thomas Preud'homme <robotux@celest.fr>  Thu, 05 Jan 2012 15:32:07 +0100
+ -- Thomas Preud'homme <robotux@celest.fr>  Thu, 05 Jan 2012 15:45:51 +0100
 
 tcc (0.9.25-13) unstable; urgency=low
 

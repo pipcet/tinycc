@@ -31,6 +31,7 @@ Description: Small ANSI C compiler
 Package: libtcc-dev
 Section: libdevel
 Architecture: any-i386 any-amd64 armel
+Multi-Arch: same
 Depends: ${misc:Depends}
 Description: Fast library for dynamic code generation
  Libtcc is a library that uses tcc, a compiler several times faster than
