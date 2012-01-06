@@ -1,3 +1,10 @@
+tcc (0.9.26~git20120104.83d57c0-2) experimental; urgency=low
+
+  * Fix armel FTBFS by not compiling tccasm.c, as inline assembly is not
+    supported on armel (Closes: #654904).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Fri, 06 Jan 2012 18:37:50 +0100
+
 tcc (0.9.26~git20120104.83d57c0-1) experimental; urgency=low
 
   * New upstream snapshot:
