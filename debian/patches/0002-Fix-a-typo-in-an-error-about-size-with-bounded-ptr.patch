@@ -1,5 +1,5 @@
-From 7e5fa99f838819c07cb22c8f4b05aeb714a9ac05 Mon Sep 17 00:00:00 2001
-From: Thomas Preud'homme <robotux@celest.fr>
+From 979807c63f1e208f3631f0e0cef05c222485608d Mon Sep 17 00:00:00 2001
+From: Urs Janssen <urs@tin.org>
 Date: Sun, 8 Jan 2012 17:58:19 +0100
 Subject: Fix a typo in an error about size with bounded ptr
 
