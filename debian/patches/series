@@ -1,1 +1,2 @@
 0001-Compile-tccasm.c-conditionally-TCC_CONFIG_ASM.patch
+0002-Fix-a-typo-in-an-error-about-size-with-bounded-ptr.patch

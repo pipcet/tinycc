@@ -1,0 +1,28 @@
+From 7e5fa99f838819c07cb22c8f4b05aeb714a9ac05 Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <robotux@celest.fr>
+Date: Sun, 8 Jan 2012 17:58:19 +0100
+Subject: Fix a typo in an error about size with bounded ptr
+
+s/derefencing/dereferencing/ in i386-gen.c
+
+Origin: vendor
+Forwarded: http://repo.or.cz/w/tinycc.git/commit/9c25ed13b42f0a58af19bd2dc414a53328ff5757
+Last-Update: 2012-01-08
+Applied-Upstream: commit:9c25ed13b42f0a58af19bd2dc414a53328ff5757
+---
+ i386-gen.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/i386-gen.c b/i386-gen.c
+index 686419c..a782de5 100644
+--- a/i386-gen.c
++++ b/i386-gen.c
+@@ -1068,7 +1068,7 @@ ST_FUNC void gen_bounded_ptr_deref(void)
+     case 12: func = TOK___bound_ptr_indir12; break;
+     case 16: func = TOK___bound_ptr_indir16; break;
+     default:
+-        tcc_error("unhandled size when derefencing bounded pointer");
++        tcc_error("unhandled size when dereferencing bounded pointer");
+         func = 0;
+         break;
+     }
