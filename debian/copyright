@@ -1,4 +1,4 @@
-Format: http://dep.debian.net/deps/dep5/
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Tiny C Compiler
 Upstream-Contact: Fabrice Bellard <fabrice@bellard.org>
 Source: http://repo.or.cz/w/tinycc.git/snapshot/330d2ee0faf2849f6d861839e563422a1519c4c3.tar.gz
