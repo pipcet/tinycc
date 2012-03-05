@@ -2,8 +2,9 @@ tcc (0.9.26~git20120104.83d57c0-3) experimental; urgency=low
 
   * Fix loading of LLOCAL floats (Closes: #656995).
   * Use version 1.0 for DEP5 copyright.
+  * Bump Standards-Version to 3.9.3 (no changes needed).
 
- -- Thomas Preud'homme <robotux@celest.fr>  Mon, 05 Mar 2012 23:09:25 +0100
+ -- Thomas Preud'homme <robotux@celest.fr>  Mon, 05 Mar 2012 23:13:42 +0100
 
 tcc (0.9.26~git20120104.83d57c0-2) experimental; urgency=low
 

@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Aurélien GÉRÔME <ag@debian.org>
 Uploaders: Thomas Preud'homme <robotux@celest.fr>, Arthur Loiret <arthur.loiret@gmail.com>
 Build-Depends: debhelper (>= 8.1.3), texi2html, texinfo, perl
-Standards-Version: 3.9.2
+Standards-Version: 3.9.3
 Homepage: http://www.tinycc.org/
 DM-Upload-Allowed: yes
 Vcs-Browser: http://anonscm.debian.org/git/collab-maint/tcc.git
