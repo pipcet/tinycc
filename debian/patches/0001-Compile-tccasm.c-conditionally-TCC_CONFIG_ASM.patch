@@ -1,4 +1,4 @@
-From 8e091413040b2f0affb20a6062d8be1de61f5e7b Mon Sep 17 00:00:00 2001
+From c34230e22d6a4e3e82db7e68db9764ed6a5fc5ff Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <robotux@celest.fr>
 Date: Fri, 6 Jan 2012 18:14:34 +0100
 Subject: Compile tccasm.c conditionally (TCC_CONFIG_ASM)
@@ -9,7 +9,7 @@ this architecture by testing the presence of macro TCC_CONFIG_ASM.
 Origin: vendor
 Bug-Debian: http://bugs.debian.org/654904
 Forwarded: http://repo.or.cz/w/tinycc.git/commit/519a9040a16f86a7b309accf1cb54ed64d2f921f
-Last-Updated: 2012-01-06
+Last-Update: 2012-03-05
 Applied-Upstream: commit: 519a9040a16f86a7b309accf1cb54ed64d2f921f
 ---
  tccasm.c |    2 ++

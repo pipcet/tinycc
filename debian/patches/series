@@ -1,2 +1,4 @@
 0001-Compile-tccasm.c-conditionally-TCC_CONFIG_ASM.patch
 0002-Fix-a-typo-in-an-error-about-size-with-bounded-ptr.patch
+0003-i386-fix-loading-of-LLOCAL-floats.patch
+0004-x86_64-fix-loading-of-LLOCAL-floats.patch

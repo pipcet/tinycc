@@ -1,0 +1,81 @@
+From 22ab2ee2ae9cb1260ff034cbe60859d969c6e2a7 Mon Sep 17 00:00:00 2001
+From: grischka <grischka>
+Date: Mon, 5 Mar 2012 20:19:28 +0100
+Subject: x86_64: fix loading of LLOCAL floats
+
+See also commit 58c6f140f20114bf565690feef9252a0eee40d5c
+On x86_64 we need to extend the reg_classes array because load()
+is called for (at least) R11 too, which was not part of reg_classes
+previously.
+
+Origin: upstream, http://repo.or.cz/w/tinycc.git/commitdiff/ae191c3a619db25e3c9d4b6c89d1a9970563d825
+Bug-Debian: http://bugs.debian.org/656995
+Forwarded: http://repo.or.cz/w/tinycc.git/commitdiff/ae191c3a619db25e3c9d4b6c89d1a9970563d825
+Last-Update: 2012-03-05
+Applied-Upstream: commit: ae191c3a619db25e3c9d4b6c89d1a9970563d825
+---
+ tcc.h        |    2 +-
+ x86_64-gen.c |   12 ++++++++----
+ 2 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/tcc.h b/tcc.h
+index d158829..cda9626 100644
+--- a/tcc.h
++++ b/tcc.h
+@@ -1347,7 +1347,7 @@ ST_FUNC void *resolve_sym(TCCState *s1, const char *symbol);
+ #endif
+ #undef TARGET_DEFS_ONLY
+ 
+-ST_DATA const int reg_classes[NB_REGS];
++ST_DATA const int reg_classes[];
+ 
+ /********************************************************/
+ #undef ST_DATA
+diff --git a/x86_64-gen.c b/x86_64-gen.c
+index 4d2521d..0b0e69e 100644
+--- a/x86_64-gen.c
++++ b/x86_64-gen.c
+@@ -36,6 +36,8 @@
+ #define RC_RDX     0x0010
+ #define RC_R8      0x0100
+ #define RC_R9      0x0200
++#define RC_R10     0x0400
++#define RC_R11     0x0800
+ #define RC_XMM0    0x0020
+ #define RC_ST0     0x0040 /* only for long double */
+ #define RC_IRET    RC_RAX /* function return: integer register */
+@@ -104,19 +106,19 @@ ST_FUNC void gen_le64(int64_t c);
+ #include "tcc.h"
+ #include <assert.h>
+ 
+-ST_DATA const int reg_classes[NB_REGS] = {
++ST_DATA const int reg_classes[] = {
+     /* eax */ RC_INT | RC_RAX,
+     /* ecx */ RC_INT | RC_RCX,
+     /* edx */ RC_INT | RC_RDX,
+     /* xmm0 */ RC_FLOAT | RC_XMM0,
+     /* st0 */ RC_ST0,
+-#if NB_REGS == 10
+     0,
+     0,
+     0,
+     RC_INT | RC_R8,
+     RC_INT | RC_R9,
+-#endif
++    RC_INT | RC_R10,
++    RC_INT | RC_R11
+ };
+ 
+ static unsigned long func_sub_sp_offset;
+@@ -367,8 +369,10 @@ void load(int r, SValue *sv)
+             v1.type.t = VT_PTR;
+             v1.r = VT_LOCAL | VT_LVAL;
+             v1.c.ul = fc;
+-            load(r, &v1);
+             fr = r;
++            if (!(reg_classes[fr] & RC_INT))
++                fr = get_reg(RC_INT);
++            load(fr, &v1);
+         }
+         ll = 0;
+         if ((ft & VT_BTYPE) == VT_FLOAT) {

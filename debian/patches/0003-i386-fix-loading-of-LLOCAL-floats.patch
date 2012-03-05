@@ -1,0 +1,32 @@
+From 523f075c09f285b1c404f0bf6e2c8567d3563272 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Daniel=20Gl=C3=B6ckner?= <daniel-gl@gmx.net>
+Date: Mon, 23 Jan 2012 01:41:36 +0100
+Subject: i386: fix loading of LLOCAL floats
+
+These loads clobbered ebx as TinyCC wanted to load the address into st0.
+
+Origin: upstream, http://repo.or.cz/w/tinycc.git/commit/9527c4949fd94adb2567229413c70c19b663a118
+Bug-Debian: http://bugs.debian.org/656995
+Forwarded: http://repo.or.cz/w/tinycc.git/commit/9527c4949fd94adb2567229413c70c19b663a118
+Last-Update: 2012-01-23
+Applied-Upstream: commit: 9527c4949fd94adb2567229413c70c19b663a118
+---
+ i386-gen.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/i386-gen.c b/i386-gen.c
+index a782de5..6635559 100644
+--- a/i386-gen.c
++++ b/i386-gen.c
+@@ -229,8 +229,10 @@ ST_FUNC void load(int r, SValue *sv)
+             v1.type.t = VT_INT;
+             v1.r = VT_LOCAL | VT_LVAL;
+             v1.c.ul = fc;
+-            load(r, &v1);
+             fr = r;
++            if (!(reg_classes[fr] & RC_INT))
++                fr = get_reg(RC_INT);
++            load(fr, &v1);
+         }
+         if ((ft & VT_BTYPE) == VT_FLOAT) {
+             o(0xd9); /* flds */
