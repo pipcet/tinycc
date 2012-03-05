@@ -1,5 +1,7 @@
 tcc (0.9.26~git20120104.83d57c0-3) experimental; urgency=low
 
+  * Fix typo of an error about unknown size with bounded pointer arithmetic
+    (Closes: #655110, thanks Urs Janssen).
   * Fix loading of LLOCAL floats (Closes: #656995).
   * Use version 1.0 for DEP5 copyright.
   * Bump Standards-Version to 3.9.3 (no changes needed).
@@ -10,8 +12,6 @@ tcc (0.9.26~git20120104.83d57c0-2) experimental; urgency=low
 
   * Fix armel FTBFS by not compiling tccasm.c, as inline assembly is not
     supported on armel (Closes: #654904).
-  * Fix typo of an error about unknown size with bounded pointer arithmetic
-    (Closes: #655110, thanks Urs Janssen).
 
  -- Thomas Preud'homme <robotux@celest.fr>  Fri, 06 Jan 2012 18:37:50 +0100
 
