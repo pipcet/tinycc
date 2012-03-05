@@ -1,3 +1,9 @@
+tcc (0.9.26~git20120104.83d57c0-4) unstable; urgency=low
+
+  * Upload to unstable.
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Tue, 06 Mar 2012 00:19:03 +0100
+
 tcc (0.9.26~git20120104.83d57c0-3) experimental; urgency=low
 
   * Fix typo of an error about unknown size with bounded pointer arithmetic
