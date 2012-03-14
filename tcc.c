@@ -35,6 +35,7 @@ static int do_bench = 0;
 static int gen_deps;
 static const char *deps_outfile;
 static const char *m_option;
+static CString linker_arg;
 
 #define TCC_OPTION_HAS_ARG 0x0001
 #define TCC_OPTION_NOSEP   0x0002 /* cannot have space before option and arg */
@@ -284,6 +285,7 @@ static int parse_args(TCCState *s, int argc, char **argv)
     was_pthread = 0; /* is set if commandline contains -pthread key */
 
     optind = 1;
+    cstr_new(&linker_arg);
     while (optind < argc) {
 
         r = argv[optind++];
@@ -442,8 +444,12 @@ static int parse_args(TCCState *s, int argc, char **argv)
                 s->rdynamic = 1;
                 break;
             case TCC_OPTION_Wl:
-                if ((r = (char *) tcc_set_linker(s, (char *)optarg, TRUE)))
-                    tcc_error("unsupported linker option '%s'", r);
+                if (!linker_arg.data_allocated)
+                    cstr_cat(&linker_arg, optarg);
+                else {
+                    cstr_ccat(&linker_arg, ',');
+                    cstr_cat(&linker_arg, optarg);
+                }
                 break;
             case TCC_OPTION_E:
                 output_type = TCC_OUTPUT_PREPROCESS;
@@ -465,6 +471,8 @@ static int parse_args(TCCState *s, int argc, char **argv)
             }
         }
     }
+    if ((r = (char *) tcc_set_linker(s, (char *) linker_arg.data, TRUE)))
+        tcc_error("unsupported linker option '%s'", r);
     /* fixme: these options could be different on your platform */
     if (was_pthread && output_type != TCC_OUTPUT_OBJ) {
         dynarray_add((void ***)&files, &nb_files, "-lpthread");
@@ -593,6 +601,7 @@ int main(int argc, char **argv)
     }
 
     tcc_delete(s);
+    cstr_free(&linker_arg);
     tcc_free(outfile);
 
 #ifdef MEM_DEBUG
