@@ -35,6 +35,7 @@ static int do_bench = 0;
 static int gen_deps;
 static const char *deps_outfile;
 static const char *m_option;
+static char *linker_arg;
 
 #define TCC_OPTION_HAS_ARG 0x0001
 #define TCC_OPTION_NOSEP   0x0002 /* cannot have space before option and arg */
@@ -280,6 +281,7 @@ static int parse_args(TCCState *s, int argc, char **argv)
     const char *optarg, *p1, *r1;
     char *r;
     int was_pthread;
+    unsigned long linker_argsize = 0;
 
     was_pthread = 0; /* is set if commandline contains -pthread key */
 
@@ -442,8 +444,17 @@ static int parse_args(TCCState *s, int argc, char **argv)
                 s->rdynamic = 1;
                 break;
             case TCC_OPTION_Wl:
-                if ((r = (char *) tcc_set_linker(s, (char *)optarg, TRUE)))
-                    tcc_error("unsupported linker option '%s'", r);
+                if (!linker_arg) {
+                    linker_argsize = strlen(optarg) + 1;
+                    linker_arg = tcc_malloc(linker_argsize);
+                    pstrcpy(linker_arg, linker_argsize, optarg);
+                }
+                else {
+                    linker_argsize += strlen(optarg) + 1;
+                    linker_arg = tcc_realloc(linker_arg, linker_argsize);
+                    pstrcat(linker_arg, linker_argsize, ",");
+                    pstrcat(linker_arg, linker_argsize, optarg);
+                }
                 break;
             case TCC_OPTION_E:
                 output_type = TCC_OUTPUT_PREPROCESS;
@@ -465,6 +476,8 @@ static int parse_args(TCCState *s, int argc, char **argv)
             }
         }
     }
+    if ((r = (char *) tcc_set_linker(s, (char *)linker_arg, TRUE)))
+        tcc_error("unsupported linker option '%s'", r);
     /* fixme: these options could be different on your platform */
     if (was_pthread && output_type != TCC_OUTPUT_OBJ) {
         dynarray_add((void ***)&files, &nb_files, "-lpthread");
@@ -593,6 +606,7 @@ int main(int argc, char **argv)
     }
 
     tcc_delete(s);
+    tcc_free(linker_arg);
     tcc_free(outfile);
 
 #ifdef MEM_DEBUG
