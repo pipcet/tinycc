@@ -2,3 +2,6 @@
 0002-Fix-a-typo-in-an-error-about-size-with-bounded-ptr.patch
 0003-i386-fix-loading-of-LLOCAL-floats.patch
 0004-x86_64-fix-loading-of-LLOCAL-floats.patch
+0005-Inform-user-that-b-only-exists-on-i386.patch
+0006-Consider-long-int-constant-as-64-bits-on-x86-64.patch
+0007-Support-linker-options-passed-in-several-Wl-param.patch

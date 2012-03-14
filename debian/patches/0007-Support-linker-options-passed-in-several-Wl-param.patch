@@ -1,0 +1,82 @@
+From c0fba69345a8fb693e0eddd1df94f6427fd5a8b4 Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <robotux@celest.fr>
+Date: Thu, 15 Mar 2012 00:22:00 +0100
+Subject: Support linker options passed in several -Wl param
+
+ld support arguments to multiple-letter options being passed in two
+ways:
+* -opt=arg
+* -opt arg
+
+libtool generate command line of the second form. This commit add
+support for the second form so that libtool works with tcc. The way it
+is done is to concatenate all -Wl options into one and then pass it to
+set_linker.
+
+Origin: vendor
+Bug-Debian: http://bugs.debian.org/663693
+Forwarded: http://repo.or.cz/w/tinycc.git/commit/7fb0482a4645d59068ccefe44a3a022b649e5a3a
+Last-Update: 2012-03-15
+Applied-Upstream: commit: 7fb0482a4645d59068ccefe44a3a022b649e5a3a
+---
+ libtcc.c |    3 +++
+ tcc.c    |   18 ++++++++++++++++--
+ 2 files changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/libtcc.c b/libtcc.c
+index 8f5cd0e..8aadc8f 100644
+--- a/libtcc.c
++++ b/libtcc.c
+@@ -1566,6 +1566,9 @@ PUB_FUNC const char * tcc_set_linker(TCCState *s, char *option, int multi)
+             s->has_text_addr = 1;
+ 
+         } else {
++            char *comma_ptr = strchr(option, ',');
++            if (comma_ptr)
++                *comma_ptr = '\0';
+             return option;
+         }
+ 
+diff --git a/tcc.c b/tcc.c
+index 0c51451..c6ad4bf 100644
+--- a/tcc.c
++++ b/tcc.c
+@@ -280,6 +280,8 @@ static int parse_args(TCCState *s, int argc, char **argv)
+     const char *optarg, *p1, *r1;
+     char *r;
+     int was_pthread;
++    char *linker_arg = NULL;
++    unsigned long linker_argsize = 0;
+ 
+     was_pthread = 0; /* is set if commandline contains -pthread key */
+ 
+@@ -442,8 +444,17 @@ static int parse_args(TCCState *s, int argc, char **argv)
+                 s->rdynamic = 1;
+                 break;
+             case TCC_OPTION_Wl:
+-                if ((r = (char *) tcc_set_linker(s, (char *)optarg, TRUE)))
+-                    tcc_error("unsupported linker option '%s'", r);
++                if (!linker_arg) {
++                    linker_argsize = strlen(optarg) + 1;
++                    linker_arg = tcc_malloc(linker_argsize);
++                    pstrcpy(linker_arg, linker_argsize, optarg);
++                }
++                else {
++                    linker_argsize += strlen(optarg) + 1;
++                    linker_arg = tcc_realloc(linker_arg, linker_argsize);
++                    pstrcat(linker_arg, linker_argsize, ",");
++                    pstrcat(linker_arg, linker_argsize, optarg);
++                }
+                 break;
+             case TCC_OPTION_E:
+                 output_type = TCC_OUTPUT_PREPROCESS;
+@@ -465,6 +476,9 @@ static int parse_args(TCCState *s, int argc, char **argv)
+             }
+         }
+     }
++    if ((r = (char *) tcc_set_linker(s, (char *)linker_arg, TRUE)))
++        tcc_error("unsupported linker option '%s'", r);
++    tcc_free(linker_arg);
+     /* fixme: these options could be different on your platform */
+     if (was_pthread && output_type != TCC_OUTPUT_OBJ) {
+         dynarray_add((void ***)&files, &nb_files, "-lpthread");

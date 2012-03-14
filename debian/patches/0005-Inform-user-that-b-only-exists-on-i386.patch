@@ -1,0 +1,29 @@
+From ca7022297ea0df8c751c39c229f7f982350953f6 Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <robotux@celest.fr>
+Date: Tue, 13 Mar 2012 19:43:43 +0100
+Subject: Inform user that -b only exists on i386.
+
+Document that -b option is only available on i386 systems for now.
+
+Origin: vendor
+Bug-Debian: http://bugs.debian.org/663692
+Forwarded: http://repo.or.cz/w/tinycc.git/commit/3d25213c16f937356f49655e485b53beea267c54
+Last-Update: 2012-03-13
+Applied-Upstream: commit: 3d25213c16f937356f49655e485b53beea267c54
+---
+ tcc-doc.texi |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/tcc-doc.texi b/tcc-doc.texi
+index 2522e48..4d4a029 100644
+--- a/tcc-doc.texi
++++ b/tcc-doc.texi
+@@ -334,6 +334,8 @@ Generate additional support code to check
+ memory allocations and array/pointer bounds. @option{-g} is implied. Note
+ that the generated code is slower and bigger in this case.
+ 
++Note: @option{-b} is only available on i386 for the moment.
++
+ @item -bt N
+ Display N callers in stack traces. This is useful with @option{-g} or
+ @option{-b}.
