@@ -1,3 +1,13 @@
+tcc (0.9.26~git20120104.83d57c0-5) unstable; urgency=low
+
+  * Document that -b is only available on i386 (Closes: #663692).
+  * Correctly parse unsigned long constants (ex: 1UL) on amd64
+    (Closes: #663711).
+  * Support arguments to linker options to be passed in separate linker
+    options as in -Wl,-rpath -Wl,<somedir> (Closes: #663693).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Thu, 15 Mar 2012 00:39:47 +0100
+
 tcc (0.9.26~git20120104.83d57c0-4) unstable; urgency=low
 
   * Upload to unstable.
