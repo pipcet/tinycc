@@ -15,7 +15,7 @@ Architecture: any-i386 any-amd64 armel
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Recommends: libc6-dev | libc-dev
 Provides: c-compiler
-Description: Small ANSI C compiler
+Description: small ANSI C compiler
  TCC (for Tiny C Compiler) is a small and fast ANSI C compiler.  It
  generates optimized x86 code, and can compile, assemble, and link
  several times faster than 'gcc -O0'.  Any C dynamic library can be used
@@ -33,7 +33,7 @@ Section: libdevel
 Architecture: any-i386 any-amd64 armel
 Multi-Arch: same
 Depends: ${misc:Depends}
-Description: Fast library for dynamic code generation
+Description: fast library for dynamic code generation
  Libtcc is a library that uses tcc, a compiler several times faster than
  'gcc -O0' to perform dynamic code generation. It exposes in its API all
  operations tcc performs to generate a binary from sources: setting
