@@ -13,7 +13,7 @@ Last-Update: 2012-03-15
 Applied-Upstream: commit: 1736a71b71221df7c81b0d3da25e774f3c4005d2
 ---
  tccpp.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ 1 file changed, 4 insertions(+)
 
 diff --git a/tccpp.c b/tccpp.c
 index ff47838..d1043e0 100644

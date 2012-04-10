@@ -13,7 +13,7 @@ Last-Update: 2012-03-05
 Applied-Upstream: commit: 519a9040a16f86a7b309accf1cb54ed64d2f921f
 ---
  tccasm.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ 1 file changed, 2 insertions(+)
 
 diff --git a/tccasm.c b/tccasm.c
 index 527c006..d1d2af1 100644

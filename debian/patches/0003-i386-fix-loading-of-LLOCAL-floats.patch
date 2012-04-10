@@ -12,7 +12,7 @@ Last-Update: 2012-01-23
 Applied-Upstream: commit: 9527c4949fd94adb2567229413c70c19b663a118
 ---
  i386-gen.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/i386-gen.c b/i386-gen.c
 index a782de5..6635559 100644

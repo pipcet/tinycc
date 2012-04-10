@@ -12,7 +12,7 @@ Last-Update: 2012-03-13
 Applied-Upstream: commit: 3d25213c16f937356f49655e485b53beea267c54
 ---
  tcc-doc.texi |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ 1 file changed, 2 insertions(+)
 
 diff --git a/tcc-doc.texi b/tcc-doc.texi
 index 2522e48..4d4a029 100644
