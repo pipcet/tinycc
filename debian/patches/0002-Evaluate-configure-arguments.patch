@@ -1,0 +1,29 @@
+From 3f094b4d2650e6cd576869bf8a5b285fc72787bf Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <robotux@celest.fr>
+Date: Tue, 12 Jun 2012 20:48:01 +0200
+Subject: Evaluate configure arguments
+
+Evaluate configure arguments to reproduce autotools behavior. Autotools
+actually only expands a few variable and do it at make time but it makes
+the change much simpler.
+
+Origin: vendor
+Forwarded: yes
+Last-Update: 2012-06-12
+Applied-Upstream: commit: 2e7a1af5d5d659c94b53ba2d06b84875942eb6fe
+---
+ configure |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/configure b/configure
+index f152cf9..1efe9cc 100755
+--- a/configure
++++ b/configure
+@@ -103,6 +103,7 @@ if test -z "$source_path" -o "$source_path" = "." ; then
+ fi
+ 
+ for opt do
++  eval opt=$opt
+   case "$opt" in
+   --prefix=*) prefix=`echo $opt | cut -d '=' -f 2`
+   ;;
