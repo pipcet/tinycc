@@ -1,3 +1,10 @@
+tcc (0.9.26~git20120104.83d57c0-6) unstable; urgency=low
+
+  * debian/control:
+    + Remove initial capital in package synopsis.
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Tue, 12 Jun 2012 17:45:21 +0200
+
 tcc (0.9.26~git20120104.83d57c0-5) unstable; urgency=low
 
   * Document that -b is only available on i386 (Closes: #663692).
