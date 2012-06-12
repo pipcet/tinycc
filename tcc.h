@@ -49,11 +49,9 @@
 #include <direct.h> /* getcwd */
 #define inline __inline
 #define inp next_inp
-#ifdef _WIN64
-# define uplong unsigned long long
-#endif
 #ifdef LIBTCC_AS_DLL
 # define LIBTCCAPI __declspec(dllexport)
+# define PUB_FUNC LIBTCCAPI
 #endif
 #endif
 
@@ -67,16 +65,9 @@
 
 #endif /* !CONFIG_TCCBOOT */
 
-#ifndef uplong
-#define uplong unsigned long
-#endif
-
 #ifndef PAGESIZE
 #define PAGESIZE 4096
 #endif
-
-#include "elf.h"
-#include "stab.h"
 
 #ifndef O_BINARY
 #define O_BINARY 0
@@ -86,6 +77,8 @@
 #define SA_SIGINFO 0x00000004u
 #endif
 
+#include "elf.h"
+#include "stab.h"
 #include "libtcc.h"
 
 /* parser debug */
@@ -131,8 +124,26 @@
 #define TCC_TARGET_COFF
 #endif
 
-#if !defined(CONFIG_TCCBOOT)
-#define CONFIG_TCC_BACKTRACE
+/* only native compiler supports -run */
+#if defined _WIN32 == defined TCC_TARGET_PE
+# if (defined __i386__ || defined _X86_) && defined TCC_TARGET_I386
+#  define TCC_IS_NATIVE
+# elif (defined __x86_64__ || defined _AMD64_) && defined TCC_TARGET_X86_64
+#  define TCC_IS_NATIVE
+# elif defined __arm__ && defined TCC_TARGET_ARM
+#  define TCC_IS_NATIVE
+# endif
+#endif
+
+#if defined TCC_IS_NATIVE && !defined CONFIG_TCCBOOT
+# define CONFIG_TCC_BACKTRACE
+#endif
+
+/* target address type */
+#if defined TCC_TARGET_X86_64 && (!defined __x86_64__ || defined _WIN32)
+# define uplong unsigned long long
+#else
+# define uplong unsigned long
 #endif
 
 /* ------------ path configuration ------------ */
@@ -141,17 +152,17 @@
 # define CONFIG_SYSROOT ""
 #endif
 
-#ifndef CONFIG_TCC_LDDIR
-# if defined(TCC_TARGET_X86_64_CENTOS)
-#  define CONFIG_TCC_LDDIR "/lib64"
-# else
-#  define CONFIG_TCC_LDDIR "/lib"
-# endif
+#ifdef CONFIG_MULTIARCHDIR
+# define CONFIG_LDDIR "lib/" CONFIG_MULTIARCHDIR
+#endif
+
+#ifndef CONFIG_LDDIR
+# define CONFIG_LDDIR "lib"
 #endif
 
 /* path to find crt1.o, crti.o and crtn.o */
 #ifndef CONFIG_TCC_CRTPREFIX
-# define CONFIG_TCC_CRTPREFIX CONFIG_SYSROOT "/usr" CONFIG_TCC_LDDIR
+# define CONFIG_TCC_CRTPREFIX CONFIG_SYSROOT "/usr/" CONFIG_LDDIR
 #endif
 
 /* Below: {B} is substituted by CONFIG_TCCDIR (rsp. -B option) */
@@ -160,6 +171,13 @@
 #ifndef CONFIG_TCC_SYSINCLUDEPATHS
 # ifdef TCC_TARGET_PE
 #  define CONFIG_TCC_SYSINCLUDEPATHS "{B}/include;{B}/include/winapi"
+# elif defined CONFIG_MULTIARCHDIR
+#  define CONFIG_TCC_SYSINCLUDEPATHS \
+        CONFIG_SYSROOT "/usr/local/include" \
+    ":" CONFIG_SYSROOT "/usr/local/include/" CONFIG_MULTIARCHDIR \
+    ":" CONFIG_SYSROOT "/usr/include" \
+    ":" CONFIG_SYSROOT "/usr/include/" CONFIG_MULTIARCHDIR \
+    ":" "{B}/include"
 # else
 #  define CONFIG_TCC_SYSINCLUDEPATHS \
         CONFIG_SYSROOT "/usr/local/include" \
@@ -174,9 +192,9 @@
 #  define CONFIG_TCC_LIBPATHS "{B}/lib"
 # else
 #  define CONFIG_TCC_LIBPATHS \
-        CONFIG_SYSROOT "/usr" CONFIG_TCC_LDDIR \
-    ":" CONFIG_SYSROOT CONFIG_TCC_LDDIR \
-    ":" CONFIG_SYSROOT "/usr/local" CONFIG_TCC_LDDIR
+        CONFIG_SYSROOT "/usr/" CONFIG_LDDIR \
+    ":" CONFIG_SYSROOT "/" CONFIG_LDDIR \
+    ":" CONFIG_SYSROOT "/usr/local/" CONFIG_LDDIR
 # endif
 #endif
 
@@ -185,20 +203,22 @@
 # if defined __FreeBSD__
 #  define CONFIG_TCC_ELFINTERP "/libexec/ld-elf.so.1"
 # elif defined __FreeBSD_kernel__
-#  define CONFIG_TCC_ELFINTERP CONFIG_TCC_LDDIR"/ld.so.1"
+#  define CONFIG_TCC_ELFINTERP "/lib/ld.so.1"
+# elif defined TCC_ARM_HARDFLOAT
+#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-armhf.so.3"
 # elif defined TCC_ARM_EABI
-#  define CONFIG_TCC_ELFINTERP CONFIG_TCC_LDDIR"/ld-linux.so.3"
+#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux.so.3"
 # elif defined(TCC_TARGET_X86_64)
-#  define CONFIG_TCC_ELFINTERP CONFIG_TCC_LDDIR"/ld-linux-x86-64.so.2"
+#  define CONFIG_TCC_ELFINTERP "/lib64/ld-linux-x86-64.so.2"
 # elif defined(TCC_UCLIBC)
-#  define CONFIG_TCC_ELFINTERP CONFIG_TCC_LDDIR"/ld-uClibc.so.0"
+#  define CONFIG_TCC_ELFINTERP "/lib/ld-uClibc.so.0"
 # else
-#  define CONFIG_TCC_ELFINTERP CONFIG_TCC_LDDIR"/ld-linux.so.2"
+#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux.so.2"
 # endif
 #endif
 
 /* library to use with CONFIG_USE_LIBGCC instead of libtcc1.a */
-#define TCC_LIBGCC CONFIG_SYSROOT CONFIG_TCC_LDDIR "/libgcc_s.so.1"
+#define TCC_LIBGCC CONFIG_SYSROOT "/" CONFIG_LDDIR "/libgcc_s.so.1"
 
 /* -------------------------------------------- */
 
@@ -313,8 +333,8 @@ typedef struct Section {
     int sh_addralign;        /* elf section alignment */
     int sh_entsize;          /* elf entry size */
     unsigned long sh_size;   /* section size (only used during output) */
-    unsigned long sh_addr;      /* address at which the section is relocated */
-    unsigned long sh_offset;    /* file offset */
+    uplong sh_addr;          /* address at which the section is relocated */
+    unsigned long sh_offset; /* file offset */
     int nb_hashed_syms;      /* used to resize the hash table */
     struct Section *link;    /* link to another section */
     struct Section *reloc;   /* corresponding section for relocation, if any */
@@ -509,6 +529,9 @@ struct TCCState {
     /* exported dynamic symbol section */
     Section *dynsym;
 
+    /* copy of the gobal symtab_section variable */
+    Section *symtab;
+
     int nostdinc; /* if true, no standard headers are added */
     int nostdlib; /* if true, no standard libraries are added */
     int nocommon; /* if true, do not use common symbols for .bss data */
@@ -531,7 +554,7 @@ struct TCCState {
     int alacarte_link;
 
     /* address of text section */
-    unsigned long text_addr;
+    uplong text_addr;
     int has_text_addr;
 
     /* symbols to call at load-time / unload-time */
@@ -871,7 +894,8 @@ enum tcc_token {
 #ifndef __GNUC__
   #define strtold (long double)strtod
   #define strtof (float)strtod
-  #define strtoll (long long)strtol
+  #define strtoll _strtoi64
+  #define strtoull _strtoui64
 #endif
 #else
 /* XXX: need to define this to use them in non ISOC99 context */
@@ -944,12 +968,6 @@ ST_DATA int tcc_ext;
 /* XXX: get rid of this ASAP */
 ST_DATA struct TCCState *tcc_state;
 
-#ifdef CONFIG_TCC_BACKTRACE
-ST_DATA int rt_num_callers;
-ST_DATA const char **rt_bound_error_msg;
-ST_DATA void *rt_prog_main;
-#endif
-
 #define AFF_PRINT_ERROR     0x0001 /* print error if file not found */
 #define AFF_REFERENCED_DLL  0x0002 /* load a referenced dll from another dll */
 #define AFF_PREPROCESS      0x0004 /* preprocess file */
@@ -978,12 +996,11 @@ PUB_FUNC void tcc_error(const char *fmt, ...);
 PUB_FUNC void tcc_warning(const char *fmt, ...);
 
 /* other utilities */
-ST_INLN void cstr_ccat(CString *cstr, int ch);
-ST_FUNC void cstr_cat(CString *cstr, const char *str);
-ST_FUNC void cstr_wccat(CString *cstr, int ch);
-ST_FUNC void cstr_new(CString *cstr);
-ST_FUNC void cstr_free(CString *cstr);
-ST_FUNC void add_char(CString *cstr, int c);
+PUB_FUNC void cstr_ccat(CString *cstr, int ch);
+PUB_FUNC void cstr_cat(CString *cstr, const char *str);
+PUB_FUNC void cstr_wccat(CString *cstr, int ch);
+PUB_FUNC void cstr_new(CString *cstr);
+PUB_FUNC void cstr_free(CString *cstr);
 #define cstr_reset(cstr) cstr_free(cstr)
 
 ST_FUNC Section *new_section(TCCState *s1, const char *name, int sh_type, int sh_flags);
@@ -992,8 +1009,8 @@ ST_FUNC void *section_ptr_add(Section *sec, unsigned long size);
 ST_FUNC void section_reserve(Section *sec, unsigned long size);
 ST_FUNC Section *find_section(TCCState *s1, const char *name);
 
-ST_FUNC void put_extern_sym2(Sym *sym, Section *section, unsigned long value, unsigned long size, int can_add_underscore);
-ST_FUNC void put_extern_sym(Sym *sym, Section *section, unsigned long value, unsigned long size);
+ST_FUNC void put_extern_sym2(Sym *sym, Section *section, uplong value, unsigned long size, int can_add_underscore);
+ST_FUNC void put_extern_sym(Sym *sym, Section *section, uplong value, unsigned long size);
 ST_FUNC void greloc(Section *s, Sym *sym, unsigned long offset, int type);
 
 ST_INLN void sym_free(Sym *sym);
@@ -1019,9 +1036,6 @@ PUB_FUNC int tcc_set_flag(TCCState *s, const char *flag_name, int value);
 PUB_FUNC void tcc_print_stats(TCCState *s, int64_t total_time);
 PUB_FUNC char *tcc_default_target(TCCState *s, const char *default_file);
 PUB_FUNC void tcc_gen_makedeps(TCCState *s, const char *target, const char *filename);
-#ifdef CONFIG_TCC_BACKTRACE
-PUB_FUNC void tcc_set_num_callers(int n);
-#endif
 
 /* ------------ tccpp.c ------------ */
 
@@ -1105,7 +1119,7 @@ ST_DATA Sym *local_stack;
 ST_DATA Sym *local_label_stack;
 ST_DATA Sym *global_label_stack;
 ST_DATA Sym *define_stack;
-ST_DATA CType char_pointer_type, func_old_type, int_type;
+ST_DATA CType char_pointer_type, func_old_type, int_type, size_type;
 ST_DATA SValue vstack[VSTACK_SIZE], *vtop;
 ST_DATA int rsym, anon_sym, ind, loc;
 
@@ -1126,10 +1140,11 @@ ST_FUNC Sym *external_global_sym(int v, CType *type, int r);
 ST_FUNC void vset(CType *type, int r, int v);
 ST_FUNC void vswap(void);
 ST_FUNC void vpush_global_sym(CType *type, int v);
+ST_FUNC void vrote(SValue *e, int n);
 ST_FUNC void vrott(int n);
+ST_FUNC void vrotb(int n);
 #ifdef TCC_TARGET_ARM
 ST_FUNC int get_reg_ex(int rc, int rc2);
-ST_FUNC void vnrott(int n);
 ST_FUNC void lexpand_nr(void);
 #endif
 ST_FUNC void vpushv(SValue *v);
@@ -1328,6 +1343,14 @@ ST_FUNC void *resolve_sym(TCCState *s1, const char *symbol);
 #elif !defined TCC_TARGET_PE || !defined _WIN32
 ST_FUNC void *resolve_sym(TCCState *s1, const char *symbol);
 #endif
+
+#ifdef CONFIG_TCC_BACKTRACE
+ST_DATA int rt_num_callers;
+ST_DATA const char **rt_bound_error_msg;
+ST_DATA void *rt_prog_main;
+PUB_FUNC void tcc_set_num_callers(int n);
+#endif
+
 /********************************************************/
 /* include the target specific definitions */
 
@@ -1347,7 +1370,7 @@ ST_FUNC void *resolve_sym(TCCState *s1, const char *symbol);
 #endif
 #undef TARGET_DEFS_ONLY
 
-ST_DATA const int reg_classes[NB_REGS];
+ST_DATA const int reg_classes[];
 
 /********************************************************/
 #undef ST_DATA

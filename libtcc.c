@@ -237,6 +237,8 @@ PUB_FUNC void *tcc_realloc(void *ptr, unsigned long size)
     mem_cur_size -= malloc_usable_size(ptr);
 #endif
     ptr1 = realloc(ptr, size);
+    if (!ptr1 && size)
+        tcc_error("memory full");
 #ifdef MEM_DEBUG
     /* NOTE: count not correct if alloc error, but not critical */
     mem_cur_size += malloc_usable_size(ptr1);
@@ -282,8 +284,6 @@ PUB_FUNC void dynarray_add(void ***ptab, int *nb_ptr, void *data)
         else
             nb_alloc = nb * 2;
         pp = tcc_realloc(pp, nb_alloc * sizeof(void *));
-        if (!pp)
-            tcc_error("memory full");
         *ptab = pp;
     }
     pp[nb++] = data;
@@ -377,8 +377,6 @@ ST_FUNC void section_realloc(Section *sec, unsigned long new_size)
     while (size < new_size)
         size = size * 2;
     data = tcc_realloc(sec->data, size);
-    if (!data)
-        tcc_error("memory full");
     memset(data + sec->data_allocated, 0, size - sec->data_allocated);
     sec->data = data;
     sec->data_allocated = size;
@@ -425,7 +423,7 @@ ST_FUNC Section *find_section(TCCState *s1, const char *name)
 /* update sym->c so that it points to an external symbol in section
    'section' with value 'value' */
 ST_FUNC void put_extern_sym2(Sym *sym, Section *section, 
-                            unsigned long value, unsigned long size,
+                            uplong value, unsigned long size,
                             int can_add_underscore)
 {
     int sym_type, sym_bind, sh_num, info, other;
@@ -529,7 +527,7 @@ ST_FUNC void put_extern_sym2(Sym *sym, Section *section,
 }
 
 ST_FUNC void put_extern_sym(Sym *sym, Section *section, 
-                           unsigned long value, unsigned long size)
+                           uplong value, unsigned long size)
 {
     put_extern_sym2(sym, section, value, size, 1);
 }
@@ -746,6 +744,12 @@ static int tcc_compile(TCCState *s1)
 
     char_pointer_type.t = VT_BYTE;
     mk_pointer(&char_pointer_type);
+
+#if PTR_SIZE == 4
+    size_type.t = VT_INT;
+#else
+    size_type.t = VT_LLONG;
+#endif
 
     func_old_type.t = VT_FUNC;
     func_old_type.ref = sym_push(SYM_FIELD, &int_type, FUNC_CDECL, FUNC_OLD);
@@ -980,6 +984,7 @@ LIBTCCAPI TCCState *tcc_new(void)
 #endif
 
     /* glibc defines */
+    tcc_define_symbol(s, "__REDIRECT(name, proto, alias)", "name proto __asm__ (#alias)");
     tcc_define_symbol(s, "__REDIRECT_NTH(name, proto, alias)", "name proto __asm__ (#alias) __THROW");
     
 #ifndef TCC_TARGET_PE
@@ -1002,6 +1007,7 @@ LIBTCCAPI TCCState *tcc_new(void)
                                 ".strtab",
                                 ".hashtab", SHF_PRIVATE); 
     strtab_section = symtab_section->link;
+    s->symtab = symtab_section;
     
     /* private symbol table for dynamic symbols */
     s->dynsymtab_section = new_symtab(s, ".dynsymtab", SHT_SYMTAB, SHF_PRIVATE,
@@ -1488,12 +1494,14 @@ PUB_FUNC const char * tcc_set_linker(TCCState *s, char *option, int multi)
         end = NULL;
         if (link_option(option, "Bsymbolic", &p)) {
             s->symbolic = TRUE;
+        } else if (link_option(option, "nostdlib", &p)) {
+            s->nostdlib = TRUE;
         } else if (link_option(option, "fini=", &p)) {
             s->fini_symbol = p;
             if (s->warn_unsupported)
                 tcc_warning("ignoring -fini %s", p);
         } else if (link_option(option, "image-base=", &p)) {
-            s->text_addr = strtoul(p, &end, 16);
+            s->text_addr = strtoull(p, &end, 16);
             s->has_text_addr = 1;
         } else if (link_option(option, "init=", &p)) {
             s->init_symbol = p;
@@ -1562,10 +1570,12 @@ PUB_FUNC const char * tcc_set_linker(TCCState *s, char *option, int multi)
 #endif
 
         } else if (link_option(option, "Ttext=", &p)) {
-            s->text_addr = strtoul(p, &end, 16);
+            s->text_addr = strtoull(p, &end, 16);
             s->has_text_addr = 1;
-
         } else {
+            char *comma_ptr = strchr(option, ',');
+            if (comma_ptr)
+                *comma_ptr = '\0';
             return option;
         }
 
@@ -1657,7 +1667,7 @@ PUB_FUNC void tcc_gen_makedeps(TCCState *s, const char *target, const char *file
 
     fprintf(depout, "%s : \\\n", target);
     for (i=0; i<s->nb_target_deps; ++i)
-        fprintf(depout, "\t%s \\\n", s->target_deps[i]);
+        fprintf(depout, " %s \\\n", s->target_deps[i]);
     fprintf(depout, "\n");
     fclose(depout);
 }

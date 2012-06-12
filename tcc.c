@@ -35,6 +35,7 @@ static int do_bench = 0;
 static int gen_deps;
 static const char *deps_outfile;
 static const char *m_option;
+static CString linker_arg;
 
 #define TCC_OPTION_HAS_ARG 0x0001
 #define TCC_OPTION_NOSEP   0x0002 /* cannot have space before option and arg */
@@ -282,8 +283,9 @@ static int parse_args(TCCState *s, int argc, char **argv)
     int was_pthread;
 
     was_pthread = 0; /* is set if commandline contains -pthread key */
+    optind = 0;
+    cstr_new(&linker_arg);
 
-    optind = 1;
     while (optind < argc) {
 
         r = argv[optind++];
@@ -442,8 +444,10 @@ static int parse_args(TCCState *s, int argc, char **argv)
                 s->rdynamic = 1;
                 break;
             case TCC_OPTION_Wl:
-                if ((r = (char *) tcc_set_linker(s, (char *)optarg, TRUE)))
-                    tcc_error("unsupported linker option '%s'", r);
+                if (linker_arg.size)
+                    --linker_arg.size, cstr_ccat(&linker_arg, ',');
+                cstr_cat(&linker_arg, optarg);
+                cstr_ccat(&linker_arg, '\0');
                 break;
             case TCC_OPTION_E:
                 output_type = TCC_OUTPUT_PREPROCESS;
@@ -465,6 +469,8 @@ static int parse_args(TCCState *s, int argc, char **argv)
             }
         }
     }
+    if (NULL != (r1 = tcc_set_linker(s, (char *) linker_arg.data, TRUE)))
+        tcc_error("unsupported linker option '%s'", r1);
     /* fixme: these options could be different on your platform */
     if (was_pthread && output_type != TCC_OUTPUT_OBJ) {
         dynarray_add((void ***)&files, &nb_files, "-lpthread");
@@ -494,7 +500,7 @@ int main(int argc, char **argv)
     m_option = NULL;
     ret = 0;
 
-    optind = parse_args(s, argc, argv);
+    optind = parse_args(s, argc - 1, argv + 1);
 
 #if defined TCC_TARGET_X86_64 || defined TCC_TARGET_I386
     if (m_option)
@@ -578,7 +584,11 @@ int main(int argc, char **argv)
             tcc_print_stats(s, getclock_us() - start_time);
 
         if (s->output_type == TCC_OUTPUT_MEMORY) {
-            ret = tcc_run(s, argc - optind, argv + optind);
+#ifdef TCC_IS_NATIVE
+            ret = tcc_run(s, argc - 1 - optind, argv + 1 + optind);
+#else
+            tcc_error_noabort("-run is not available in a cross compiler");
+#endif
         } else if (s->output_type == TCC_OUTPUT_PREPROCESS) {
              if (s->outfile)
                 fclose(s->outfile);
@@ -593,6 +603,7 @@ int main(int argc, char **argv)
     }
 
     tcc_delete(s);
+    cstr_free(&linker_arg);
     tcc_free(outfile);
 
 #ifdef MEM_DEBUG

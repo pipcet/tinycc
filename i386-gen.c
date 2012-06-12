@@ -229,8 +229,10 @@ ST_FUNC void load(int r, SValue *sv)
             v1.type.t = VT_INT;
             v1.r = VT_LOCAL | VT_LVAL;
             v1.c.ul = fc;
-            load(r, &v1);
             fr = r;
+            if (!(reg_classes[fr] & RC_INT))
+                fr = get_reg(RC_INT);
+            load(fr, &v1);
         }
         if ((ft & VT_BTYPE) == VT_FLOAT) {
             o(0xd9); /* flds */
@@ -1068,7 +1070,7 @@ ST_FUNC void gen_bounded_ptr_deref(void)
     case 12: func = TOK___bound_ptr_indir12; break;
     case 16: func = TOK___bound_ptr_indir16; break;
     default:
-        tcc_error("unhandled size when derefencing bounded pointer");
+        tcc_error("unhandled size when dereferencing bounded pointer");
         func = 0;
         break;
     }

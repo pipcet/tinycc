@@ -36,6 +36,8 @@
 #define RC_RDX     0x0010
 #define RC_R8      0x0100
 #define RC_R9      0x0200
+#define RC_R10     0x0400
+#define RC_R11     0x0800
 #define RC_XMM0    0x0020
 #define RC_ST0     0x0040 /* only for long double */
 #define RC_IRET    RC_RAX /* function return: integer register */
@@ -104,19 +106,19 @@ ST_FUNC void gen_le64(int64_t c);
 #include "tcc.h"
 #include <assert.h>
 
-ST_DATA const int reg_classes[NB_REGS] = {
+ST_DATA const int reg_classes[] = {
     /* eax */ RC_INT | RC_RAX,
     /* ecx */ RC_INT | RC_RCX,
     /* edx */ RC_INT | RC_RDX,
     /* xmm0 */ RC_FLOAT | RC_XMM0,
     /* st0 */ RC_ST0,
-#if NB_REGS == 10
     0,
     0,
     0,
     RC_INT | RC_R8,
     RC_INT | RC_R9,
-#endif
+    RC_INT | RC_R10,
+    RC_INT | RC_R11
 };
 
 static unsigned long func_sub_sp_offset;
@@ -367,8 +369,10 @@ void load(int r, SValue *sv)
             v1.type.t = VT_PTR;
             v1.r = VT_LOCAL | VT_LVAL;
             v1.c.ul = fc;
-            load(r, &v1);
             fr = r;
+            if (!(reg_classes[fr] & RC_INT))
+                fr = get_reg(RC_INT);
+            load(fr, &v1);
         }
         ll = 0;
         if ((ft & VT_BTYPE) == VT_FLOAT) {
@@ -410,7 +414,7 @@ void load(int r, SValue *sv)
                 } else {
                     orex(1,0,r,0x8b);
                     o(0x05 + REG_VALUE(r) * 8); /* mov xx(%rip), r */
-                    gen_gotpcrel(fr, sv->sym, fc);
+                    gen_gotpcrel(r, sv->sym, fc);
                 }
 #endif
             } else if (is64_type(ft)) {
@@ -425,7 +429,18 @@ void load(int r, SValue *sv)
             gen_modrm(r, VT_LOCAL, sv->sym, fc);
         } else if (v == VT_CMP) {
             orex(0,r,0,0);
-            oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
+	    if ((fc & ~0x100) != TOK_NE)
+              oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
+	    else
+              oad(0xb8 + REG_VALUE(r), 1); /* mov $1, r */
+	    if (fc & 0x100)
+	      {
+	        /* This was a float compare.  If the parity bit is
+		   set the result was unordered, meaning false for everything
+		   except TOK_NE, and true for TOK_NE.  */
+		fc &= ~0x100;
+		o(0x037a + (REX_BASE(r) << 8));
+	      }
             orex(0,r,0, 0x0f); /* setxx %br */
             o(fc);
             o(0xc0 + REG_VALUE(r));
@@ -816,7 +831,6 @@ static const uint8_t arg_regs[REGN] = {
 void gfunc_call(int nb_args)
 {
     int size, align, r, args_size, i;
-    SValue *orig_vtop;
     int nb_reg_args = 0;
     int nb_sse_args = 0;
     int sse_reg, gen_reg;
@@ -841,7 +855,6 @@ void gfunc_call(int nb_args)
     /* for struct arguments, we need to call memcpy and the function
        call breaks register passing arguments we are preparing.
        So, we process arguments which will be passed by stack first. */
-    orig_vtop = vtop;
     gen_reg = nb_reg_args;
     sse_reg = nb_sse_args;
 
@@ -857,6 +870,14 @@ void gfunc_call(int nb_args)
     }
 
     for(i = 0; i < nb_args; i++) {
+	/* Swap argument to top, it will possibly be changed here,
+	   and might use more temps.  All arguments must remain on the
+	   stack, so that get_reg can correctly evict some of them onto
+	   stack.  We could use also use a vrott(nb_args) at the end
+	   of this loop, but this seems faster.  */
+        SValue tmp = vtop[0];
+	vtop[0] = vtop[-i];
+	vtop[-i] = tmp;
         if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
             size = type_size(&vtop->type, &align);
             /* align to stack align size */
@@ -868,18 +889,9 @@ void gfunc_call(int nb_args)
             r = get_reg(RC_INT);
             orex(1, r, 0, 0x89); /* mov %rsp, r */
             o(0xe0 + REG_VALUE(r));
-            {
-                /* following code breaks vtop[1], vtop[2], and vtop[3] */
-                SValue tmp1 = vtop[1];
-                SValue tmp2 = vtop[2];
-                SValue tmp3 = vtop[3];
-                vset(&vtop->type, r | VT_LVAL, 0);
-                vswap();
-                vstore();
-                vtop[1] = tmp1;
-                vtop[2] = tmp2;
-                vtop[3] = tmp3;
-            }
+	    vset(&vtop->type, r | VT_LVAL, 0);
+	    vswap();
+	    vstore();
             args_size += size;
         } else if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
             gv(RC_ST0);
@@ -909,10 +921,14 @@ void gfunc_call(int nb_args)
                 args_size += 8;
             }
         }
-        vtop--;
-    }
-    vtop = orig_vtop;
 
+	/* And swap the argument back to it's original position.  */
+        tmp = vtop[0];
+	vtop[0] = vtop[-i];
+	vtop[-i] = tmp;
+    }
+
+    /* XXX This should be superfluous.  */
     save_regs(0); /* save used temporary registers */
 
     /* then, we prepare register passing arguments.
@@ -948,6 +964,12 @@ void gfunc_call(int nb_args)
         }
         vtop--;
     }
+
+    /* We shouldn't have many operands on the stack anymore, but the
+       call address itself is still there, and it might be in %eax
+       (or edx/ecx) currently, which the below writes would clobber.
+       So evict all remaining operands here.  */
+    save_regs(0);
 
     /* Copy R10 and R11 into RDX and RCX, respectively */
     if (nb_reg_args > 2) {
@@ -1150,6 +1172,24 @@ int gtst(int inv, int t)
     v = vtop->r & VT_VALMASK;
     if (v == VT_CMP) {
         /* fast case : can jump directly since flags are set */
+	if (vtop->c.i & 0x100)
+	  {
+	    /* This was a float compare.  If the parity flag is set
+	       the result was unordered.  For anything except != this
+	       means false and we don't jump (anding both conditions).
+	       For != this means true (oring both).
+	       Take care about inverting the test.  We need to jump
+	       to our target if the result was unordered and test wasn't NE,
+	       otherwise if unordered we don't want to jump.  */
+	    vtop->c.i &= ~0x100;
+	    if (!inv == (vtop->c.i != TOK_NE))
+	      o(0x067a);  /* jp +6 */
+	    else
+	      {
+	        g(0x0f);
+		t = psym(0x8a, t); /* jp t */
+	      }
+	  }
         g(0x0f);
         t = psym((vtop->c.i - 16) ^ inv, t);
     } else if (v == VT_JMP || v == VT_JMPI) {
@@ -1420,7 +1460,7 @@ void gen_opf(int op)
             if ((r & VT_VALMASK) == VT_LLOCAL) {
                 SValue v1;
                 r = get_reg(RC_INT);
-                v1.type.t = VT_INT;
+                v1.type.t = VT_PTR;
                 v1.r = VT_LOCAL | VT_LVAL;
                 v1.c.ul = fc;
                 load(r, &v1);
@@ -1458,7 +1498,7 @@ void gen_opf(int op)
 
             vtop--;
             vtop->r = VT_CMP;
-            vtop->c.i = op;
+            vtop->c.i = op | 0x100;
         } else {
             /* no memory reference possible for long double operations */
             if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
@@ -1491,7 +1531,7 @@ void gen_opf(int op)
                 if ((r & VT_VALMASK) == VT_LLOCAL) {
                     SValue v1;
                     r = get_reg(RC_INT);
-                    v1.type.t = VT_INT;
+                    v1.type.t = VT_PTR;
                     v1.r = VT_LOCAL | VT_LVAL;
                     v1.c.ul = fc;
                     load(r, &v1);

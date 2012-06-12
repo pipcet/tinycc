@@ -162,8 +162,8 @@ static void *get_elf_sym_addr(TCCState *s, const char *name, int err)
     int sym_index;
     ElfW(Sym) *sym;
 
-    sym_index = find_elf_sym(symtab_section, name);
-    sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
+    sym_index = find_elf_sym(s->symtab, name);
+    sym = &((ElfW(Sym) *)s->symtab->data)[sym_index];
     if (!sym_index || sym->st_shndx == SHN_UNDEF) {
         if (err)
             tcc_error("%s not defined", name);
@@ -634,6 +634,8 @@ ST_FUNC void relocate_section(TCCState *s1, Section *s)
         case R_ARM_ABS32:
             *(int *)ptr += val;
             break;
+        case R_ARM_REL32:
+            *(int *)ptr += val - addr;
         case R_ARM_BASE_PREL:
             *(int *)ptr += s1->got->sh_addr - addr;
             break;
@@ -836,8 +838,6 @@ static void put_got_offset(TCCState *s1, int index, unsigned long val)
         while (index >= n)
             n *= 2;
         tab = tcc_realloc(s1->got_offsets, n * sizeof(unsigned long));
-        if (!tab)
-            tcc_error("memory full");
         s1->got_offsets = tab;
         memset(s1->got_offsets + s1->nb_got_offsets, 0,
                (n - s1->nb_got_offsets) * sizeof(unsigned long));
@@ -1153,7 +1153,7 @@ ST_FUNC Section *new_symtab(TCCState *s1,
 }
 
 /* put dynamic tag */
-static void put_dt(Section *dynamic, int dt, unsigned long val)
+static void put_dt(Section *dynamic, int dt, uplong val)
 {
     ElfW(Dyn) *dyn;
     dyn = section_ptr_add(dynamic, sizeof(ElfW(Dyn)));
@@ -1381,7 +1381,7 @@ ST_FUNC void fill_got_entry(TCCState *s1, ElfW_Rel *rel)
 	section_reserve(s1->got, offset + PTR_SIZE);
 #ifdef TCC_TARGET_X86_64
 	/* only works for x86-64 */
-	put32(s1->got->data + offset, sym->st_value >> 32);
+	put32(s1->got->data + offset + 4, sym->st_value >> 32);
 #endif
 	put32(s1->got->data + offset, sym->st_value & 0xffffffff);
 }
@@ -1421,8 +1421,9 @@ static int elf_output_file(TCCState *s1, const char *filename)
     FILE *f;
     int fd, mode, ret;
     int *section_order;
-    int shnum, i, phnum, file_offset, offset, size, j, tmp, sh_order_index, k;
-    unsigned long addr;
+    int shnum, i, phnum, file_offset, offset, size, j, sh_order_index, k;
+    long long tmp;
+    uplong addr;
     Section *strsec, *s;
     ElfW(Shdr) shdr, *sh;
     ElfW(Phdr) *phdr, *ph;
@@ -1430,9 +1431,9 @@ static int elf_output_file(TCCState *s1, const char *filename)
     unsigned long saved_dynamic_data_offset;
     ElfW(Sym) *sym;
     int type, file_type;
-    unsigned long rel_addr, rel_size;
+    uplong rel_addr, rel_size;
 #if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
-    unsigned long bss_addr, bss_size;
+    uplong bss_addr, bss_size;
 #endif
 
     file_type = s1->output_type;
@@ -1747,7 +1748,7 @@ static int elf_output_file(TCCState *s1, const char *filename)
             addr = s1->text_addr;
             /* we ensure that (addr % ELF_PAGE_SIZE) == file_offset %
                ELF_PAGE_SIZE */
-            a_offset = addr & (s1->section_align - 1);
+            a_offset = (int) (addr & (s1->section_align - 1));
             p_offset = file_offset & (s1->section_align - 1);
             if (a_offset < p_offset) 
                 a_offset += s1->section_align;
@@ -1821,7 +1822,7 @@ static int elf_output_file(TCCState *s1, const char *filename)
                     tmp = addr;
                     addr = (addr + s->sh_addralign - 1) & 
                         ~(s->sh_addralign - 1);
-                    file_offset += addr - tmp;
+                    file_offset += (int) ( addr - tmp );
                     s->sh_offset = file_offset;
                     s->sh_addr = addr;
                     
