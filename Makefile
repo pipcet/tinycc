@@ -15,12 +15,14 @@ CFLAGS+=-Wno-pointer-sign -Wno-sign-compare -D_FORTIFY_SOURCE=0
 endif
 endif
 
+ifneq ($(TARGETOS),Darwin)
 ifeq ($(ARCH),i386)
 CFLAGS+=-mpreferred-stack-boundary=2
 ifeq ($(GCC_MAJOR),2)
 CFLAGS+=-m386 -malign-functions=0
 else
 CFLAGS+=-march=i386 -falign-functions=0
+endif
 endif
 endif
 
@@ -36,11 +38,15 @@ endif
 endif
 
 ifeq ($(ARCH),i386)
-NATIVE_DEFINES=-DTCC_TARGET_I386
+NATIVE_DEFINES=-DTCC_TARGET_I386 
+NATIVE_DEFINES+=$(if $(wildcard /lib/i386-linux-gnu),-DCONFIG_MULTIARCHDIR=\"i386-linux-gnu\")
+CFLAGS+=-m32
 else
 ifeq ($(ARCH),x86-64)
 NATIVE_DEFINES=-DTCC_TARGET_X86_64
-NATIVE_DEFINES+=$(if $(wildcard /lib64/ld-linux-x86-64.so.2),-DTCC_TARGET_X86_64_CENTOS)
+CFLAGS+=-m64
+NATIVE_DEFINES+=$(if $(wildcard /usr/lib64),-DCONFIG_LDDIR=\"lib64\")
+NATIVE_DEFINES+=$(if $(wildcard /lib/x86_64-linux-gnu),-DCONFIG_MULTIARCHDIR=\"x86_64-linux-gnu\")
 endif
 endif
 
@@ -48,7 +54,10 @@ ifeq ($(ARCH),arm)
 NATIVE_DEFINES=-DTCC_TARGET_ARM
 NATIVE_DEFINES+=-DWITHOUT_LIBTCC
 NATIVE_DEFINES+=$(if $(wildcard /lib/ld-linux.so.3),-DTCC_ARM_EABI)
+NATIVE_DEFINES+=$(if $(wildcard /lib/arm-linux-gnueabi),-DCONFIG_MULTIARCHDIR=\"arm-linux-gnueabi\")
 NATIVE_DEFINES+=$(if $(shell grep -l "^Features.* \(vfp\|iwmmxt\) " /proc/cpuinfo),-DTCC_ARM_VFP)
+# To use ARM hardfloat calling convension
+#NATIVE_DEFINES+=-DTCC_ARM_HARDFLOAT
 endif
 
 ifdef CONFIG_WIN32
@@ -136,6 +145,10 @@ endif
 ifdef CONFIG_UCLIBC
 BCHECK_O=
 endif
+ifeq ($(TARGETOS),Darwin)
+BCHECK_O=
+PROGS+=tiny_libmaker$(EXESUF)
+endif
 
 ifdef CONFIG_USE_LIBGCC
 LIBTCC1=
@@ -153,7 +166,7 @@ all: $(PROGS) $(TCCLIBS) $(TCCDOCS)
 
 # Host Tiny C Compiler
 tcc$(EXESUF): tcc.o $(LIBTCC)
-	$(CC) -o $@ $^ $(LIBS) $(LDFLAGS) $(LINK_LIBTCC)
+	$(CC) -o $@ $^ $(LIBS) $(CFLAGS) $(LDFLAGS) $(LINK_LIBTCC)
 
 # Cross Tiny C Compilers
 %-tcc$(EXESUF):
@@ -190,7 +203,7 @@ LIBTCC_INC = $(filter %.h,$(CORE_FILES)) $(filter-out $(CORE_FILES),$(NATIVE_FIL
 else
 LIBTCC_OBJ = libtcc.o
 LIBTCC_INC = $(NATIVE_FILES)
-$(LIBTCC_OBJ) tcc.o : NATIVE_DEFINES += -DONE_SOURCE
+libtcc.o : NATIVE_DEFINES += -DONE_SOURCE
 endif
 
 $(LIBTCC_OBJ) tcc.o : %.o : %.c $(LIBTCC_INC)

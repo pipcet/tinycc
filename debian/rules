@@ -9,17 +9,12 @@ export LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
 
 DEB_HOST_MULTIARCH?=$(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
+override_dh_auto_configure:
+	dh_auto_configure -- --libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
+		--tccdir=../tcc
+
 override_dh_auto_clean:
 	[ ! -f config.mak ] || dh_auto_clean
-
-override_dh_auto_configure:
-	./configure --prefix=/usr \
-		--tccdir=../tcc \
-		--docdir=/usr/share/doc/tcc \
-		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
-		--crtprefix=/usr/lib/$(DEB_HOST_MULTIARCH) \
-		--sysincludepaths=/usr/local/include:/usr/include/$(DEB_HOST_MULTIARCH):/usr/include:{B}/include \
-		--libpaths=/usr/lib/$(DEB_HOST_MULTIARCH):/usr/lib:/lib/$(DEB_HOST_MULTIARCH):/lib:/usr/local/lib
 
 clean:
 	rm -f build

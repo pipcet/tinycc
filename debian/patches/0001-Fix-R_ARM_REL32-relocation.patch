@@ -1,0 +1,26 @@
+From d95a4bab810540a72e22a8585fbc13d6ea5189dd Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <robotux@celest.fr>
+Date: Tue, 12 Jun 2012 17:57:31 +0200
+Subject: Fix R_ARM_REL32 relocation
+
+Add missing break in the code handling R_ARM_REL32 relocation.
+
+Origin: vendor
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2012-06/msg00031.html
+Last-Update: 2012-06-12
+---
+ tccelf.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/tccelf.c b/tccelf.c
+index 655860b..a16499b 100644
+--- a/tccelf.c
++++ b/tccelf.c
+@@ -636,6 +636,7 @@ ST_FUNC void relocate_section(TCCState *s1, Section *s)
+             break;
+         case R_ARM_REL32:
+             *(int *)ptr += val - addr;
++            break;
+         case R_ARM_BASE_PREL:
+             *(int *)ptr += s1->got->sh_addr - addr;
+             break;

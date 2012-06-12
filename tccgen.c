@@ -64,7 +64,7 @@ ST_DATA int func_vc;
 ST_DATA int last_line_num, last_ind, func_ind; /* debug last line number and pc */
 ST_DATA char *funcname;
 
-ST_DATA CType char_pointer_type, func_old_type, int_type;
+ST_DATA CType char_pointer_type, func_old_type, int_type, size_type;
 
 /* ------------------------------------------------------------------------- */
 static void gen_cast(CType *type);
@@ -325,6 +325,17 @@ ST_FUNC void vpushi(int v)
     vsetc(&int_type, VT_CONST, &cval);
 }
 
+/* push a pointer sized constant */
+static void vpushs(long long v)
+{
+  CValue cval;
+  if (PTR_SIZE == 4)
+    cval.i = (int)v;
+  else
+    cval.ull = v;
+  vsetc(&size_type, VT_CONST, &cval);
+}
+
 /* push long long constant */
 static void vpushll(long long v)
 {
@@ -441,6 +452,14 @@ ST_FUNC void vswap(void)
 {
     SValue tmp;
 
+    /* cannot let cpu flags if other instruction are generated. Also
+       avoid leaving VT_JMP anywhere except on the top of the stack
+       because it would complicate the code generator. */
+    if (vtop >= vstack) {
+        int v = vtop->r & VT_VALMASK;
+        if (v == VT_CMP || (v & ~1) == VT_JMP)
+            gv(RC_INT);
+    }
     tmp = vtop[0];
     vtop[0] = vtop[-1];
     vtop[-1] = tmp;
@@ -942,7 +961,7 @@ static void lbuild(int t)
 /* rotate n first stack elements to the bottom 
    I1 ... In -> I2 ... In I1 [top is right]
 */
-static void vrotb(int n)
+ST_FUNC void vrotb(int n)
 {
     int i;
     SValue tmp;
@@ -953,35 +972,27 @@ static void vrotb(int n)
     vtop[0] = tmp;
 }
 
-/* rotate n first stack elements to the top 
+/* rotate the n elements before entry e towards the top
+   I1 ... In ... -> In I1 ... I(n-1) ... [top is right]
+ */
+ST_FUNC void vrote(SValue *e, int n)
+{
+    int i;
+    SValue tmp;
+
+    tmp = *e;
+    for(i = 0;i < n - 1; i++)
+        e[-i] = e[-i - 1];
+    e[-n + 1] = tmp;
+}
+
+/* rotate n first stack elements to the top
    I1 ... In -> In I1 ... I(n-1)  [top is right]
  */
 ST_FUNC void vrott(int n)
 {
-    int i;
-    SValue tmp;
-
-    tmp = vtop[0];
-    for(i = 0;i < n - 1; i++)
-        vtop[-i] = vtop[-i - 1];
-    vtop[-n + 1] = tmp;
+    vrote(vtop, n);
 }
-
-#ifdef TCC_TARGET_ARM
-/* like vrott but in other direction
-   In ... I1 -> I(n-1) ... I1 In  [top is right]
- */
-ST_FUNC void vnrott(int n)
-{
-    int i;
-    SValue tmp;
-
-    tmp = vtop[-n + 1];
-    for(i = n - 1; i > 0; i--)
-        vtop[-i] = vtop[-i + 1];
-    vtop[0] = tmp;
-}
-#endif
 
 /* pop stack value */
 ST_FUNC void vpop(void)
@@ -1505,7 +1516,8 @@ static inline int is_null_pointer(SValue *p)
     if ((p->r & (VT_VALMASK | VT_LVAL | VT_SYM)) != VT_CONST)
         return 0;
     return ((p->type.t & VT_BTYPE) == VT_INT && p->c.i == 0) ||
-        ((p->type.t & VT_BTYPE) == VT_LLONG && p->c.ll == 0);
+        ((p->type.t & VT_BTYPE) == VT_LLONG && p->c.ll == 0) ||
+	((p->type.t & VT_BTYPE) == VT_PTR && p->c.ptr == 0);
 }
 
 static inline int is_integer_btype(int bt)
@@ -2258,6 +2270,8 @@ static void gen_assign_cast(CType *dt)
     st = &vtop->type; /* source type */
     dbt = dt->t & VT_BTYPE;
     sbt = st->t & VT_BTYPE;
+    if (sbt == VT_VOID)
+        tcc_error("Cannot assign void value");
     if (dt->t & VT_CONSTANT)
         tcc_warning("assignment of read-only location");
     switch(dbt) {
@@ -2333,8 +2347,9 @@ ST_FUNC void vstore(void)
     ft = vtop[-1].type.t;
     sbt = vtop->type.t & VT_BTYPE;
     dbt = ft & VT_BTYPE;
-    if (((sbt == VT_INT || sbt == VT_SHORT) && dbt == VT_BYTE) ||
-        (sbt == VT_INT && dbt == VT_SHORT)) {
+    if ((((sbt == VT_INT || sbt == VT_SHORT) && dbt == VT_BYTE) ||
+         (sbt == VT_INT && dbt == VT_SHORT))
+	&& !(vtop->type.t & VT_BITFIELD)) {
         /* optimize char/short casts */
         delayed_cast = VT_MUSTCAST;
         vtop->type.t = ft & (VT_TYPE & ~(VT_BITFIELD | (-1 << VT_STRUCT_SHIFT)));
@@ -3587,12 +3602,12 @@ ST_FUNC void unary(void)
             if (!(type.t & VT_VLA)) {
                 if (size < 0)
                     tcc_error("sizeof applied to an incomplete type");
-                vpushi(size);
+                vpushs(size);
             } else {
                 vla_runtime_type_size(&type, &align);
             }
         } else {
-            vpushi(align);
+            vpushs(align);
         }
         vtop->type.t |= VT_UNSIGNED;
         break;
@@ -4130,14 +4145,22 @@ static void expr_cond(void)
                     (t2 & (VT_BTYPE | VT_UNSIGNED)) == (VT_LLONG | VT_UNSIGNED))
                     type.t |= VT_UNSIGNED;
             } else if (bt1 == VT_PTR || bt2 == VT_PTR) {
-                /* XXX: test pointer compatibility */
-                type = type1;
+		/* If one is a null ptr constant the result type
+		   is the other.  */
+		if (is_null_pointer (vtop))
+		  type = type1;
+		else if (is_null_pointer (&sv))
+		  type = type2;
+                /* XXX: test pointer compatibility, C99 has more elaborate
+		   rules here.  */
+		else
+		  type = type1;
             } else if (bt1 == VT_FUNC || bt2 == VT_FUNC) {
                 /* XXX: test function pointer compatibility */
-                type = type1;
+                type = bt1 == VT_FUNC ? type1 : type2;
             } else if (bt1 == VT_STRUCT || bt2 == VT_STRUCT) {
                 /* XXX: test structure compatibility */
-                type = type1;
+                type = bt1 == VT_STRUCT ? type1 : type2;
             } else if (bt1 == VT_VOID || bt2 == VT_VOID) {
                 /* NOTE: as an extension, we accept void on only one side */
                 type.t = VT_VOID;
@@ -4290,6 +4313,25 @@ static int is_label(void)
     }
 }
 
+static void label_or_decl(int l)
+{
+    int last_tok;
+
+    /* fast test first */
+    if (tok >= TOK_UIDENT)
+      {
+	/* no need to save tokc because tok is an identifier */
+	last_tok = tok;
+	next();
+	if (tok == ':') {
+	    unget_tok(last_tok);
+	    return;
+	}
+	unget_tok(last_tok);
+      }
+    decl(l);
+}
+
 static void block(int *bsym, int *csym, int *case_sym, int *def_sym, 
                   int case_reg, int is_expr)
 {
@@ -4363,7 +4405,7 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
             }
         }
         while (tok != '}') {
-            decl(VT_LOCAL);
+            label_or_decl(VT_LOCAL);
             if (tok != '}') {
                 if (is_expr)
                     vpop();

@@ -112,15 +112,13 @@ static void cstr_realloc(CString *cstr, int new_size)
     while (size < new_size)
         size = size * 2;
     data = tcc_realloc(cstr->data_allocated, size);
-    if (!data)
-        tcc_error("memory full");
     cstr->data_allocated = data;
     cstr->size_allocated = size;
     cstr->data = data;
 }
 
 /* add a byte */
-ST_INLN void cstr_ccat(CString *cstr, int ch)
+PUB_FUNC void cstr_ccat(CString *cstr, int ch)
 {
     int size;
     size = cstr->size + 1;
@@ -130,7 +128,7 @@ ST_INLN void cstr_ccat(CString *cstr, int ch)
     cstr->size = size;
 }
 
-ST_FUNC void cstr_cat(CString *cstr, const char *str)
+PUB_FUNC void cstr_cat(CString *cstr, const char *str)
 {
     int c;
     for(;;) {
@@ -143,7 +141,7 @@ ST_FUNC void cstr_cat(CString *cstr, const char *str)
 }
 
 /* add a wide char */
-ST_FUNC void cstr_wccat(CString *cstr, int ch)
+PUB_FUNC void cstr_wccat(CString *cstr, int ch)
 {
     int size;
     size = cstr->size + sizeof(nwchar_t);
@@ -153,20 +151,20 @@ ST_FUNC void cstr_wccat(CString *cstr, int ch)
     cstr->size = size;
 }
 
-ST_FUNC void cstr_new(CString *cstr)
+PUB_FUNC void cstr_new(CString *cstr)
 {
     memset(cstr, 0, sizeof(CString));
 }
 
 /* free string and reset it to NULL */
-ST_FUNC void cstr_free(CString *cstr)
+PUB_FUNC void cstr_free(CString *cstr)
 {
     tcc_free(cstr->data_allocated);
     cstr_new(cstr);
 }
 
 /* XXX: unicode ? */
-ST_FUNC void add_char(CString *cstr, int c)
+static void add_char(CString *cstr, int c)
 {
     if (c == '\'' || c == '\"' || c == '\\') {
         /* XXX: could be more precise if char or string */
@@ -200,8 +198,6 @@ static TokenSym *tok_alloc_new(TokenSym **pts, const char *str, int len)
     i = tok_ident - TOK_IDENT;
     if ((i % TOK_ALLOC_INCR) == 0) {
         ptable = tcc_realloc(table_ident, (i + TOK_ALLOC_INCR) * sizeof(TokenSym *));
-        if (!ptable)
-            tcc_error("memory full");
         table_ident = ptable;
     }
 
@@ -844,8 +840,6 @@ static int *tok_str_realloc(TokenString *s)
         len = s->allocated_len * 2;
     }
     str = tcc_realloc(s->str, len * sizeof(int));
-    if (!str)
-        tcc_error("memory full");
     s->allocated_len = len;
     s->str = str;
     return str;
@@ -2703,10 +2697,25 @@ static int macro_subst_tok(TokenString *tok_str,
                     goto redo;
                 }
             } else {
-                /* XXX: incorrect with comments */
                 ch = file->buf_ptr[0];
-                while (is_space(ch) || ch == '\n')
-                    cinp();
+                while (is_space(ch) || ch == '\n' || ch == '/')
+		  {
+		    if (ch == '/')
+		      {
+			int c;
+			uint8_t *p = file->buf_ptr;
+			PEEKC(c, p);
+			if (c == '*') {
+			    p = parse_comment(p);
+			    file->buf_ptr = p - 1;
+			} else if (c == '/') {
+			    p = parse_line_comment(p);
+			    file->buf_ptr = p - 1;
+			} else
+			  break;
+		      }
+		    cinp();
+		  }
                 t = ch;
             }
             if (t != '(') /* no macro subst */
@@ -3001,8 +3010,16 @@ ST_INLN void unget_tok(int last_tok)
 {
     int i, n;
     int *q;
-    unget_saved_macro_ptr = macro_ptr;
-    unget_buffer_enabled = 1;
+    if (unget_buffer_enabled)
+      {
+        /* assert(macro_ptr == unget_saved_buffer + 1);
+	   assert(*macro_ptr == 0);  */
+      }
+    else
+      {
+	unget_saved_macro_ptr = macro_ptr;
+	unget_buffer_enabled = 1;
+      }
     q = unget_saved_buffer;
     macro_ptr = q;
     *q++ = tok;

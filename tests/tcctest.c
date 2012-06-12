@@ -85,6 +85,10 @@ void statement_expr_test(void);
 void asm_test(void);
 void builtin_test(void);
 void weak_test(void);
+void global_data_test(void);
+void cmp_comparison_test(void);
+void math_cmp_test(void);
+void callsave_test(void);
 
 int fib(int n);
 void num(int n);
@@ -287,6 +291,10 @@ comment
     /* test function macro substitution when the function name is
        substituted */
     TEST2();
+
+    /* And again when the name and parenthes are separated by a
+       comment.  */
+    TEST2 /* the comment */ ();
 }
 
 
@@ -431,6 +439,7 @@ void loop_test()
     printf("\n");
 }
 
+typedef int typedef_and_label;
 
 void goto_test()
 {
@@ -439,6 +448,8 @@ void goto_test()
 
     printf("goto:\n");
     i = 0;
+    /* This needs to parse as label, not as start of decl.  */
+ typedef_and_label:
  s_loop:
     if (i >= 10) 
         goto s_end;
@@ -583,6 +594,10 @@ int main(int argc, char **argv)
     asm_test();
     builtin_test();
     weak_test();
+    global_data_test();
+    cmp_comparison_test();
+    math_cmp_test();
+    callsave_test();
     return 0; 
 }
 
@@ -1122,25 +1137,30 @@ struct structa1 struct_assign_test2(struct structa1 s1, int t)
 
 void struct_assign_test(void)
 {
-    struct structa1 lsta1, lsta2;
+    struct S {
+      struct structa1 lsta1, lsta2;
+      int i;
+    } s, *ps;
     
+    ps = &s;
+    ps->i = 4;
 #if 0
     printf("struct_assign_test:\n");
 
-    lsta1.f1 = 1;
-    lsta1.f2 = 2;
-    printf("%d %d\n", lsta1.f1, lsta1.f2);
-    lsta2 = lsta1;
-    printf("%d %d\n", lsta2.f1, lsta2.f2);
+    s.lsta1.f1 = 1;
+    s.lsta1.f2 = 2;
+    printf("%d %d\n", s.lsta1.f1, s.lsta1.f2);
+    s.lsta2 = s.lsta1;
+    printf("%d %d\n", s.lsta2.f1, s.lsta2.f2);
 #else
-    lsta2.f1 = 1;
-    lsta2.f2 = 2;
+    s.lsta2.f1 = 1;
+    s.lsta2.f2 = 2;
 #endif
-    struct_assign_test1(lsta2, 3, 4.5);
+    struct_assign_test1(ps->lsta2, 3, 4.5);
     
-    printf("before call: %d %d\n", lsta2.f1, lsta2.f2);
-    lsta2 = struct_assign_test2(lsta2, 4);
-    printf("after call: %d %d\n", lsta2.f1, lsta2.f2);
+    printf("before call: %d %d\n", s.lsta2.f1, s.lsta2.f2);
+    ps->lsta2 = struct_assign_test2(ps->lsta2, ps->i);
+    printf("after call: %d %d\n", ps->lsta2.f1, ps->lsta2.f2);
 
     static struct {
         void (*elem)();
@@ -1461,6 +1481,8 @@ void c99_bool_test(void)
 void bitfield_test(void)
 {
     int a;
+    short sa;
+    unsigned char ca;
     struct sbf1 {
         int f1 : 3;
         int : 2;
@@ -1482,6 +1504,9 @@ void bitfield_test(void)
     st1.f5++;
     printf("%d %d %d %d %d\n",
            st1.f1, st1.f2, st1.f3, st1.f4, st1.f5);
+    sa = st1.f5;
+    ca = st1.f5;
+    printf("%d %d\n", sa, ca);
 
     st1.f1 = 7;
     if (st1.f1 == -1) 
@@ -2136,6 +2161,8 @@ void c99_vla_test(int size1, int size2)
 #endif
 }
 
+typedef __SIZE_TYPE__ uintptr_t;
+
 void sizeof_test(void)
 {
     int a;
@@ -2155,6 +2182,20 @@ void sizeof_test(void)
     printf("a=%d\n", a);
     ptr = NULL;
     printf("sizeof(**ptr) = %d\n", sizeof (**ptr));
+
+    /* The type of sizeof should be as large as a pointer, actually
+       it should be size_t.  */
+    printf("sizeof(sizeof(int) = %d\n", sizeof(sizeof(int)));
+    uintptr_t t = 1;
+    uintptr_t t2;
+    /* Effectively <<32, but defined also on 32bit machines.  */
+    t <<= 16;
+    t <<= 16;
+    t++;
+    /* This checks that sizeof really can be used to manipulate 
+       uintptr_t objects, without truncation.  */
+    t2 = t & -sizeof(uintptr_t);
+    printf ("%lu %lu\n", t, t2);
 
     /* some alignof tests */
     printf("__alignof__(int) = %d\n", __alignof__(int));
@@ -2485,4 +2526,155 @@ void const_func(const int a)
 void const_warn_test(void)
 {
     const_func(1);
+}
+
+struct condstruct {
+  int i;
+};
+
+int getme (struct condstruct *s, int i)
+{
+  int i1 = (i == 0 ? 0 : s)->i;
+  int i2 = (i == 0 ? s : 0)->i;
+  int i3 = (i == 0 ? (void*)0 : s)->i;
+  int i4 = (i == 0 ? s : (void*)0)->i;
+  return i1 + i2 + i3 + i4;
+}
+
+struct global_data
+{
+  int a[40];
+  int *b[40];
+};
+
+struct global_data global_data;
+
+int global_data_getstuff (int *, int);
+
+void global_data_callit (int i)
+{
+  *global_data.b[i] = global_data_getstuff (global_data.b[i], 1);
+}
+
+int global_data_getstuff (int *p, int i)
+{
+  return *p + i;
+}
+
+void global_data_test (void)
+{
+  global_data.a[0] = 42;
+  global_data.b[0] = &global_data.a[0];
+  global_data_callit (0);
+  printf ("%d\n", global_data.a[0]);
+}
+
+struct cmpcmpS
+{
+  unsigned char fill : 3;
+  unsigned char b1 : 1;
+  unsigned char b2 : 1;
+  unsigned char fill2 : 3;
+};
+
+int glob1, glob2, glob3;
+
+void compare_comparisons (struct cmpcmpS *s)
+{
+  if (s->b1 != (glob1 == glob2)
+      || (s->b2 != (glob1 == glob3)))
+    printf ("comparing comparisons broken\n");
+}
+
+void cmp_comparison_test(void)
+{
+  struct cmpcmpS s;
+  s.b1 = 1;
+  glob1 = 42; glob2 = 42;
+  s.b2 = 0;
+  glob3 = 43;
+  compare_comparisons (&s);
+  return 0;
+}
+
+int fcompare (double a, double b, int code)
+{
+  switch (code) {
+    case 0: return a == b;
+    case 1: return a != b;
+    case 2: return a < b;
+    case 3: return a >= b;
+    case 4: return a > b;
+    case 5: return a <= b;
+  }
+}
+
+void math_cmp_test(void)
+{
+  double nan = 0.0/0.0;
+  double one = 1.0;
+  double two = 2.0;
+  int comp = 0;
+#define bug(a,b,op,iop,part) printf("Test broken: %s %s %s %s %d\n", #a, #b, #op, #iop, part)
+
+  /* This asserts that "a op b" is _not_ true, but "a iop b" is true.
+     And it does this in various ways so that all code generation paths
+     are checked (generating inverted tests, or non-inverted tests, or
+     producing a 0/1 value without jumps (that's done in the fcompare
+     function).  */
+#define FCMP(a,b,op,iop,code) \
+  if (fcompare (a,b,code))    \
+    bug (a,b,op,iop,1); \
+  if (a op b) \
+    bug (a,b,op,iop,2); \
+  if (a iop b) \
+    ; \
+  else \
+    bug (a,b,op,iop,3); \
+  if ((a op b) || comp) \
+    bug (a,b,op,iop,4); \
+  if ((a iop b) || comp) \
+    ; \
+  else \
+    bug (a,b,op,iop,5);
+
+  /* Equality tests.  */
+  FCMP(nan, nan, ==, !=, 0);
+  FCMP(one, two, ==, !=, 0);
+  FCMP(one, one, !=, ==, 1);
+  /* Non-equality is a bit special.  */
+  if (!fcompare (nan, nan, 1))
+    bug (nan, nan, !=, ==, 6);
+
+  /* Relational tests on numbers.  */
+  FCMP(two, one, <, >=, 2);
+  FCMP(one, two, >=, <, 3);
+  FCMP(one, two, >, <=, 4);
+  FCMP(two, one, <=, >, 5);
+
+  /* Relational tests on NaNs.  Note that the inverse op here is
+     always !=, there's no operator in C that is equivalent to !(a < b),
+     when NaNs are involved, same for the other relational ops.  */
+  FCMP(nan, nan, <, !=, 2);
+  FCMP(nan, nan, >=, !=, 3);
+  FCMP(nan, nan, >, !=, 4);
+  FCMP(nan, nan, <=, !=, 5);
+}
+
+double get100 () { return 100.0; }
+
+void callsave_test(void)
+{
+  int i, s; double *d; double t;
+  s = sizeof (double);
+  printf ("callsavetest: %d\n", s);
+  d = alloca (sizeof(double));
+  d[0] = 10.0;
+  /* x86-64 had a bug were the next call to get100 would evict
+     the lvalue &d[0] as VT_LLOCAL, and the reload would be done
+     in int type, not pointer type.  When alloca returns a pointer
+     with the high 32 bit set (which is likely on x86-64) the access
+     generates a segfault.  */
+  i = d[0] > get100 ();
+  printf ("%d\n", i);
 }

@@ -18,6 +18,12 @@ ifdef DISABLE_STATIC
 export LD_LIBRARY_PATH:=$(CURDIR)/..
 endif
 
+ifeq ($(TARGETOS),Darwin)
+CFLAGS+=-Wl,-flat_namespace,-undefined,warning
+export MACOSX_DEPLOYMENT_TARGET:=10.2
+NATIVE_DEFINES+=-D_ANSI_SOURCE
+endif
+
 # run local version of tcc with local libraries and includes
 TCC = ../tcc -B..
 RUN_TCC = $(NATIVE_DEFINES) -run -DONE_SOURCE ../tcc.c -B..
@@ -45,7 +51,7 @@ libtcc_test$(EXESUF): libtcc_test.c ../$(LIBTCC)
 # test.ref - generate using gcc
 # copy only tcclib.h so GCC's stddef and stdarg will be used
 test.ref: tcctest.c
-	cp -u ../include/tcclib.h .
+	cp ../include/tcclib.h .
 	$(CC) -o tcctest.gcc $< -I. -w $(CFLAGS) -std=gnu99
 	./tcctest.gcc > $@
 
