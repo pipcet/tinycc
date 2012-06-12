@@ -3,6 +3,7 @@ tcc (0.9.26~git20120612.ad5f375-1) unstable; urgency=low
   * New upstream snapshot
   * debian/patches:
     + Fix R_ARM_REL32 relocation.
+    + Expands arguments of configure script in order to accept ${prefix}.
   * debian/control:
     + Remove initial capital in package synopsis.
     + Update build dependency version on debhelper to reflect compatibility.
