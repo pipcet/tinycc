@@ -10,6 +10,7 @@ tcc (0.9.26~git20120612.ad5f375-1) unstable; urgency=low
   * debian/rules:
     + Adapt to new upstream build system.
     + Remove build flags export as debhelper already does it.
+    + Remove useless comments.
   * Bump compatibility to 9.
 
  -- Thomas Preud'homme <robotux@celest.fr>  Tue, 12 Jun 2012 18:06:17 +0200
