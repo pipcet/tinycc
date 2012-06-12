@@ -3,15 +3,8 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-export CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
-export CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
-export LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
-
-DEB_HOST_MULTIARCH?=$(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
-
 override_dh_auto_configure:
-	dh_auto_configure -- --libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
-		--tccdir=../tcc
+	dh_auto_configure -- --tccdir=../tcc
 
 override_dh_auto_clean:
 	[ ! -f config.mak ] || dh_auto_clean

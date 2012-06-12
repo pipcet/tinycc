@@ -5,8 +5,11 @@ tcc (0.9.26~git20120612.ad5f375-1) unstable; urgency=low
     + Fix R_ARM_REL32 relocation.
   * debian/control:
     + Remove initial capital in package synopsis.
+    + Update build dependency version on debhelper to reflect compatibility.
   * debian/rules:
     + Adapt to new upstream build system.
+    + Remove build flags export as debhelper already does it.
+  * Bump compatibility to 9.
 
  -- Thomas Preud'homme <robotux@celest.fr>  Tue, 12 Jun 2012 18:06:17 +0200
 
