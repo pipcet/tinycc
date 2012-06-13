@@ -1,3 +1,11 @@
+tcc (0.9.26~git20120612.ad5f375-3) unstable; urgency=low
+
+  * debian/patches:
+    + Disable the new callsave_test test on arm since it uses alloca which is
+      not supported on arm (yet).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Wed, 13 Jun 2012 22:31:30 +0200
+
 tcc (0.9.26~git20120612.ad5f375-2) unstable; urgency=low
 
   * debian/patches:
