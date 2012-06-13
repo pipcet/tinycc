@@ -1,3 +1,10 @@
+tcc (0.9.26~git20120612.ad5f375-2) unstable; urgency=low
+
+  * debian/patches:
+    + Correctly handle multiarch on Kfreebsd and Hurd.
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Wed, 13 Jun 2012 18:34:11 +0200
+
 tcc (0.9.26~git20120612.ad5f375-1) unstable; urgency=low
 
   * New upstream snapshot
