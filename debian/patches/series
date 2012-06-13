@@ -1,2 +1,3 @@
 0001-Fix-R_ARM_REL32-relocation.patch
 0002-Evaluate-configure-arguments.patch
+0003-Detect-multiarch-on-Kfreebsd-and-Hurd.patch
