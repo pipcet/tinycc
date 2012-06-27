@@ -1,3 +1,10 @@
+tcc (0.9.26~git20120612.ad5f375-4) unstable; urgency=low
+
+  * debian/patches:
+    + Cherry-pick patch fixing incorrect shift result type (Closes: #679123).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Wed, 27 Jun 2012 14:55:39 +0200
+
 tcc (0.9.26~git20120612.ad5f375-3) unstable; urgency=low
 
   * debian/patches:
