@@ -1,0 +1,44 @@
+From 25def4fa7488f8bcf621155d3b2725fca711b7a1 Mon Sep 17 00:00:00 2001
+From: Vincent Lefevre <vincent@vinc17.net>
+Date: Wed, 27 Jun 2012 13:31:44 +0200
+Subject: Incorrect shift result type with 64-bit ABI
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+On 2012-06-26 15:07:57 +0200, Vincent Lefevre wrote:
+> ISO C99 TC3 says: [6.5.7#3] "The integer promotions are performed on
+> each of the operands. The type of the result is that of the promoted
+> left operand."
+
+I've written a patch (attached). Now the shift problems no longer
+occur with the testcase and with GNU MPFR's "make check".
+
+--
+Vincent Lefèvre <vincent@vinc17.net> - Web: <http://www.vinc17.net/>
+100% accessible validated (X)HTML - Blog: <http://www.vinc17.net/blog/>
+Work: CR INRIA - computer arithmetic / AriC project (LIP, ENS-Lyon)
+
+Origin: upstream, http://repo.or.cz/w/tinycc.git/commit/240064c03bbc4264ff972f4dbd2d0e2f6d4222c7
+Bug-Debian: http://bugs.debian.org/679123
+Forwarded: http://lists.nongnu.org/archive/html/tinycc-devel/2012-06/msg00038.html
+Last-Update: 2012-06-27
+Applied-Upstream: commit: 240064c03bbc4264ff972f4dbd2d0e2f6d4222c7
+---
+ tccgen.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/tccgen.c b/tccgen.c
+index 7295267..26a5781 100644
+--- a/tccgen.c
++++ b/tccgen.c
+@@ -1678,6 +1678,9 @@ ST_FUNC void gen_op(int op)
+             (op < TOK_ULT || op > TOK_GT))
+             tcc_error("invalid operands for binary operation");
+         goto std_op;
++    } else if (op == TOK_SHR || op == TOK_SAR || op == TOK_SHL) {
++        t = (bt1 == VT_LLONG ? VT_LLONG : VT_INT) | (t1 & VT_UNSIGNED);
++        goto std_op;
+     } else if (bt1 == VT_LLONG || bt2 == VT_LLONG) {
+         /* cast to biggest op */
+         t = VT_LLONG;
