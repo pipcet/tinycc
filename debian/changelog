@@ -1,3 +1,11 @@
+tcc (0.9.26~git20120612.ad5f375-5) unstable; urgency=low
+
+  * debian/patches:
+    + Correctly handle integer promotion in patch fixing incorrect shift
+      result type (Closes: #679123).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Fri, 06 Jul 2012 15:55:17 +0200
+
 tcc (0.9.26~git20120612.ad5f375-4) unstable; urgency=low
 
   * debian/patches:
