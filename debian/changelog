@@ -3,6 +3,9 @@ tcc (0.9.26~git20120612.ad5f375-5) unstable; urgency=low
   * debian/patches:
     + Correctly handle integer promotion in patch fixing incorrect shift
       result type (Closes: #679123).
+  * debian/control:
+    + Set myself as Maintainer instead of Aurélien Gérôme as a result of him
+      being MIA (Closes: #677782).
 
  -- Thomas Preud'homme <robotux@celest.fr>  Sun, 08 Jul 2012 17:36:15 +0200
 
