@@ -3,3 +3,4 @@
 0003-Detect-multiarch-on-Kfreebsd-and-Hurd.patch
 0004-Disable-callsave_test-test-on-arm.patch
 0005-Incorrect-shift-result-type-with-64-bit-ABI.patch
+0006-get_reg-try-to-free-r2-for-an-SValue-first.patch
