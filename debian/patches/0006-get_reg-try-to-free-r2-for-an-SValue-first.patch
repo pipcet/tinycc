@@ -1,4 +1,4 @@
-From 38d51d2542cb4acd2ad6912db8877bb2c1e5223d Mon Sep 17 00:00:00 2001
+From 315185fe1db1296e511bec15894dad22432c9a7f Mon Sep 17 00:00:00 2001
 From: Thomas Preud'homme <robotux@celest.fr>
 Date: Sat, 21 Jul 2012 03:36:51 +0200
 Subject: get_reg(): try to free r2 for an SValue first
