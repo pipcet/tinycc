@@ -1,3 +1,17 @@
+tcc (0.9.26~git20120612.ad5f375-6) unstable; urgency=low
+
+  [Paul Tagliamonte]
+    * Uploading Tom's fixes on his behalf. Although he's signed this upload
+      (he issued a debdiff), I've prepared this upload. Fix verified on
+      i386.
+
+  [Thomas Preud'homme]
+    * debian/patches:
+      + Fix incorrect reading of long long values on architecture with 32bits
+        registers like i386 and armel (Closes: #681281).
+
+ -- Thomas Preud'homme <robotux@celest.fr>  Sat, 21 Jul 2012 03:43:35 +0200
+
 tcc (0.9.26~git20120612.ad5f375-5) unstable; urgency=low
 
   * debian/patches:
