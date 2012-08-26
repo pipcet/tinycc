@@ -1,7 +1,7 @@
 Source: tcc
 Section: devel
 Priority: optional
-Maintainer: Thomas Preud'homme <robotux@celest.fr>
+Maintainer: Thomas Preud'homme <robotux@debian.org>
 Uploaders: Arthur Loiret <arthur.loiret@gmail.com>
 Build-Depends: debhelper (>= 9), texi2html, texinfo, perl
 Standards-Version: 3.9.3

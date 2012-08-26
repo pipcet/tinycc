@@ -12,7 +12,7 @@ Files: debian/*
 Copyright: 2002, Cyril Bouthors <cyril@bouthors.org>
            2003-2006, Romain Francoise <rfrancoise@debian.org>
            2007-2010, Aurélien GÉRÔME <ag@roxor.cx>,
-           2007-2010, Thomas Preud'homme <robotux@celest.fr>,
+           2007-2010, Thomas Preud'homme <robotux@debian.org>,
            2007-2010, Arthur Loiret <arthur.loiret@gmail.com>
 License: Expat
  Permission is hereby granted, free of charge, to any person obtaining a copy
