@@ -5,7 +5,7 @@ tcc (0.9.26~git20120612.ad5f375-7) unstable; urgency=low
   * debian/copyright:
     + Update my maintainer email address.
 
- -- Thomas Preud'homme <robotux@celest.fr>  Sun, 26 Aug 2012 17:22:02 +0200
+ -- Thomas Preud'homme <robotux@debian.org>  Sun, 26 Aug 2012 17:22:02 +0200
 
 tcc (0.9.26~git20120612.ad5f375-6) unstable; urgency=low
 
