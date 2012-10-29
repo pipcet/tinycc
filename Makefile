@@ -40,6 +40,8 @@ endif
 ifeq ($(ARCH),i386)
 NATIVE_DEFINES=-DTCC_TARGET_I386 
 NATIVE_DEFINES+=$(if $(wildcard /lib/i386-linux-gnu),-DCONFIG_MULTIARCHDIR=\"i386-linux-gnu\")
+NATIVE_DEFINES+=$(if $(wildcard /lib/i386-kfreebsd-gnu),-DCONFIG_MULTIARCHDIR=\"i386-kfreebsd-gnu\")
+NATIVE_DEFINES+=$(if $(wildcard /lib/i386-gnu),-DCONFIG_MULTIARCHDIR=\"i386-gnu\")
 CFLAGS+=-m32
 else
 ifeq ($(ARCH),x86-64)
@@ -47,6 +49,7 @@ NATIVE_DEFINES=-DTCC_TARGET_X86_64
 CFLAGS+=-m64
 NATIVE_DEFINES+=$(if $(wildcard /usr/lib64),-DCONFIG_LDDIR=\"lib64\")
 NATIVE_DEFINES+=$(if $(wildcard /lib/x86_64-linux-gnu),-DCONFIG_MULTIARCHDIR=\"x86_64-linux-gnu\")
+NATIVE_DEFINES+=$(if $(wildcard /lib/x86_64-kfreebsd-gnu),-DCONFIG_MULTIARCHDIR=\"x86_64-kfreebsd-gnu\")
 endif
 endif
 
@@ -54,10 +57,12 @@ ifeq ($(ARCH),arm)
 NATIVE_DEFINES=-DTCC_TARGET_ARM
 NATIVE_DEFINES+=-DWITHOUT_LIBTCC
 NATIVE_DEFINES+=$(if $(wildcard /lib/ld-linux.so.3),-DTCC_ARM_EABI)
-NATIVE_DEFINES+=$(if $(wildcard /lib/arm-linux-gnueabi),-DCONFIG_MULTIARCHDIR=\"arm-linux-gnueabi\")
+ifneq (,$(wildcard /lib/arm-linux-gnueabi))
+NATIVE_DEFINES+=-DCONFIG_MULTIARCHDIR=\"arm-linux-gnueabi\"
+else
+NATIVE_DEFINES+=$(if $(wildcard /lib/arm-linux-gnueabihf),-DCONFIG_MULTIARCHDIR=\"arm-linux-gnueabihf\" -DTCC_ARM_HARDFLOAT)
+endif
 NATIVE_DEFINES+=$(if $(shell grep -l "^Features.* \(vfp\|iwmmxt\) " /proc/cpuinfo),-DTCC_ARM_VFP)
-# To use ARM hardfloat calling convension
-#NATIVE_DEFINES+=-DTCC_ARM_HARDFLOAT
 endif
 
 ifdef CONFIG_WIN32
@@ -355,10 +360,12 @@ tar:
 export LIBTCC1
 
 %est:
+	$(MAKE) -C tests2 $@
 	$(MAKE) -C tests $@
 
 clean:
 	rm -vf $(PROGS) tcc_p$(EXESUF) tcc.pod *~ *.o *.a *.so* *.out *.exe libtcc_test$(EXESUF)
+	$(MAKE) -C tests2 $@
 	$(MAKE) -C tests $@
 ifneq ($(LIBTCC1),)
 	$(MAKE) -C lib $@

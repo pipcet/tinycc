@@ -601,24 +601,131 @@ ST_FUNC void relocate_section(TCCState *s1, Section *s)
         case R_ARM_JUMP24:
         case R_ARM_PLT32:
             {
-                int x;
+                int x, is_thumb, is_call, h, blx_avail;
                 x = (*(int *)ptr)&0xffffff;
                 (*(int *)ptr) &= 0xff000000;
                 if (x & 0x800000)
                     x -= 0x1000000;
-                x *= 4;
+                x <<= 2;
+                blx_avail = (TCC_ARM_VERSION >= 5);
+                is_thumb = val & 1;
+                is_call = (type == R_ARM_CALL);
                 x += val - addr;
+                h = x & 2;
 #ifndef TCC_TARGET_PE
-                if((x & 3) != 0 || x >= 0x4000000 || x < -0x4000000)
-                    if (s1->output_type == TCC_OUTPUT_MEMORY)
-                        x += add_jmp_table(s1, val) - val; /* add veneer */
+                if ((x & 3) || x >= 0x4000000 || x < -0x4000000)
+                    if (!(x & 3) || !blx_avail || !is_call)
+                        if (s1->output_type == TCC_OUTPUT_MEMORY)
+                            x += add_jmp_table(s1, val) - val; /* add veneer */
 #endif
-                if((x & 3) != 0 || x >= 0x4000000 || x < -0x4000000)
-                    tcc_error("can't relocate value at %x",addr);
+                if ((x & 3) || x >= 0x4000000 || x < -0x4000000)
+                    if (!(x & 3) || !blx_avail || !is_call)
+                        tcc_error("can't relocate value at %x",addr);
                 x >>= 2;
                 x &= 0xffffff;
+                /* Only reached if blx is avail and it is a call */
+                if (is_thumb) {
+                    x |= h << 24;
+                    (*(int *)ptr) = 0xfa << 24; /* bl -> blx */
+                }
                 (*(int *)ptr) |= x;
             }
+            break;
+        /* Since these relocations only concern Thumb-2 and blx instruction was
+           introduced before Thumb-2, we can assume blx is available and not
+           guard its use */
+        case R_ARM_THM_CALL:
+        case R_ARM_THM_JUMP24:
+	    {
+                int x, hi, lo, s, j1, j2, i1, i2, imm10, imm11;
+                int to_thumb, is_call, blx_bit = 1 << 12;
+
+                /* weak reference */
+                if (sym->st_shndx == SHN_UNDEF &&
+                    ELFW(ST_BIND)(sym->st_info) == STB_WEAK)
+                    break;
+
+                /* Get initial offset */
+                hi = (*(uint16_t *)ptr);
+                lo = (*(uint16_t *)(ptr+2));
+                s = (hi >> 10) & 1;
+                j1 = (lo >> 13) & 1;
+                j2 = (lo >> 11) & 1;
+                i1 = (j1 ^ s) ^ 1;
+                i2 = (j2 ^ s) ^ 1;
+                imm10 = hi & 0x3ff;
+                imm11 = lo & 0x7ff;
+                x = (s << 24) | (i1 << 23) | (i2 << 22) |
+                    (imm10 << 12) | (imm11 << 1);
+                if (x & 0x01000000)
+                    x -= 0x02000000;
+
+                /* Relocation infos */
+                to_thumb = val & 1;
+                is_call = (type == R_ARM_THM_CALL);
+
+                /* Compute final offset */
+                x += val - addr;
+                if (!to_thumb && is_call) {
+                    blx_bit = 0; /* bl -> blx */
+                    x = (x + 3) & -4; /* Compute offset from aligned PC */
+                }
+
+                /* Check that relocation is possible
+                   * offset must not be out of range
+                   * if target is to be entered in arm mode:
+                     - bit 1 must not set
+                     - instruction must be a call (bl) */
+                if (!to_thumb || x >= 0x1000000 || x < -0x1000000)
+                    if (to_thumb || (val & 2) || !is_call)
+                        tcc_error("can't relocate value at %x",addr);
+
+                /* Compute and store final offset */
+                s = (x >> 24) & 1;
+                i1 = (x >> 23) & 1;
+                i2 = (x >> 22) & 1;
+                j1 = s ^ (i1 ^ 1);
+                j2 = s ^ (i2 ^ 1);
+                imm10 = (x >> 12) & 0x3ff;
+                imm11 = (x >> 1) & 0x7ff;
+                (*(uint16_t *)ptr) = (uint16_t) ((hi & 0xf800) |
+                                     (s << 10) | imm10);
+                (*(uint16_t *)(ptr+2)) = (uint16_t) ((lo & 0xc000) |
+                                (j1 << 13) | blx_bit | (j2 << 11) |
+                                imm11);
+            }
+            break;
+        case R_ARM_MOVT_ABS:
+        case R_ARM_MOVW_ABS_NC:
+            {
+                int x, imm4, imm12;
+                if (type == R_ARM_MOVT_ABS)
+                    val >>= 16;
+                imm12 = val & 0xfff;
+                imm4 = (val >> 12) & 0xf;
+                x = (imm4 << 16) | imm12;
+                if (type == R_ARM_THM_MOVT_ABS)
+                    *(int *)ptr |= x;
+                else
+                    *(int *)ptr += x;
+	    }
+            break;
+        case R_ARM_THM_MOVT_ABS:
+        case R_ARM_THM_MOVW_ABS_NC:
+            {
+                int x, i, imm4, imm3, imm8;
+                if (type == R_ARM_THM_MOVT_ABS)
+                    val >>= 16;
+                imm8 = val & 0xff;
+                imm3 = (val >> 8) & 0x7;
+                i = (val >> 11) & 1;
+                imm4 = (val >> 12) & 0xf;
+                x = (imm3 << 28) | (imm8 << 16) | (i << 10) | imm4;
+                if (type == R_ARM_THM_MOVT_ABS)
+                    *(int *)ptr |= x;
+                else
+                    *(int *)ptr += x;
+	    }
             break;
         case R_ARM_PREL31:
             {
@@ -636,6 +743,7 @@ ST_FUNC void relocate_section(TCCState *s1, Section *s)
             break;
         case R_ARM_REL32:
             *(int *)ptr += val - addr;
+            break;
         case R_ARM_BASE_PREL:
             *(int *)ptr += s1->got->sh_addr - addr;
             break;

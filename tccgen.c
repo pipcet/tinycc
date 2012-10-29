@@ -50,6 +50,7 @@ ST_DATA int nb_sym_pools;
 
 ST_DATA Sym *global_stack;
 ST_DATA Sym *local_stack;
+ST_DATA Sym *scope_stack_bottom;
 ST_DATA Sym *define_stack;
 ST_DATA Sym *global_label_stack;
 ST_DATA Sym *local_label_stack;
@@ -147,6 +148,13 @@ ST_INLN void sym_free(Sym *sym)
 ST_FUNC Sym *sym_push2(Sym **ps, int v, int t, long c)
 {
     Sym *s;
+    if (ps == &local_stack) {
+        for (s = *ps; s && s != scope_stack_bottom; s = s->prev)
+            if (!(v & SYM_FIELD) && (v & ~SYM_STRUCT) < SYM_FIRST_ANOM && s->v == v)
+                tcc_error("incompatible types for redefinition of '%s'",
+                          get_tok_str(v, NULL));
+    }
+    s = *ps;
     s = sym_malloc();
     s->asm_label = NULL;
     s->v = v;
@@ -589,11 +597,11 @@ ST_FUNC int get_reg(int rc)
        IMPORTANT to start from the bottom to ensure that we don't
        spill registers used in gen_opi()) */
     for(p=vstack;p<=vtop;p++) {
-        r = p->r & VT_VALMASK;
+        /* look at second register (if long long) */
+        r = p->r2 & VT_VALMASK;
         if (r < VT_CONST && (reg_classes[r] & rc))
             goto save_found;
-        /* also look at second register (if long long) */
-        r = p->r2 & VT_VALMASK;
+        r = p->r & VT_VALMASK;
         if (r < VT_CONST && (reg_classes[r] & rc)) {
         save_found:
             save_reg(r);
@@ -812,7 +820,8 @@ ST_FUNC int gv(int rc)
                     vtop[-1].r = r; /* save register value */
                     vtop->r = vtop[-1].r2;
                 }
-                /* allocate second register */
+                /* Allocate second register. Here we rely on the fact that
+                   get_reg() tries first to free r2 of an SValue. */
                 r2 = get_reg(rc2);
                 load(r2, vtop);
                 vpop();
@@ -1677,6 +1686,11 @@ ST_FUNC void gen_op(int op)
         if (op != '+' && op != '-' && op != '*' && op != '/' &&
             (op < TOK_ULT || op > TOK_GT))
             tcc_error("invalid operands for binary operation");
+        goto std_op;
+    } else if (op == TOK_SHR || op == TOK_SAR || op == TOK_SHL) {
+        t = bt1 == VT_LLONG ? VT_LLONG : VT_INT;
+        if ((t1 & (VT_BTYPE | VT_UNSIGNED)) == (t | VT_UNSIGNED))
+          t |= VT_UNSIGNED;
         goto std_op;
     } else if (bt1 == VT_LLONG || bt2 == VT_LLONG) {
         /* cast to biggest op */
@@ -3244,7 +3258,7 @@ static void type_decl(CType *type, AttributeDef *ad, int *v, int td)
 {
     Sym *s;
     CType type1, *type2;
-    int qualifiers, storage;
+    int qualifiers, storage, saved_nocode_wanted;
     
     while (tok == '*') {
         qualifiers = 0;
@@ -3298,7 +3312,13 @@ static void type_decl(CType *type, AttributeDef *ad, int *v, int td)
     }
     storage = type->t & VT_STORAGE;
     type->t &= ~VT_STORAGE;
+    if (storage & VT_STATIC) {
+        saved_nocode_wanted = nocode_wanted;
+        nocode_wanted = 1;
+    }
     post_type(type, ad);
+    if (storage & VT_STATIC)
+        nocode_wanted = saved_nocode_wanted;
     type->t |= storage;
     if (tok == TOK_ATTRIBUTE1 || tok == TOK_ATTRIBUTE2)
         parse_attribute(ad);
@@ -4336,7 +4356,7 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
                   int case_reg, int is_expr)
 {
     int a, b, c, d;
-    Sym *s;
+    Sym *s, *frame_bottom;
 
     /* generate line number info */
     if (tcc_state->do_debug &&
@@ -4387,6 +4407,9 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
         next();
         /* record local declaration stack position */
         s = local_stack;
+        frame_bottom = sym_push2(&local_stack, SYM_FIELD, 0, 0);
+        frame_bottom->next = scope_stack_bottom;
+        scope_stack_bottom = frame_bottom;
         llabel = local_label_stack;
         /* handle local labels declarations */
         if (tok == TOK_LABEL) {
@@ -4429,6 +4452,7 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
             }
         }
         /* pop locally defined symbols */
+        scope_stack_bottom = scope_stack_bottom->next;
         sym_pop(&local_stack, s);
         next();
     } else if (tok == TOK_RETURN) {
@@ -4499,6 +4523,9 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
         next();
         skip('(');
         s = local_stack;
+        frame_bottom = sym_push2(&local_stack, SYM_FIELD, 0, 0);
+        frame_bottom->next = scope_stack_bottom;
+        scope_stack_bottom = frame_bottom;
         if (tok != ';') {
             /* c99 for-loop init decl? */
             if (!decl0(VT_LOCAL, 1)) {
@@ -4530,6 +4557,7 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
         gjmp_addr(c);
         gsym(a);
         gsym_addr(b, c);
+        scope_stack_bottom = scope_stack_bottom->next;
         sym_pop(&local_stack, s);
     } else 
     if (tok == TOK_DO) {
@@ -5498,7 +5526,9 @@ static void gen_function(Sym *sym)
     gfunc_epilog();
     cur_text_section->data_offset = ind;
     label_pop(&global_label_stack, NULL);
-    sym_pop(&local_stack, NULL); /* reset local stack */
+    /* reset local stack */
+    scope_stack_bottom = NULL;
+    sym_pop(&local_stack, NULL);
     /* end of function */
     /* patch symbol size */
     ((ElfW(Sym) *)symtab_section->data)[sym->c].st_size = 
@@ -5566,7 +5596,7 @@ static int decl0(int l, int is_for_loop_init)
     CType type, btype;
     Sym *sym;
     AttributeDef ad;
-    
+
     while (1) {
         if (!parse_btype(&btype, &ad)) {
             if (is_for_loop_init)

@@ -1673,7 +1673,7 @@ typedef Elf32_Addr Elf32_Conflict;
 #define R_ARM_THM_ABS5          7
 #define R_ARM_ABS8              8       /* Direct 8 bit */
 #define R_ARM_SBREL32           9
-#define R_ARM_THM_PC22          10
+#define R_ARM_THM_CALL          10
 #define R_ARM_THM_PC8           11
 #define R_ARM_AMP_VCALL9        12
 #define R_ARM_SWI24             13
@@ -1690,8 +1690,13 @@ typedef Elf32_Addr Elf32_Conflict;
 #define R_ARM_PLT32             27      /* 32 bit PLT address */
 #define R_ARM_CALL              28
 #define R_ARM_JUMP24            29
+#define R_ARM_THM_JUMP24        30
 #define R_ARM_V4BX              40
 #define R_ARM_PREL31            42
+#define R_ARM_MOVW_ABS_NC       43
+#define R_ARM_MOVT_ABS          44
+#define R_ARM_THM_MOVW_ABS_NC   47
+#define R_ARM_THM_MOVT_ABS      48
 #define R_ARM_GNU_VTENTRY       100
 #define R_ARM_GNU_VTINHERIT     101
 #define R_ARM_THM_PC11          102     /* thumb unconditional branch */
