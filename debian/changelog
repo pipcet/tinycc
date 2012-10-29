@@ -1,11 +1,14 @@
-tcc (0.9.26~git20120612.ad5f375-7) unstable; urgency=low
+tcc (0.9.26~git20120612.ad5f375-7) experimental; urgency=low
 
+  * debian/rules:
+    + Directly install tcc-doc.html in the right directory instead of relying
+      on dh_installdocs.
   * debian/control:
     + Update my maintainer email address.
   * debian/copyright:
     + Update my maintainer email address.
 
- -- Thomas Preud'homme <robotux@debian.org>  Sun, 26 Aug 2012 17:22:02 +0200
+ -- Thomas Preud'homme <robotux@debian.org>  Mon, 29 Oct 2012 16:33:56 +0100
 
 tcc (0.9.26~git20120612.ad5f375-6) unstable; urgency=low
 
