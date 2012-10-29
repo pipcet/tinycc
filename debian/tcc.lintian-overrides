@@ -1,6 +1,2 @@
 # Upstream Makefile explicitly disable fortification of functions
 tcc binary: hardening-no-fortify-functions usr/bin/tcc
-
-# These files are examples and need thus to be modified
-tcc binary: example-interpreter-in-usr-local usr/share/doc/tcc/examples/ex1.c #!/usr/local/bin/tcc
-tcc binary: example-interpreter-in-usr-local usr/share/doc/tcc/examples/ex4.c #!/usr/local/bin/tcc
