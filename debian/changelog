@@ -7,6 +7,7 @@ tcc (0.9.26~git20120612.ad5f375-7) experimental; urgency=low
       again.
   * debian/control:
     + Update my maintainer email address.
+    + Remove Arthur Loiret from Uploaders, as agreed.
   * debian/copyright:
     + Update my maintainer email address.
   * Remove unused lintian overrides about incorrect interpreter.
