@@ -8,6 +8,8 @@ tcc (0.9.26~git20120612.ad5f375-7) experimental; urgency=low
   * debian/control:
     + Update my maintainer email address.
     + Remove Arthur Loiret from Uploaders, as agreed.
+    + Remove DMUA flag: it's both unneeded (DD maintainance) and useless now
+      (http://lists.debian.org/debian-devel-announce/2012/11/msg00006.html).
   * debian/copyright:
     + Update my maintainer email address.
   * Remove unused lintian overrides about incorrect interpreter.
