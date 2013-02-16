@@ -35,7 +35,7 @@ ST_DATA void *rt_prog_main;
 
 static void set_pages_executable(void *ptr, unsigned long length);
 static void set_exception_handler(void);
-static int rt_get_caller_pc(uplong *paddr, ucontext_t *uc, int level);
+static int rt_get_caller_pc(addr_t *paddr, ucontext_t *uc, int level);
 static void rt_error(ucontext_t *uc, const char *fmt, ...);
 static int tcc_relocate_ex(TCCState *s1, void *ptr);
 
@@ -47,36 +47,43 @@ static void win64_add_function_table(TCCState *s1);
 /* Do all relocations (needed before using tcc_get_symbol())
    Returns -1 on error. */
 
-LIBTCCAPI int tcc_relocate(TCCState *s1)
+LIBTCCAPI int tcc_relocate(TCCState *s1, void *ptr)
 {
     int ret;
-#ifdef HAVE_SELINUX
-    /* Use mmap instead of malloc for Selinux
-    Ref http://www.gnu.org/s/libc/manual/html_node/File-Size.html */
-    char tmpfname[] = "/tmp/.tccrunXXXXXX";
-    int fd = mkstemp (tmpfname);
-    if ((ret= tcc_relocate_ex(s1,NULL)) < 0)return -1;
-    s1->mem_size=ret;
-    unlink (tmpfname); ftruncate (fd, s1->mem_size);
-    s1->write_mem = mmap (NULL, ret, PROT_READ|PROT_WRITE,
-        MAP_SHARED, fd, 0);
-    if(s1->write_mem == MAP_FAILED){
-        tcc_error("/tmp not writeable");
-        return -1;
-    }
-    s1->runtime_mem = mmap (NULL, ret, PROT_READ|PROT_EXEC,
-        MAP_SHARED, fd, 0);
-    if(s1->runtime_mem == MAP_FAILED){
-        tcc_error("/tmp not executable");
-        return -1;
-    }
-    ret = tcc_relocate_ex(s1, s1->write_mem);
-#else
+
+    if (TCC_RELOCATE_AUTO != ptr)
+        return tcc_relocate_ex(s1, ptr);
+
     ret = tcc_relocate_ex(s1, NULL);
-    if (-1 != ret) {
-        s1->runtime_mem = tcc_malloc(ret);
-        ret = tcc_relocate_ex(s1, s1->runtime_mem);
+    if (ret < 0)
+        return ret;
+
+#ifdef HAVE_SELINUX
+    {   /* Use mmap instead of malloc for Selinux.  Ref:
+           http://www.gnu.org/s/libc/manual/html_node/File-Size.html */
+
+        char tmpfname[] = "/tmp/.tccrunXXXXXX";
+        int fd = mkstemp (tmpfname);
+
+        s1->mem_size = ret;
+        unlink (tmpfname);
+        ftruncate (fd, s1->mem_size);
+
+        s1->write_mem = mmap (NULL, ret, PROT_READ|PROT_WRITE,
+            MAP_SHARED, fd, 0);
+        if (s1->write_mem == MAP_FAILED)
+            tcc_error("/tmp not writeable");
+
+        s1->runtime_mem = mmap (NULL, ret, PROT_READ|PROT_EXEC,
+            MAP_SHARED, fd, 0);
+        if (s1->runtime_mem == MAP_FAILED)
+            tcc_error("/tmp not executable");
+
+        ret = tcc_relocate_ex(s1, s1->write_mem);
     }
+#else
+    s1->runtime_mem = tcc_malloc(ret);
+    ret = tcc_relocate_ex(s1, s1->runtime_mem);
 #endif
     return ret;
 }
@@ -87,7 +94,7 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
     int (*prog_main)(int, char **);
     int ret;
 
-    if (tcc_relocate(s1) < 0)
+    if (tcc_relocate(s1, TCC_RELOCATE_AUTO) < 0)
         return -1;
 
     prog_main = tcc_get_symbol_err(s1, "main");
@@ -123,11 +130,10 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr)
 {
     Section *s;
     unsigned long offset, length;
-    uplong mem;
+    addr_t mem;
     int i;
 
-    if (0 == s1->runtime_added) {
-        s1->runtime_added = 1;
+    if (NULL == ptr) {
         s1->nb_errors = 0;
 #ifdef TCC_TARGET_PE
         pe_output_file(s1, NULL);
@@ -141,7 +147,7 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr)
             return -1;
     }
 
-    offset = 0, mem = (uplong)ptr;
+    offset = 0, mem = (addr_t)ptr;
     for(i = 1; i < s1->nb_sections; i++) {
         s = s1->sections[i];
         if (0 == (s->sh_flags & SHF_ALLOC))
@@ -157,7 +163,7 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr)
     if (s1->nb_errors)
         return -1;
 
-#if (defined TCC_TARGET_X86_64 || defined TCC_TARGET_ARM) && !defined TCC_TARGET_PE
+#ifdef TCC_HAS_RUNTIME_PLTGOT
     s1->runtime_plt_and_got_offset = 0;
     s1->runtime_plt_and_got = (char *)(mem + offset);
     /* double the size of the buffer for got and plt entries
@@ -181,7 +187,7 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr)
             continue;
         length = s->data_offset;
         // printf("%-12s %08x %04x\n", s->name, s->sh_addr, length);
-        ptr = (void*)(uplong)s->sh_addr;
+        ptr = (void*)s->sh_addr;
         if (NULL == s->data || s->sh_type == SHT_NOBITS)
             memset(ptr, 0, length);
         else
@@ -191,7 +197,7 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr)
             set_pages_executable(ptr, length);
     }
 
-#if (defined TCC_TARGET_X86_64 || defined TCC_TARGET_ARM) && !defined TCC_TARGET_PE
+#ifdef TCC_HAS_RUNTIME_PLTGOT
     set_pages_executable(s1->runtime_plt_and_got,
                          s1->runtime_plt_and_got_offset);
 #endif
@@ -211,30 +217,31 @@ static void set_pages_executable(void *ptr, unsigned long length)
     unsigned long old_protect;
     VirtualProtect(ptr, length, PAGE_EXECUTE_READWRITE, &old_protect);
 #else
-    unsigned long start, end;
-    start = (uplong)ptr & ~(PAGESIZE - 1);
-    end = (uplong)ptr + length;
+#ifndef PAGESIZE
+# define PAGESIZE 4096
+#endif
+    addr_t start, end;
+    start = (addr_t)ptr & ~(PAGESIZE - 1);
+    end = (addr_t)ptr + length;
     end = (end + PAGESIZE - 1) & ~(PAGESIZE - 1);
     mprotect((void *)start, end - start, PROT_READ | PROT_WRITE | PROT_EXEC);
 #endif
 }
 
 /* ------------------------------------------------------------- */
-#endif /* TCC_IS_NATIVE */
-
 #ifdef CONFIG_TCC_BACKTRACE
 
-PUB_FUNC void tcc_set_num_callers(int n)
+ST_FUNC void tcc_set_num_callers(int n)
 {
     rt_num_callers = n;
 }
 
 /* print the position in the source file of PC value 'pc' by reading
    the stabs debug information */
-static uplong rt_printline(uplong wanted_pc, const char *msg)
+static addr_t rt_printline(addr_t wanted_pc, const char *msg)
 {
     char func_name[128], last_func_name[128];
-    uplong func_addr, last_pc, pc;
+    addr_t func_addr, last_pc, pc;
     const char *incl_files[INCLUDE_STACK_SIZE];
     int incl_index, len, last_line_num, i;
     const char *str, *p;
@@ -253,7 +260,7 @@ static uplong rt_printline(uplong wanted_pc, const char *msg)
     func_addr = 0;
     incl_index = 0;
     last_func_name[0] = '\0';
-    last_pc = (uplong)-1;
+    last_pc = (addr_t)-1;
     last_line_num = 1;
 
     if (!stab_sym)
@@ -376,7 +383,7 @@ no_stabs:
 static void rt_error(ucontext_t *uc, const char *fmt, ...)
 {
     va_list ap;
-    uplong pc;
+    addr_t pc;
     int i;
 
     fprintf(stderr, "Runtime error: ");
@@ -389,7 +396,7 @@ static void rt_error(ucontext_t *uc, const char *fmt, ...)
         if (rt_get_caller_pc(&pc, uc, i) < 0)
             break;
         pc = rt_printline(pc, i ? "by" : "at");
-        if (pc == (uplong)rt_prog_main && pc)
+        if (pc == (addr_t)rt_prog_main && pc)
             break;
     }
 }
@@ -434,6 +441,10 @@ static void sig_error(int signum, siginfo_t *siginf, void *puc)
     exit(255);
 }
 
+#ifndef SA_SIGINFO
+# define SA_SIGINFO 0x00000004u
+#endif
+
 /* Generate a stack backtrace when a CPU exception occurs. */
 static void set_exception_handler(void)
 {
@@ -459,10 +470,10 @@ static void set_exception_handler(void)
 #define REG_EBP EBP
 #endif
 
-/* return the PC at frame level 'level'. Return non zero if not found */
-static int rt_get_caller_pc(unsigned long *paddr, ucontext_t *uc, int level)
+/* return the PC at frame level 'level'. Return negative if not found */
+static int rt_get_caller_pc(addr_t *paddr, ucontext_t *uc, int level)
 {
-    unsigned long fp;
+    addr_t fp;
     int i;
 
     if (level == 0) {
@@ -490,9 +501,9 @@ static int rt_get_caller_pc(unsigned long *paddr, ucontext_t *uc, int level)
             /* XXX: check address validity with program info */
             if (fp <= 0x1000 || fp >= 0xc0000000)
                 return -1;
-            fp = ((unsigned long *)fp)[0];
+            fp = ((addr_t *)fp)[0];
         }
-        *paddr = ((unsigned long *)fp)[1];
+        *paddr = ((addr_t *)fp)[1];
         return 0;
     }
 }
@@ -500,11 +511,10 @@ static int rt_get_caller_pc(unsigned long *paddr, ucontext_t *uc, int level)
 /* ------------------------------------------------------------- */
 #elif defined(__x86_64__)
 
-/* return the PC at frame level 'level'. Return non zero if not found */
-static int rt_get_caller_pc(unsigned long *paddr,
-                            ucontext_t *uc, int level)
+/* return the PC at frame level 'level'. Return negative if not found */
+static int rt_get_caller_pc(addr_t *paddr, ucontext_t *uc, int level)
 {
-    unsigned long fp;
+    addr_t fp;
     int i;
 
     if (level == 0) {
@@ -529,9 +539,9 @@ static int rt_get_caller_pc(unsigned long *paddr,
             /* XXX: check address validity with program info */
             if (fp <= 0x1000)
                 return -1;
-            fp = ((unsigned long *)fp)[0];
+            fp = ((addr_t *)fp)[0];
         }
-        *paddr = ((unsigned long *)fp)[1];
+        *paddr = ((addr_t *)fp)[1];
         return 0;
     }
 }
@@ -540,10 +550,9 @@ static int rt_get_caller_pc(unsigned long *paddr,
 #elif defined(__arm__)
 
 /* return the PC at frame level 'level'. Return negative if not found */
-static int rt_get_caller_pc(unsigned long *paddr,
-                            ucontext_t *uc, int level)
+static int rt_get_caller_pc(addr_t *paddr, ucontext_t *uc, int level)
 {
-    uint32_t fp, sp;
+    addr_t fp, sp;
     int i;
 
     if (level == 0) {
@@ -567,15 +576,15 @@ static int rt_get_caller_pc(unsigned long *paddr,
         if (fp < sp + 12 || fp & 3)
             return -1;
         for(i = 1; i < level; i++) {
-            sp = ((uint32_t *)fp)[-2];
+            sp = ((addr_t *)fp)[-2];
             if (sp < fp || sp - fp > 16 || sp & 3)
                 return -1;
-            fp = ((uint32_t *)fp)[-3];
+            fp = ((addr_t *)fp)[-3];
             if (fp <= sp || fp - sp < 12 || fp & 3)
                 return -1;
         }
         /* XXX: check address validity with program info */
-        *paddr = ((uint32_t *)fp)[-1];
+        *paddr = ((addr_t *)fp)[-1];
         return 0;
     }
 }
@@ -584,8 +593,7 @@ static int rt_get_caller_pc(unsigned long *paddr,
 #else
 
 #warning add arch specific rt_get_caller_pc()
-static int rt_get_caller_pc(unsigned long *paddr,
-                            ucontext_t *uc, int level)
+static int rt_get_caller_pc(addr_t *paddr, ucontext_t *uc, int level)
 {
     return -1;
 }
@@ -616,8 +624,7 @@ static long __stdcall cpu_exception_handler(EXCEPTION_POINTERS *ex_info)
         rt_error(uc, "exception caught");
         break;
     }
-    exit(-1);
-    return EXCEPTION_CONTINUE_SEARCH;
+    return EXCEPTION_EXECUTE_HANDLER;
 }
 
 /* Generate a stack backtrace when a CPU exception occurs. */
@@ -630,17 +637,17 @@ static void set_exception_handler(void)
 static void win64_add_function_table(TCCState *s1)
 {
     RtlAddFunctionTable(
-        (RUNTIME_FUNCTION*)(uplong)s1->uw_pdata->sh_addr,
+        (RUNTIME_FUNCTION*)s1->uw_pdata->sh_addr,
         s1->uw_pdata->data_offset / sizeof (RUNTIME_FUNCTION),
-        (uplong)text_section->sh_addr
+        text_section->sh_addr
         );
 }
 #endif
 
 /* return the PC at frame level 'level'. Return non zero if not found */
-static int rt_get_caller_pc(uplong *paddr, CONTEXT *uc, int level)
+static int rt_get_caller_pc(addr_t *paddr, CONTEXT *uc, int level)
 {
-    uplong fp, pc;
+    addr_t fp, pc;
     int i;
 #ifdef _WIN64
     pc = uc->Rip;
@@ -654,9 +661,9 @@ static int rt_get_caller_pc(uplong *paddr, CONTEXT *uc, int level)
 	    /* XXX: check address validity with program info */
 	    if (fp <= 0x1000 || fp >= 0xc0000000)
 		return -1;
-	    fp = ((uplong*)fp)[0];
+	    fp = ((addr_t*)fp)[0];
 	}
-        pc = ((uplong*)fp)[1];
+        pc = ((addr_t*)fp)[1];
     }
     *paddr = pc;
     return 0;
@@ -665,13 +672,7 @@ static int rt_get_caller_pc(uplong *paddr, CONTEXT *uc, int level)
 #endif /* _WIN32 */
 #endif /* CONFIG_TCC_BACKTRACE */
 /* ------------------------------------------------------------- */
-
 #ifdef CONFIG_TCC_STATIC
-
-#define RTLD_LAZY       0x001
-#define RTLD_NOW        0x002
-#define RTLD_GLOBAL     0x100
-#define RTLD_DEFAULT    NULL
 
 /* dummy function for profiling */
 ST_FUNC void *dlopen(const char *filename, int flag)
@@ -682,26 +683,27 @@ ST_FUNC void *dlopen(const char *filename, int flag)
 ST_FUNC void dlclose(void *p)
 {
 }
-/*
-const char *dlerror(void)
+
+ST_FUNC const char *dlerror(void)
 {
     return "error";
 }
-*/
+
 typedef struct TCCSyms {
     char *str;
     void *ptr;
 } TCCSyms;
 
-#define TCCSYM(a) { #a, &a, },
 
 /* add the symbol you want here if no dynamic linking is done */
 static TCCSyms tcc_syms[] = {
 #if !defined(CONFIG_TCCBOOT)
+#define TCCSYM(a) { #a, &a, },
     TCCSYM(printf)
     TCCSYM(fprintf)
     TCCSYM(fopen)
     TCCSYM(fclose)
+#undef TCCSYM
 #endif
     { NULL, NULL },
 };
@@ -726,5 +728,5 @@ ST_FUNC void *resolve_sym(TCCState *s1, const char *sym)
 }
 
 #endif /* CONFIG_TCC_STATIC */
-
+#endif /* TCC_IS_NATIVE */
 /* ------------------------------------------------------------- */

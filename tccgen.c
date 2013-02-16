@@ -50,11 +50,12 @@ ST_DATA int nb_sym_pools;
 
 ST_DATA Sym *global_stack;
 ST_DATA Sym *local_stack;
+ST_DATA Sym *scope_stack_bottom;
 ST_DATA Sym *define_stack;
 ST_DATA Sym *global_label_stack;
 ST_DATA Sym *local_label_stack;
 
-ST_DATA SValue vstack[VSTACK_SIZE], *vtop;
+ST_DATA SValue __vstack[1+VSTACK_SIZE], *vtop;
 
 ST_DATA int const_wanted; /* true if constant wanted */
 ST_DATA int nocode_wanted; /* true if no code generation wanted for an expression */
@@ -147,6 +148,13 @@ ST_INLN void sym_free(Sym *sym)
 ST_FUNC Sym *sym_push2(Sym **ps, int v, int t, long c)
 {
     Sym *s;
+    if (ps == &local_stack) {
+        for (s = *ps; s && s != scope_stack_bottom; s = s->prev)
+            if (!(v & SYM_FIELD) && (v & ~SYM_STRUCT) < SYM_FIRST_ANOM && s->v == v)
+                tcc_error("incompatible types for redefinition of '%s'",
+                          get_tok_str(v, NULL));
+    }
+    s = *ps;
     s = sym_malloc();
     s->asm_label = NULL;
     s->v = v;
@@ -336,25 +344,21 @@ static void vpushs(long long v)
   vsetc(&size_type, VT_CONST, &cval);
 }
 
-/* push long long constant */
-static void vpushll(long long v)
-{
-    CValue cval;
-    CType ctype;
-    ctype.t = VT_LLONG;
-    ctype.ref = 0;
-    cval.ull = v;
-    vsetc(&ctype, VT_CONST, &cval);
-}
-
 /* push arbitrary 64bit constant */
 void vpush64(int ty, unsigned long long v)
 {
     CValue cval;
     CType ctype;
     ctype.t = ty;
+    ctype.ref = NULL;
     cval.ull = v;
     vsetc(&ctype, VT_CONST, &cval);
+}
+
+/* push long long constant */
+static inline void vpushll(long long v)
+{
+    vpush64(VT_LLONG, v);
 }
 
 /* Return a static symbol pointing to a section */
@@ -451,7 +455,6 @@ static void vseti(int r, int v)
 ST_FUNC void vswap(void)
 {
     SValue tmp;
-
     /* cannot let cpu flags if other instruction are generated. Also
        avoid leaving VT_JMP anywhere except on the top of the stack
        because it would complicate the code generator. */
@@ -463,6 +466,11 @@ ST_FUNC void vswap(void)
     tmp = vtop[0];
     vtop[0] = vtop[-1];
     vtop[-1] = tmp;
+
+/* XXX: +2% overall speed possible with optimized memswap
+ *
+ *  memswap(&vtop[0], &vtop[1], sizeof *vtop);
+ */
 }
 
 ST_FUNC void vpushv(SValue *v)
@@ -1692,6 +1700,8 @@ ST_FUNC void gen_op(int op)
             (t2 & (VT_BTYPE | VT_UNSIGNED)) == (VT_LLONG | VT_UNSIGNED))
             t |= VT_UNSIGNED;
         goto std_op;
+    } else if (bt1 == VT_STRUCT || bt2 == VT_STRUCT) {
+        tcc_error("comparison of struct");
     } else {
         /* integer operations */
         t = VT_INT;
@@ -3251,7 +3261,7 @@ static void type_decl(CType *type, AttributeDef *ad, int *v, int td)
     Sym *s;
     CType type1, *type2;
     int qualifiers, storage;
-    
+
     while (tok == '*') {
         qualifiers = 0;
     redo:
@@ -3304,7 +3314,13 @@ static void type_decl(CType *type, AttributeDef *ad, int *v, int td)
     }
     storage = type->t & VT_STORAGE;
     type->t &= ~VT_STORAGE;
-    post_type(type, ad);
+    if (storage & VT_STATIC) {
+        int saved_nocode_wanted = nocode_wanted;
+        nocode_wanted = 1;
+        post_type(type, ad);
+        nocode_wanted = saved_nocode_wanted;
+    } else
+        post_type(type, ad);
     type->t |= storage;
     if (tok == TOK_ATTRIBUTE1 || tok == TOK_ATTRIBUTE2)
         parse_attribute(ad);
@@ -3649,20 +3665,23 @@ ST_FUNC void unary(void)
         break;
     case TOK_builtin_frame_address:
         {
+            int level;
             CType type;
             next();
             skip('(');
-            if (tok != TOK_CINT) {
-                tcc_error("__builtin_frame_address only takes integers");
+            if (tok != TOK_CINT || tokc.i < 0) {
+                tcc_error("__builtin_frame_address only takes positive integers");
             }
-            if (tokc.i != 0) {
-                tcc_error("TCC only supports __builtin_frame_address(0)");
-            }
+            level = tokc.i;
             next();
             skip(')');
             type.t = VT_VOID;
             mk_pointer(&type);
-            vset(&type, VT_LOCAL, 0);
+            vset(&type, VT_LOCAL, 0);       /* local frame */
+            while (level--) {
+                mk_pointer(&vtop->type);
+                indir();                    /* -> parent frame */
+            }
         }
         break;
 #ifdef TCC_TARGET_X86_64
@@ -4342,7 +4361,7 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
                   int case_reg, int is_expr)
 {
     int a, b, c, d;
-    Sym *s;
+    Sym *s, *frame_bottom;
 
     /* generate line number info */
     if (tcc_state->do_debug &&
@@ -4393,6 +4412,9 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
         next();
         /* record local declaration stack position */
         s = local_stack;
+        frame_bottom = sym_push2(&local_stack, SYM_FIELD, 0, 0);
+        frame_bottom->next = scope_stack_bottom;
+        scope_stack_bottom = frame_bottom;
         llabel = local_label_stack;
         /* handle local labels declarations */
         if (tok == TOK_LABEL) {
@@ -4435,6 +4457,7 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
             }
         }
         /* pop locally defined symbols */
+        scope_stack_bottom = scope_stack_bottom->next;
         sym_pop(&local_stack, s);
         next();
     } else if (tok == TOK_RETURN) {
@@ -4505,6 +4528,9 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
         next();
         skip('(');
         s = local_stack;
+        frame_bottom = sym_push2(&local_stack, SYM_FIELD, 0, 0);
+        frame_bottom->next = scope_stack_bottom;
+        scope_stack_bottom = frame_bottom;
         if (tok != ';') {
             /* c99 for-loop init decl? */
             if (!decl0(VT_LOCAL, 1)) {
@@ -4536,6 +4562,7 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
         gjmp_addr(c);
         gsym(a);
         gsym_addr(b, c);
+        scope_stack_bottom = scope_stack_bottom->next;
         sym_pop(&local_stack, s);
     } else 
     if (tok == TOK_DO) {
@@ -5504,7 +5531,9 @@ static void gen_function(Sym *sym)
     gfunc_epilog();
     cur_text_section->data_offset = ind;
     label_pop(&global_label_stack, NULL);
-    sym_pop(&local_stack, NULL); /* reset local stack */
+    /* reset local stack */
+    scope_stack_bottom = NULL;
+    sym_pop(&local_stack, NULL);
     /* end of function */
     /* patch symbol size */
     ((ElfW(Sym) *)symtab_section->data)[sym->c].st_size = 
@@ -5541,7 +5570,7 @@ ST_FUNC void gen_inline_functions(void)
                 str = fn->token_str;
                 fn->sym = NULL;
                 if (file)
-                    strcpy(file->filename, fn->filename);
+                    pstrcpy(file->filename, sizeof file->filename, fn->filename);
                 sym->r = VT_SYM | VT_CONST;
                 sym->type.t &= ~VT_INLINE;
 
@@ -5572,7 +5601,7 @@ static int decl0(int l, int is_for_loop_init)
     CType type, btype;
     Sym *sym;
     AttributeDef ad;
-    
+
     while (1) {
         if (!parse_btype(&btype, &ad)) {
             if (is_for_loop_init)
