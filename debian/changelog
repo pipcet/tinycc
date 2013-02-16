@@ -3,11 +3,13 @@ tcc (0.9.26-1) experimental; urgency=low
   * New upstream release:
     + Add support for hardfloat calling convention (Closes: #645692).
   * debian/rules:
+    + Use DEB_HOST_ARCH to set the default ABI (Closes: #651840).
     + Directly install tcc-doc.html in the right directory instead of relying
       on dh_installdocs.
     + Scripts in /usr/share/doc/tcc/examples contain correct interpreter path
       again.
   * debian/control:
+    + Enable build on armhf. (Closes: #645673, thanks Loïc Minier).
     + Update my maintainer email address.
     + Remove Arthur Loiret from Uploaders, as agreed.
     + Remove DMUA flag: it's both unneeded (DD maintainance) and useless now
