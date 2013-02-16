@@ -89,6 +89,7 @@ void global_data_test(void);
 void cmp_comparison_test(void);
 void math_cmp_test(void);
 void callsave_test(void);
+void builtin_frame_address_test(void);
 
 int fib(int n);
 void num(int n);
@@ -593,11 +594,14 @@ int main(int argc, char **argv)
     local_label_test();
     asm_test();
     builtin_test();
+#ifndef _WIN32
     weak_test();
+#endif
     global_data_test();
     cmp_comparison_test();
     math_cmp_test();
     callsave_test();
+    builtin_frame_address_test();
     return 0; 
 }
 
@@ -2462,7 +2466,7 @@ void builtin_test(void)
     printf("res = %d\n", __builtin_constant_p(constant_p_var));
 }
 
-
+#ifndef _WIN32
 extern int __attribute__((weak)) weak_f1(void);
 extern int __attribute__((weak)) weak_f2(void);
 extern int                       weak_f3(void);
@@ -2518,6 +2522,7 @@ int __attribute__((weak)) weak_f2() { return 222; }
 int __attribute__((weak)) weak_f3() { return 333; }
 int __attribute__((weak)) weak_v2 = 222;
 int __attribute__((weak)) weak_v3 = 333;
+#endif
 
 void const_func(const int a)
 {
@@ -2594,7 +2599,6 @@ void cmp_comparison_test(void)
   s.b2 = 0;
   glob3 = 43;
   compare_comparisons (&s);
-  return 0;
 }
 
 int fcompare (double a, double b, int code)
@@ -2679,4 +2683,31 @@ void callsave_test(void)
   i = d[0] > get100 ();
   printf ("%d\n", i);
 #endif
+}
+
+
+void bfa3(ptrdiff_t str_offset)
+{
+    printf("bfa3: %s\n", (char *)__builtin_frame_address(3) + str_offset);
+}
+void bfa2(ptrdiff_t str_offset)
+{
+    printf("bfa2: %s\n", (char *)__builtin_frame_address(2) + str_offset);
+    bfa3(str_offset);
+}
+void bfa1(ptrdiff_t str_offset)
+{
+    printf("bfa1: %s\n", (char *)__builtin_frame_address(1) + str_offset);
+#if defined(__arm__) && !defined(__GNUC__)
+    bfa2(str_offset);
+#endif
+}
+
+void builtin_frame_address_test(void)
+{
+    char str[] = "__builtin_frame_address";
+    char *fp0 = __builtin_frame_address(0);
+
+    printf("str: %s\n", str);
+    bfa1(str-fp0);
 }

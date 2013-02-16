@@ -2,6 +2,7 @@
  *  ARMv4 code generator for TCC
  * 
  *  Copyright (c) 2003 Daniel Glöckner
+ *  Copyright (c) 2012 Thomas Preud'homme
  *
  *  Based on i386-gen.c by Fabrice Bellard
  *
@@ -33,6 +34,10 @@
 #define NB_REGS            13
 #else
 #define NB_REGS             9
+#endif
+
+#ifndef TCC_ARM_VERSION
+# define TCC_ARM_VERSION 5
 #endif
 
 /* a register can belong to several classes. The classes must be
@@ -101,15 +106,6 @@ enum {
    are directly pushed on stack. */
 //#define FUNC_STRUCT_PARAM_AS_PTR
 
-#if defined(TCC_ARM_EABI) && defined(TCC_ARM_VFP)
-ST_DATA CType float_type, double_type, func_float_type, func_double_type;
-#define func_ldouble_type func_double_type
-#else
-#define func_float_type func_old_type
-#define func_double_type func_old_type
-#define func_ldouble_type func_old_type
-#endif
-
 /* pointer size, in bytes */
 #define PTR_SIZE 4
 
@@ -170,13 +166,26 @@ ST_DATA const int reg_classes[NB_REGS] = {
 #endif
 };
 
-/* keep in sync with line 104 above */
-#if defined(TCC_ARM_EABI) && defined(TCC_ARM_VFP)
-ST_DATA CType float_type, double_type, func_float_type, func_double_type;
-#endif
-
 static int func_sub_sp_offset, last_itod_magic;
 static int leaffunc;
+
+#if defined(TCC_ARM_EABI) && defined(TCC_ARM_VFP)
+static CType float_type, double_type, func_float_type, func_double_type;
+ST_FUNC void arm_init_types(void)
+{
+    float_type.t = VT_FLOAT;
+    double_type.t = VT_DOUBLE;
+    func_float_type.t = VT_FUNC;
+    func_float_type.ref = sym_push(SYM_FIELD, &float_type, FUNC_CDECL, FUNC_OLD);
+    func_double_type.t = VT_FUNC;
+    func_double_type.ref = sym_push(SYM_FIELD, &double_type, FUNC_CDECL, FUNC_OLD);
+}
+#else
+#define func_float_type func_old_type
+#define func_double_type func_old_type
+#define func_ldouble_type func_old_type
+ST_FUNC void arm_init_types(void) {}
+#endif
 
 static int two2mask(int a,int b) {
   return (reg_classes[a]|reg_classes[b])&~(RC_INT|RC_FLOAT);
@@ -829,11 +838,10 @@ void gfunc_call(int nb_args)
     --nb_args;
   }
   
-  vpushi(0);
+  vpushi(0), nb_args++;
   vtop->type.t = VT_LLONG;
-  args_size = 0;
 #endif
-  ncrn = ncprn = argno = vfp_argno = 0;
+  ncrn = ncprn = argno = vfp_argno = args_size = 0;
   /* Assign argument to registers and stack with alignment.
      If, considering alignment constraints, enough registers of the correct type
      (core or VFP) are free for the current argument, assign them to it, else
@@ -845,7 +853,7 @@ void gfunc_call(int nb_args)
      structures in the first zone are moved just after the SValue pointed by
      before_vfpreg_hfa. SValue's representing structures in the second zone are
      moved just after the SValue pointer by before_stack. */
-  for(i = nb_args + 1 ; i-- ;) {
+  for(i = nb_args; i-- ;) {
     int j, assigned_vfpreg = 0;
     size = type_size(&vtop[-i].type, &align);
     switch(vtop[-i].type.t & VT_BTYPE) {
@@ -920,9 +928,11 @@ void gfunc_call(int nb_args)
       }
       continue;
       default:
+#ifdef TCC_ARM_EABI
       if (!i) {
         break;
       }
+#endif
       if (ncrn < 4) {
         int is_long = (vtop[-i].type.t & VT_BTYPE) == VT_LLONG;
 
@@ -953,7 +963,9 @@ void gfunc_call(int nb_args)
 #endif
     args_size += (size + 3) & -4;
   }
-  vtop--;
+#ifdef TCC_ARM_EABI
+  vtop--, nb_args--;
+#endif
   args_size = keep = 0;
   for(i = 0;i < nb_args; i++) {
     vrotb(keep+1);
@@ -1053,10 +1065,12 @@ void gfunc_call(int nb_args)
   for(i = 0; i < keep; i++) {
     vrotb(keep);
     gv(regmask(plan2[i]));
+#ifdef TCC_ARM_HARDFLOAT
     /* arg is in s(2d+1): plan2[i]<plan2[i+1] => alignment occured (ex f,d,f) */
     if (i < keep - 1 && is_float(vtop->type.t) && (plan2[i] <= plan2[i + 1])) {
       o(0xEEF00A40|(vfpr(plan2[i])<<12)|vfpr(plan2[i]));
     }
+#endif
   }
 save_regs(keep); /* save used temporary registers */
   keep++;
@@ -1146,6 +1160,7 @@ void gfunc_prolog(CType *func_type)
   {
     n++;
     struct_ret = 1;
+    func_vc = 12; /* Offset from fp of the place to store the result */
   }
   for(sym2=sym->next;sym2 && (n<4 || nf<16);sym2=sym2->next) {
     size = type_size(&sym2->type, &align);
@@ -1159,8 +1174,6 @@ void gfunc_prolog(CType *func_type)
     if (n < 4)
       n += (size + 3) / 4;
   }
-  if (struct_ret)
-    func_vc = nf * 4;
   o(0xE1A0C00D); /* mov ip,sp */
   if(variadic)
     n=4;
@@ -1179,7 +1192,7 @@ void gfunc_prolog(CType *func_type)
     o(0xED2D0A00|nf); /* save s0-s15 on stack if needed */
   }
   o(0xE92D5800); /* save fp, ip, lr */
-  o(0xE28DB00C); /* add fp, sp, #12 */
+  o(0xE1A0B00D); /* mov fp, sp */
   func_sub_sp_offset = ind;
   o(0xE1A00000); /* nop, leave space for stack adjustment in epilogue */
   {
@@ -1193,6 +1206,7 @@ void gfunc_prolog(CType *func_type)
       type = &sym->type;
       size = type_size(type, &align);
       size = (size + 3) >> 2;
+      align = (align + 3) & ~3;
 #ifdef TCC_ARM_HARDFLOAT
       if (!variadic && (is_float(sym->type.t)
           || is_float_hgen_aggr(&sym->type))) {
@@ -1221,12 +1235,12 @@ from_stack:
         addr = (n + nf + sn) * 4;
         sn += size;
       }
-      sym_push(sym->v & ~SYM_FIELD, type, VT_LOCAL | lvalue_type(type->t), addr);
+      sym_push(sym->v & ~SYM_FIELD, type, VT_LOCAL | lvalue_type(type->t), addr+12);
     }
   }
   last_itod_magic=0;
   leaffunc = 1;
-  loc = -12;
+  loc = 0;
 }
 
 /* generate function epilog */
@@ -1246,13 +1260,13 @@ void gfunc_epilog(void)
     }
   }
 #endif
-  o(0xE91BA800); /* restore fp, sp, pc */
+  o(0xE89BA800); /* restore fp, sp, pc */
   diff = (-loc + 3) & -4;
 #ifdef TCC_ARM_EABI
   if(!leaffunc)
-    diff = (diff + 7) & -8;
+    diff = ((diff + 11) & -8) - 4;
 #endif
-  if(diff > 12) {
+  if(diff > 0) {
     x=stuff_const(0xE24BD000, diff); /* sub sp,fp,# */
     if(x)
       *(uint32_t *)(cur_text_section->data + func_sub_sp_offset) = x;
@@ -1564,7 +1578,7 @@ void gen_opf(int op)
       x|=0x800000;
       break;
     default:
-      if(op < TOK_ULT && op > TOK_GT) {
+      if(op < TOK_ULT || op > TOK_GT) {
         tcc_error("unknown fp op %x!",op);
         return;
       }
@@ -1837,7 +1851,7 @@ ST_FUNC void gen_cvt_itof1(int t)
 #ifdef TCC_ARM_VFP
     r2=vfpr(vtop->r=get_reg(RC_FLOAT));
     o(0xEE000A10|(r<<12)|(r2<<16)); /* fmsr */
-    r2<<=12;
+    r2|=r2<<12;
     if(!(vtop->type.t & VT_UNSIGNED))
       r2|=0x80;                /* fuitoX -> fsituX */
     o(0xEEB80A40|r2|T2CPR(t)); /* fYitoX*/
@@ -1916,7 +1930,7 @@ void gen_cvt_ftoi(int t)
 #ifdef TCC_ARM_VFP
     r=vfpr(gv(RC_FLOAT));
     u=u?0:0x10000;
-    o(0xEEBC0A40|(r<<12)|r|T2CPR(r2)); /* ftoXiY */
+    o(0xEEBC0AC0|(r<<12)|r|T2CPR(r2)|u); /* ftoXizY */
     r2=intr(vtop->r=get_reg(RC_INT));
     o(0xEE100A10|(r<<16)|(r2<<12));
     return;

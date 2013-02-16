@@ -55,7 +55,7 @@ ST_DATA Sym *define_stack;
 ST_DATA Sym *global_label_stack;
 ST_DATA Sym *local_label_stack;
 
-ST_DATA SValue vstack[VSTACK_SIZE], *vtop;
+ST_DATA SValue __vstack[1+VSTACK_SIZE], *vtop;
 
 ST_DATA int const_wanted; /* true if constant wanted */
 ST_DATA int nocode_wanted; /* true if no code generation wanted for an expression */
@@ -344,25 +344,21 @@ static void vpushs(long long v)
   vsetc(&size_type, VT_CONST, &cval);
 }
 
-/* push long long constant */
-static void vpushll(long long v)
-{
-    CValue cval;
-    CType ctype;
-    ctype.t = VT_LLONG;
-    ctype.ref = 0;
-    cval.ull = v;
-    vsetc(&ctype, VT_CONST, &cval);
-}
-
 /* push arbitrary 64bit constant */
 void vpush64(int ty, unsigned long long v)
 {
     CValue cval;
     CType ctype;
     ctype.t = ty;
+    ctype.ref = NULL;
     cval.ull = v;
     vsetc(&ctype, VT_CONST, &cval);
+}
+
+/* push long long constant */
+static inline void vpushll(long long v)
+{
+    vpush64(VT_LLONG, v);
 }
 
 /* Return a static symbol pointing to a section */
@@ -459,7 +455,6 @@ static void vseti(int r, int v)
 ST_FUNC void vswap(void)
 {
     SValue tmp;
-
     /* cannot let cpu flags if other instruction are generated. Also
        avoid leaving VT_JMP anywhere except on the top of the stack
        because it would complicate the code generator. */
@@ -471,6 +466,11 @@ ST_FUNC void vswap(void)
     tmp = vtop[0];
     vtop[0] = vtop[-1];
     vtop[-1] = tmp;
+
+/* XXX: +2% overall speed possible with optimized memswap
+ *
+ *  memswap(&vtop[0], &vtop[1], sizeof *vtop);
+ */
 }
 
 ST_FUNC void vpushv(SValue *v)
@@ -1700,6 +1700,8 @@ ST_FUNC void gen_op(int op)
             (t2 & (VT_BTYPE | VT_UNSIGNED)) == (VT_LLONG | VT_UNSIGNED))
             t |= VT_UNSIGNED;
         goto std_op;
+    } else if (bt1 == VT_STRUCT || bt2 == VT_STRUCT) {
+        tcc_error("comparison of struct");
     } else {
         /* integer operations */
         t = VT_INT;
@@ -3258,8 +3260,8 @@ static void type_decl(CType *type, AttributeDef *ad, int *v, int td)
 {
     Sym *s;
     CType type1, *type2;
-    int qualifiers, storage, saved_nocode_wanted;
-    
+    int qualifiers, storage;
+
     while (tok == '*') {
         qualifiers = 0;
     redo:
@@ -3313,12 +3315,12 @@ static void type_decl(CType *type, AttributeDef *ad, int *v, int td)
     storage = type->t & VT_STORAGE;
     type->t &= ~VT_STORAGE;
     if (storage & VT_STATIC) {
-        saved_nocode_wanted = nocode_wanted;
+        int saved_nocode_wanted = nocode_wanted;
         nocode_wanted = 1;
-    }
-    post_type(type, ad);
-    if (storage & VT_STATIC)
+        post_type(type, ad);
         nocode_wanted = saved_nocode_wanted;
+    } else
+        post_type(type, ad);
     type->t |= storage;
     if (tok == TOK_ATTRIBUTE1 || tok == TOK_ATTRIBUTE2)
         parse_attribute(ad);
@@ -3663,20 +3665,23 @@ ST_FUNC void unary(void)
         break;
     case TOK_builtin_frame_address:
         {
+            int level;
             CType type;
             next();
             skip('(');
-            if (tok != TOK_CINT) {
-                tcc_error("__builtin_frame_address only takes integers");
+            if (tok != TOK_CINT || tokc.i < 0) {
+                tcc_error("__builtin_frame_address only takes positive integers");
             }
-            if (tokc.i != 0) {
-                tcc_error("TCC only supports __builtin_frame_address(0)");
-            }
+            level = tokc.i;
             next();
             skip(')');
             type.t = VT_VOID;
             mk_pointer(&type);
-            vset(&type, VT_LOCAL, 0);
+            vset(&type, VT_LOCAL, 0);       /* local frame */
+            while (level--) {
+                mk_pointer(&vtop->type);
+                indir();                    /* -> parent frame */
+            }
         }
         break;
 #ifdef TCC_TARGET_X86_64
@@ -5565,7 +5570,7 @@ ST_FUNC void gen_inline_functions(void)
                 str = fn->token_str;
                 fn->sym = NULL;
                 if (file)
-                    strcpy(file->filename, fn->filename);
+                    pstrcpy(file->filename, sizeof file->filename, fn->filename);
                 sym->r = VT_SYM | VT_CONST;
                 sym->type.t &= ~VT_INLINE;
 
