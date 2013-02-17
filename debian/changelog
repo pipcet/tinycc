@@ -18,6 +18,9 @@ tcc (0.9.26-1) experimental; urgency=low
     + Update copyright and licenses according to what has changed in this new
       release and reformat Copyright entries.
     + Update my maintainer email address.
+  * debian/patches:
+    + Allow preprocessor flags to be passed to upstream Makefile through
+      environment.
   * Remove unused lintian overrides about incorrect interpreter and lack of
     fortification.
 
