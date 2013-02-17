@@ -16,7 +16,7 @@ tcc (0.9.26-1) experimental; urgency=low
       (http://lists.debian.org/debian-devel-announce/2012/11/msg00006.html).
   * debian/copyright:
     + Update copyright and licenses according to what has changed in this new
-      release.
+      release and reformat Copyright entries.
     + Update my maintainer email address.
   * Remove unused lintian overrides about incorrect interpreter.
 

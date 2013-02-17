@@ -5,26 +5,26 @@ Source: http://repo.or.cz/w/tinycc.git/snapshot/330d2ee0faf2849f6d861839e563422a
 License: GPL-2+
 
 Files: * win32/include/values.h
-Copyright: 2001-2006, Fabrice Bellard
-           2003, Daniel Glöckner
-           2003, 2004, TK
-           2005-2007, grischka
-           2007, Timppa
-           2008, Shinichiro Hamaji
-           2009, Frédéric Feret
-           2009-2011, Zik Saleeba
-           2012, Thomas Preud'homme
+Copyright: 2001-2006 Fabrice Bellard
+           2003 Daniel Glöckner
+           2003 2004, TK
+           2005-2007 grischka
+           2007 Timppa
+           2008 Shinichiro Hamaji
+           2009 Frédéric Feret
+           2009-2011 Zik Saleeba
+           2012 Thomas Preud'homme
 License: LGPL-2.1+
 Comments: For files in tests/test2/, see tests/test2/LICENSE.
  The situation is clarified further in a thread on tinycc-devel mailing list:
  http://lists.nongnu.org/archive/html/tinycc-devel/2013-02/msg00178.html
 
 Files: debian/*
-Copyright: 2002, Cyril Bouthors <cyril@bouthors.org>
-           2003-2006, Romain Francoise <rfrancoise@debian.org>
-           2007-2010, Aurélien GÉRÔME <ag@roxor.cx>,
-           2007-2010, Thomas Preud'homme <robotux@debian.org>,
-           2007-2010, Arthur Loiret <arthur.loiret@gmail.com>
+Copyright: 2002 Cyril Bouthors <cyril@bouthors.org>
+           2003-2006 Romain Francoise <rfrancoise@debian.org>
+           2007-2010 Aurélien GÉRÔME <ag@roxor.cx>,
+           2007-2010 Thomas Preud'homme <robotux@debian.org>,
+           2007-2010 Arthur Loiret <arthur.loiret@gmail.com>
 License: Expat
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -45,13 +45,13 @@ License: Expat
  THE SOFTWARE.
 
 Files: lib/libtcc1.c texi2pod.pl win32/tools/tiny_impdef.c il-opcodes.h
-Copyright: 1987-1988, 1992, 1994, 1995, 1999-2001, Free Software Foundation, Inc.
-           2002, Fabrice Bellard
-           2005, 2007, grischka
+Copyright: 1987-1988, 1992, 1994, 1995, 1999-2001 Free Software Foundation, Inc.
+           2002 Fabrice Bellard
+           2005, 2007 grischka
 License: GPL-2+
 
 Files: elf.h stab.def
-Copyright: 1988, 1995-1999, Free Software Foundation, Inc.
+Copyright: 1988, 1995-1999 Free Software Foundation, Inc.
 License: LGPL-2+
 
 Files: include/varargs.h win32/include/*
