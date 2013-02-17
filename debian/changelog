@@ -12,7 +12,7 @@ tcc (0.9.26-1) experimental; urgency=low
     + Enable build on armhf. (Closes: #645673, thanks Loïc Minier).
     + Update my maintainer email address.
     + Remove Arthur Loiret from Uploaders, as agreed.
-    + Remove DMUA flag: it's both unneeded (DD maintainance) and useless now
+    + Remove DMUA flag: it's both unneeded (DD maintenance) and useless now
       (http://lists.debian.org/debian-devel-announce/2012/11/msg00006.html).
   * debian/copyright:
     + Update copyright and licenses according to what has changed in this new
