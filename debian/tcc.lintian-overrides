@@ -1,2 +1,0 @@
-# Upstream Makefile explicitly disable fortification of functions
-tcc binary: hardening-no-fortify-functions usr/bin/tcc
