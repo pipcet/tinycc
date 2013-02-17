@@ -1,0 +1,28 @@
+From 629500df86d668bc02575140851dd02bc1bdb372 Mon Sep 17 00:00:00 2001
+From: Thomas Preud'homme <robotux@celest.fr>
+Date: Sun, 17 Feb 2013 23:39:08 +0100
+Subject: Accept CPPFLAGS from the environment
+
+Don't override CPPFLAGS so that it can be passed through the
+environment.
+
+Origin: vendor
+Forwarded: no
+Last-Update: 2013-02-17
+---
+ Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index 705b585..b755589 100644
+--- a/Makefile
++++ b/Makefile
+@@ -6,7 +6,7 @@ TOP ?= .
+ include $(TOP)/config.mak
+ VPATH = $(top_srcdir)
+ 
+-CPPFLAGS = -I$(TOP) # for config.h
++CPPFLAGS += -I$(TOP) # for config.h
+ 
+ ifeq (-$(findstring gcc,$(CC))-,-gcc-)
+ ifeq (-$(findstring $(GCC_MAJOR),01)-,--)
