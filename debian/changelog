@@ -1,6 +1,7 @@
 tcc (0.9.26-2) UNRELEASED; urgency=low
 
   * Improve watch file (thanks Bart Martens).
+  * Switch from texi2html to makeinfo.
 
  -- Thomas Preud'homme <robotux@debian.org>  Sat, 06 Apr 2013 14:16:17 +0200
 
