@@ -300,7 +300,7 @@ endif
 
 # documentation and man page
 tcc-doc.html: tcc-doc.texi
-	-texi2html -monolithic -number $<
+	-makeinfo --no-split --html --number-sections -o $@ $<
 
 tcc.1: tcc-doc.texi
 	-$(top_srcdir)/texi2pod.pl $< tcc.pod
