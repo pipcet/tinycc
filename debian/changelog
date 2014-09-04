@@ -6,6 +6,7 @@ tcc (0.9.26-2) UNRELEASED; urgency=low
 
   [ Matteo Cypriani ]
   * Add Matteo Cypriani as an Uploader.
+  * Bump Standards-Version to 3.9.5.
 
  -- Thomas Preud'homme <robotux@debian.org>  Sat, 06 Apr 2013 14:16:17 +0200
 
