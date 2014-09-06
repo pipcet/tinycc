@@ -70,15 +70,39 @@ static const char tcc_keywords[] =
 
 /* WARNING: the content of this string encodes token numbers */
 static const unsigned char tok_two_chars[] =
+/* outdated -- gr
     "<=\236>=\235!=\225&&\240||\241++\244--\242==\224<<\1>>\2+=\253"
     "-=\255*=\252/=\257%=\245&=\246^=\336|=\374->\313..\250##\266";
+*/{
+    '<','=', TOK_LE,
+    '>','=', TOK_GE,
+    '!','=', TOK_NE,
+    '&','&', TOK_LAND,
+    '|','|', TOK_LOR,
+    '+','+', TOK_INC,
+    '-','-', TOK_DEC,
+    '=','=', TOK_EQ,
+    '<','<', TOK_SHL,
+    '>','>', TOK_SAR,
+    '+','=', TOK_A_ADD,
+    '-','=', TOK_A_SUB,
+    '*','=', TOK_A_MUL,
+    '/','=', TOK_A_DIV,
+    '%','=', TOK_A_MOD,
+    '&','=', TOK_A_AND,
+    '^','=', TOK_A_XOR,
+    '|','=', TOK_A_OR,
+    '-','>', TOK_ARROW,
+    '.','.', 0xa8, // C++ token ?
+    '#','#', TOK_TWOSHARPS,
+    0
+};
 
 struct macro_level {
     struct macro_level *prev;
     const int *p;
 };
 
-ST_FUNC void next_nomacro(void);
 static void next_nomacro_spc(void);
 static void macro_subst(
     TokenString *tok_str,
@@ -198,7 +222,7 @@ static TokenSym *tok_alloc_new(TokenSym **pts, const char *str, int len)
     int i;
 
     if (tok_ident >= SYM_FIRST_ANOM) 
-        tcc_error("memory full");
+        tcc_error("memory full (symbols)");
 
     /* expand token table if needed */
     i = tok_ident - TOK_IDENT;
@@ -265,6 +289,10 @@ ST_FUNC char *get_tok_str(int v, CValue *cv)
     cstr_buf.size_allocated = sizeof(buf);
     p = buf;
 
+/* just an explanation, should never happen:
+    if (v <= TOK_LINENUM && v >= TOK_CINT && cv == NULL)
+        tcc_error("internal error: get_tok_str"); */
+
     switch(v) {
     case TOK_CINT:
     case TOK_CUINT:
@@ -277,7 +305,7 @@ ST_FUNC char *get_tok_str(int v, CValue *cv)
 #ifdef _WIN32
         sprintf(p, "%u", (unsigned)cv->ull);
 #else
-        sprintf(p, "%Lu", cv->ull);
+        sprintf(p, "%llu", cv->ull);
 #endif
         break;
     case TOK_LCHAR:
@@ -312,6 +340,15 @@ ST_FUNC char *get_tok_str(int v, CValue *cv)
         cstr_ccat(&cstr_buf, '\"');
         cstr_ccat(&cstr_buf, '\0');
         break;
+
+    case TOK_CFLOAT:
+    case TOK_CDOUBLE:
+    case TOK_CLDOUBLE:
+    case TOK_LINENUM:
+        return NULL; /* should not happen */
+
+    /* above tokens have value, the ones below don't */
+
     case TOK_LT:
         v = '<';
         goto addv;
@@ -1176,9 +1213,9 @@ static void tok_print(int *str)
 ST_FUNC void parse_define(void)
 {
     Sym *s, *first, **ps;
-    int v, t, varg, is_vaargs, spc;
+    int v, t, varg, is_vaargs, spc, ptok, macro_list_start;
     TokenString str;
-    
+
     v = tok;
     if (v < TOK_IDENT)
         tcc_error("invalid macro name '%s'", get_tok_str(tok, &tokc));
@@ -1202,23 +1239,27 @@ ST_FUNC void parse_define(void)
                 next_nomacro();
             }
             if (varg < TOK_IDENT)
-                tcc_error("badly punctuated parameter list");
+                tcc_error( "\'%s\' may not appear in parameter list", get_tok_str(varg, NULL));
             s = sym_push2(&define_stack, varg | SYM_FIELD, is_vaargs, 0);
             *ps = s;
             ps = &s->next;
             if (tok != ',')
-                break;
+                continue;
             next_nomacro();
         }
-        if (tok == ')')
-            next_nomacro_spc();
+        next_nomacro_spc();
         t = MACRO_FUNC;
     }
     tok_str_new(&str);
     spc = 2;
     /* EOF testing necessary for '-D' handling */
+    ptok = 0;
+    macro_list_start = 1;
     while (tok != TOK_LINEFEED && tok != TOK_EOF) {
-        /* remove spaces around ## and after '#' */        
+        if (!macro_list_start && spc == 2 && tok == TOK_TWOSHARPS)
+            tcc_error("'##' invalid at start of macro");
+        ptok = tok;
+        /* remove spaces around ## and after '#' */
         if (TOK_TWOSHARPS == tok) {
             if (1 == spc)
                 --str.len;
@@ -1231,7 +1272,10 @@ ST_FUNC void parse_define(void)
         tok_str_add2(&str, tok, &tokc);
     skip:
         next_nomacro_spc();
+        macro_list_start = 0;
     }
+    if (ptok == TOK_TWOSHARPS)
+        tcc_error("'##' invalid at end of macro");
     if (spc == 1)
         --str.len; /* remove trailing space */
     tok_str_add(&str, 0);
@@ -1248,7 +1292,7 @@ static inline int hash_cached_include(const char *filename)
     unsigned int h;
 
     h = TOK_HASH_INIT;
-    s = filename;
+    s = (unsigned char *) filename;
     while (*s) {
         h = TOK_HASH_FUNC(h, *s);
         s++;
@@ -1529,7 +1573,7 @@ include_done:
         c = (define_find(tok) != 0) ^ c;
     do_if:
         if (s1->ifdef_stack_ptr >= s1->ifdef_stack + IFDEF_STACK_SIZE)
-            tcc_error("memory full");
+            tcc_error("memory full (ifdef)");
         *s1->ifdef_stack_ptr++ = c;
         goto test_skip;
     case TOK_ELSE:
@@ -2223,7 +2267,7 @@ maybe_newline:
                     goto token_found;
                 pts = &(ts->hash_next);
             }
-            ts = tok_alloc_new(pts, p1, len);
+            ts = tok_alloc_new(pts, (char *) p1, len);
         token_found: ;
         } else {
             /* slower case */
@@ -2520,7 +2564,8 @@ ST_FUNC void next_nomacro(void)
     } while (is_space(tok));
 }
  
-/* substitute args in macro_str and return allocated string */
+/* substitute arguments in replacement lists in macro_str by the values in
+   args (field d) and return allocated string */
 static int *macro_arg_subst(Sym **nested_list, const int *macro_str, Sym *args)
 {
     int last_tok, t, spc;
@@ -2577,7 +2622,7 @@ static int *macro_arg_subst(Sym **nested_list, const int *macro_str, Sym *args)
                     if (gnu_ext && s->type.t &&
                         last_tok == TOK_TWOSHARPS && 
                         str.len >= 2 && str.str[str.len - 2] == ',') {
-                        if (*st == 0) {
+                        if (*st == TOK_PLCHLDR) {
                             /* suppress ',' '##' */
                             str.len -= 2;
                         } else {
@@ -2748,6 +2793,8 @@ static int macro_subst_tok(TokenString *tok_str,
                         tok_str_add2(&str, tok, &tokc);
                     next_nomacro_spc();
                 }
+                if (!str.len)
+                    tok_str_add(&str, TOK_PLCHLDR);
                 str.len -= spc;
                 tok_str_add(&str, 0);
                 sa1 = sym_push2(&args, sa->v & ~SYM_FIELD, sa->type.t, 0);
@@ -2840,9 +2887,11 @@ static inline int *macro_twosharps(const int *macro_str)
                 TOK_GET(&t, &ptr, &cval);
                 /* We concatenate the two tokens */
                 cstr_new(&cstr);
-                cstr_cat(&cstr, get_tok_str(tok, &tokc));
+                if (tok != TOK_PLCHLDR)
+                    cstr_cat(&cstr, get_tok_str(tok, &tokc));
                 n = cstr.size;
-                cstr_cat(&cstr, get_tok_str(t, &cval));
+                if (t != TOK_PLCHLDR || tok == TOK_PLCHLDR)
+                    cstr_cat(&cstr, get_tok_str(t, &cval));
                 cstr_ccat(&cstr, '\0');
 
                 tcc_open_bf(tcc_state, ":paste:", cstr.size);
@@ -2859,8 +2908,11 @@ static inline int *macro_twosharps(const int *macro_str)
                 cstr_free(&cstr);
             }
         }
-        if (tok != TOK_NOSUBST) 
+        if (tok != TOK_NOSUBST) {
+            tok_str_add2(&macro_str1, tok, &tokc);
+            tok = ' ';
             start_of_nosubsts = -1;
+        }
         tok_str_add2(&macro_str1, tok, &tokc);
     }
     tok_str_add(&macro_str1, 0);

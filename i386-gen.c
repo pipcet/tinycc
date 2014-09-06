@@ -43,6 +43,7 @@ enum {
     TREG_ECX,
     TREG_EDX,
     TREG_ST0,
+    TREG_ESP = 4
 };
 
 /* return registers for function */
@@ -55,7 +56,7 @@ enum {
 
 /* defined if structures are passed as pointers. Otherwise structures
    are directly pushed on stack. */
-//#define FUNC_STRUCT_PARAM_AS_PTR
+/* #define FUNC_STRUCT_PARAM_AS_PTR */
 
 /* pointer size, in bytes */
 #define PTR_SIZE 4
@@ -243,7 +244,7 @@ ST_FUNC void load(int r, SValue *sv)
         } else if ((ft & VT_BTYPE) == VT_LDOUBLE) {
             o(0xdb); /* fldt */
             r = 5;
-        } else if ((ft & VT_TYPE) == VT_BYTE) {
+        } else if ((ft & VT_TYPE) == VT_BYTE || (ft & VT_TYPE) == VT_BOOL) {
             o(0xbe0f);   /* movsbl */
         } else if ((ft & VT_TYPE) == (VT_BYTE | VT_UNSIGNED)) {
             o(0xb60f);   /* movzbl */
@@ -337,6 +338,15 @@ static void gadd_sp(int val)
     }
 }
 
+static void gen_static_call(int v)
+{
+    Sym *sym;
+
+    sym = external_global_sym(v, &func_old_type, 0);
+    oad(0xe8, -4);
+    greloc(cur_text_section, sym, ind-4, R_386_PC32);
+}
+
 /* 'is_jmp' is '1' if it is a jump */
 static void gcall_or_jmp(int is_jmp)
 {
@@ -363,6 +373,32 @@ static void gcall_or_jmp(int is_jmp)
 
 static uint8_t fastcall_regs[3] = { TREG_EAX, TREG_EDX, TREG_ECX };
 static uint8_t fastcallw_regs[2] = { TREG_ECX, TREG_EDX };
+
+/* Return the number of registers needed to return the struct, or 0 if
+   returning via struct pointer. */
+ST_FUNC int gfunc_sret(CType *vt, int variadic, CType *ret, int *ret_align)
+{
+#ifdef TCC_TARGET_PE
+    int size, align;
+
+    *ret_align = 1; // Never have to re-align return values for x86
+    size = type_size(vt, &align);
+    if (size > 8) {
+        return 0;
+    } else if (size > 4) {
+        ret->ref = NULL;
+        ret->t = VT_LLONG;
+        return 1;
+    } else {
+        ret->ref = NULL;
+        ret->t = VT_INT;
+        return 1;
+    }
+#else
+    *ret_align = 1; // Never have to re-align return values for x86
+    return 0;
+#endif
+}
 
 /* Generate function call. The function address is pushed first, then
    all the parameters in call order. This functions pops all the
@@ -421,7 +457,7 @@ ST_FUNC void gfunc_call(int nb_args)
     }
     save_regs(0); /* save used temporary registers */
     func_sym = vtop->type.ref;
-    func_call = FUNC_CALL(func_sym->r);
+    func_call = func_sym->a.func_call;
     /* fast call case */
     if ((func_call >= FUNC_FASTCALL1 && func_call <= FUNC_FASTCALL3) ||
         func_call == FUNC_FASTCALLW) {
@@ -442,12 +478,12 @@ ST_FUNC void gfunc_call(int nb_args)
             args_size -= 4;
         }
     }
-    gcall_or_jmp(0);
-
-#ifdef TCC_TARGET_PE
-    if ((func_sym->type.t & VT_BTYPE) == VT_STRUCT)
+#ifndef TCC_TARGET_PE
+    else if ((vtop->type.ref->type.t & VT_BTYPE) == VT_STRUCT)
         args_size -= 4;
 #endif
+    gcall_or_jmp(0);
+
     if (args_size && func_call != FUNC_STDCALL)
         gadd_sp(args_size);
     vtop--;
@@ -469,7 +505,7 @@ ST_FUNC void gfunc_prolog(CType *func_type)
     CType *type;
 
     sym = func_type->ref;
-    func_call = FUNC_CALL(sym->r);
+    func_call = sym->a.func_call;
     addr = 8;
     loc = 0;
     func_vc = 0;
@@ -491,7 +527,13 @@ ST_FUNC void gfunc_prolog(CType *func_type)
     /* if the function returns a structure, then add an
        implicit pointer parameter */
     func_vt = sym->type;
+    func_var = (sym->c == FUNC_ELLIPSIS);
+#ifdef TCC_TARGET_PE
+    size = type_size(&func_vt,&align);
+    if (((func_vt.t & VT_BTYPE) == VT_STRUCT) && (size > 8)) {
+#else
     if ((func_vt.t & VT_BTYPE) == VT_STRUCT) {
+#endif
         /* XXX: fastcall case ? */
         func_vc = addr;
         addr += 4;
@@ -526,7 +568,7 @@ ST_FUNC void gfunc_prolog(CType *func_type)
     /* pascal type call ? */
     if (func_call == FUNC_STDCALL)
         func_ret_sub = addr - 8;
-#ifdef TCC_TARGET_PE
+#ifndef TCC_TARGET_PE
     else if (func_vc)
         func_ret_sub = 4;
 #endif
@@ -551,7 +593,7 @@ ST_FUNC void gfunc_epilog(void)
      && func_bound_offset != lbounds_section->data_offset) {
         int saved_ind;
         int *bounds_ptr;
-        Sym *sym, *sym_data;
+        Sym *sym_data;
         /* add end of table info */
         bounds_ptr = section_ptr_add(lbounds_section, sizeof(int));
         *bounds_ptr = 0;
@@ -563,20 +605,16 @@ ST_FUNC void gfunc_epilog(void)
         greloc(cur_text_section, sym_data,
                ind + 1, R_386_32);
         oad(0xb8, 0); /* mov %eax, xxx */
-        sym = external_global_sym(TOK___bound_local_new, &func_old_type, 0);
-        greloc(cur_text_section, sym, 
-               ind + 1, R_386_PC32);
-        oad(0xe8, -4);
+        gen_static_call(TOK___bound_local_new);
+
         ind = saved_ind;
         /* generate bound check local freeing */
         o(0x5250); /* save returned value, if any */
         greloc(cur_text_section, sym_data,
                ind + 1, R_386_32);
         oad(0xb8, 0); /* mov %eax, xxx */
-        sym = external_global_sym(TOK___bound_local_delete, &func_old_type, 0);
-        greloc(cur_text_section, sym, 
-               ind + 1, R_386_PC32);
-        oad(0xe8, -4);
+        gen_static_call(TOK___bound_local_delete);
+
         o(0x585a); /* restore returned value, if any */
     }
 #endif
@@ -595,10 +633,8 @@ ST_FUNC void gfunc_epilog(void)
     ind = func_sub_sp_offset - FUNC_PROLOG_SIZE;
 #ifdef TCC_TARGET_PE
     if (v >= 4096) {
-        Sym *sym = external_global_sym(TOK___chkstk, &func_old_type, 0);
         oad(0xb8, v); /* mov stacksize, %eax */
-        oad(0xe8, -4); /* call __chkstk, (does the stackframe too) */
-        greloc(cur_text_section, sym, ind-4, R_386_PC32);
+        gen_static_call(TOK___chkstk); /* call __chkstk, (does the stackframe too) */
     } else
 #endif
     {
@@ -641,7 +677,7 @@ ST_FUNC int gtst(int inv, int t)
         /* fast case : can jump directly since flags are set */
         g(0x0f);
         t = psym((vtop->c.i - 16) ^ inv, t);
-    } else if (v == VT_JMP || v == VT_JMPI) {
+    } else { /* VT_JMP || VT_JMPI */
         /* && or || optimization */
         if ((v & 1) == inv) {
             /* insert vtop->c jump list in t */
@@ -653,23 +689,6 @@ ST_FUNC int gtst(int inv, int t)
         } else {
             t = gjmp(t);
             gsym(vtop->c.i);
-        }
-    } else {
-        if (is_float(vtop->type.t) || 
-            (vtop->type.t & VT_BTYPE) == VT_LLONG) {
-            vpushi(0);
-            gen_op(TOK_NE);
-        }
-        if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST) {
-            /* constant jmp optimization */
-            if ((vtop->c.i != 0) != inv) 
-                t = gjmp(t);
-        } else {
-            v = gv(RC_INT);
-            o(0x85);
-            o(0xc0 + v * 9);
-            g(0x0f);
-            t = psym(0x85 ^ inv, t);
         }
     }
     vtop--;
@@ -854,7 +873,10 @@ ST_FUNC void gen_opf(int op)
             swapped = 0;
         if (swapped)
             o(0xc9d9); /* fxch %st(1) */
-        o(0xe9da); /* fucompp */
+        if (op == TOK_EQ || op == TOK_NE)
+            o(0xe9da); /* fucompp */
+        else
+            o(0xd9de); /* fcompp */
         o(0xe0df); /* fnstsw %ax */
         if (op == TOK_EQ) {
             o(0x45e480); /* and $0x45, %ah */
@@ -958,55 +980,20 @@ ST_FUNC void gen_cvt_itof(int t)
 }
 
 /* convert fp to int 't' type */
-/* XXX: handle long long case */
 ST_FUNC void gen_cvt_ftoi(int t)
 {
-    int r, r2, size;
-    Sym *sym;
-    CType ushort_type;
-
-    ushort_type.t = VT_SHORT | VT_UNSIGNED;
-    ushort_type.ref = 0;
-
-    gv(RC_FLOAT);
-    if (t != VT_INT)
-        size = 8;
-    else 
-        size = 4;
-    
-    o(0x2dd9); /* ldcw xxx */
-    sym = external_global_sym(TOK___tcc_int_fpu_control, 
-                              &ushort_type, VT_LVAL);
-    greloc(cur_text_section, sym, 
-           ind, R_386_32);
-    gen_le32(0);
-    
-    oad(0xec81, size); /* sub $xxx, %esp */
-    if (size == 4)
-        o(0x1cdb); /* fistpl */
+    int bt = vtop->type.t & VT_BTYPE;
+    if (bt == VT_FLOAT)
+        vpush_global_sym(&func_old_type, TOK___fixsfdi);
+    else if (bt == VT_LDOUBLE)
+        vpush_global_sym(&func_old_type, TOK___fixxfdi);
     else
-        o(0x3cdf); /* fistpll */
-    o(0x24);
-    o(0x2dd9); /* ldcw xxx */
-    sym = external_global_sym(TOK___tcc_fpu_control, 
-                              &ushort_type, VT_LVAL);
-    greloc(cur_text_section, sym, 
-           ind, R_386_32);
-    gen_le32(0);
-
-    r = get_reg(RC_INT);
-    o(0x58 + r); /* pop r */
-    if (size == 8) {
-        if (t == VT_LLONG) {
-            vtop->r = r; /* mark reg as used */
-            r2 = get_reg(RC_INT);
-            o(0x58 + r2); /* pop r2 */
-            vtop->r2 = r2;
-        } else {
-            o(0x04c483); /* add $4, %esp */
-        }
-    }
-    vtop->r = r;
+        vpush_global_sym(&func_old_type, TOK___fixdfdi);
+    vswap();
+    gfunc_call(1);
+    vpushi(0);
+    vtop->r = REG_IRET;
+    vtop->r2 = REG_LRET;
 }
 
 /* convert from one floating point type to another */
@@ -1029,18 +1016,13 @@ ST_FUNC void ggoto(void)
 /* generate a bounded pointer addition */
 ST_FUNC void gen_bounded_ptr_add(void)
 {
-    Sym *sym;
-
     /* prepare fast i386 function call (args in eax and edx) */
     gv2(RC_EAX, RC_EDX);
     /* save all temporary registers */
     vtop -= 2;
     save_regs(0);
     /* do a fast function call */
-    sym = external_global_sym(TOK___bound_ptr_add, &func_old_type, 0);
-    greloc(cur_text_section, sym, 
-           ind + 1, R_386_PC32);
-    oad(0xe8, -4);
+    gen_static_call(TOK___bound_ptr_add);
     /* returned pointer is in eax */
     vtop++;
     vtop->r = TREG_EAX | VT_BOUNDED;
@@ -1089,6 +1071,44 @@ ST_FUNC void gen_bounded_ptr_deref(void)
     rel->r_info = ELF32_R_INFO(sym->c, ELF32_R_TYPE(rel->r_info));
 }
 #endif
+
+/* Save the stack pointer onto the stack */
+ST_FUNC void gen_vla_sp_save(int addr) {
+    /* mov %esp,addr(%ebp)*/
+    o(0x89);
+    gen_modrm(TREG_ESP, VT_LOCAL, NULL, addr);
+}
+
+/* Restore the SP from a location on the stack */
+ST_FUNC void gen_vla_sp_restore(int addr) {
+    o(0x8b);
+    gen_modrm(TREG_ESP, VT_LOCAL, NULL, addr);
+}
+
+/* Subtract from the stack pointer, and push the resulting value onto the stack */
+ST_FUNC void gen_vla_alloc(CType *type, int align) {
+#ifdef TCC_TARGET_PE
+    /* alloca does more than just adjust %rsp on Windows */
+    vpush_global_sym(&func_old_type, TOK_alloca);
+    vswap(); /* Move alloca ref past allocation size */
+    gfunc_call(1);
+    vset(type, REG_IRET, 0);
+#else
+    int r;
+    r = gv(RC_INT); /* allocation size */
+    /* sub r,%rsp */
+    o(0x2b);
+    o(0xe0 | r);
+    /* We align to 16 bytes rather than align */
+    /* and ~15, %esp */
+    o(0xf0e483);
+    /* mov %esp, r */
+    o(0x89);
+    o(0xe0 | r);
+    vpop();
+    vset(type, r, 0);
+#endif
+}
 
 /* end of X86 code generator */
 /*************************************************************/

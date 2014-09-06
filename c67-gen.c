@@ -20,7 +20,7 @@
 
 #ifdef TARGET_DEFS_ONLY
 
-//#define ASSEMBLY_LISTING_C67
+/* #define ASSEMBLY_LISTING_C67 */
 
 /* number of available registers */
 #define NB_REGS            24
@@ -93,11 +93,11 @@ enum {
 #define REG_FRET TREG_C67_A4	/* float return register */
 
 /* defined if function parameters must be evaluated in reverse order */
-//#define INVERT_FUNC_PARAMS
+/* #define INVERT_FUNC_PARAMS */
 
 /* defined if structures are passed as pointers. Otherwise structures
    are directly pushed on stack. */
-//#define FUNC_STRUCT_PARAM_AS_PTR
+/* #define FUNC_STRUCT_PARAM_AS_PTR */
 
 /* pointer size, in bytes */
 #define PTR_SIZE 4
@@ -245,15 +245,15 @@ void gsym(int t)
 }
 
 // these are regs that tcc doesn't really know about, 
-// but asign them unique values so the mapping routines
-// can distinquish them
+// but assign them unique values so the mapping routines
+// can distinguish them
 
 #define C67_A0 105
 #define C67_SP 106
 #define C67_B3 107
 #define C67_FP 108
 #define C67_B2 109
-#define C67_CREG_ZERO -1	// Special code for no condition reg test
+#define C67_CREG_ZERO -1	/* Special code for no condition reg test */
 
 
 int ConvertRegToRegClass(int r)
@@ -1879,6 +1879,13 @@ static void gcall_or_jmp(int is_jmp)
     }
 }
 
+/* Return the number of registers needed to return the struct, or 0 if
+   returning via struct pointer. */
+ST_FUNC int gfunc_sret(CType *vt, int variadic, CType *ret, int *ret_align) {
+    *ret_align = 1; // Never have to re-align return values for x86-64
+    return 0;
+}
+
 /* generate function call with address in (vtop->t, vtop->c) and free function
    context. Stack entry is popped */
 void gfunc_call(int nb_args)
@@ -1893,8 +1900,6 @@ void gfunc_call(int nb_args)
 
     for (i = 0; i < nb_args; i++) {
 	if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
-	    ALWAYS_ASSERT(FALSE);
-	} else if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
 	    ALWAYS_ASSERT(FALSE);
 	} else {
 	    /* simple type (currently always same size) */
@@ -1964,6 +1969,7 @@ void gfunc_prolog(CType * func_type)
     /* if the function returns a structure, then add an
        implicit pointer parameter */
     func_vt = sym->type;
+    func_var = (sym->c == FUNC_ELLIPSIS);
     if ((func_vt.t & VT_BTYPE) == VT_STRUCT) {
 	func_vc = addr;
 	addr += 4;
@@ -2096,7 +2102,7 @@ int gtst(int inv, int t)
 	C67_NOP(5);
 	t = ind1;		//return where we need to patch
 
-    } else if (v == VT_JMP || v == VT_JMPI) {
+    } else { /* VT_JMP || VT_JMPI */
 	/* && or || optimization */
 	if ((v & 1) == inv) {
 	    /* insert vtop->c jump list in t */
@@ -2121,37 +2127,6 @@ int gtst(int inv, int t)
 	} else {
 	    t = gjmp(t);
 	    gsym(vtop->c.i);
-	}
-    } else {
-	if (is_float(vtop->type.t)) {
-	    vpushi(0);
-	    gen_op(TOK_NE);
-	}
-	if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST) {
-	    /* constant jmp optimization */
-	    if ((vtop->c.i != 0) != inv)
-		t = gjmp(t);
-	} else {
-	    // I think we need to get the value on the stack
-	    // into a register, test it, and generate a branch
-	    // return the address of the branch, so it can be
-	    // later patched
-
-	    v = gv(RC_INT);	// get value into a reg 
-	    ind1 = ind;
-	    C67_MVKL(C67_A0, t);	//r=reg to load, constant
-	    C67_MVKH(C67_A0, t);	//r=reg to load, constant
-
-	    if (v != TREG_EAX &&	// check if not already in a conditional test reg
-		v != TREG_EDX && v != TREG_ST0 && v != C67_B2) {
-		C67_MV(v, C67_B2);
-		v = C67_B2;
-	    }
-
-	    C67_IREG_B_REG(inv, v, C67_A0);	// [!R] B.S2x  A0
-	    C67_NOP(5);
-	    t = ind1;		//return where we need to patch
-	    ind1 = ind;
 	}
     }
     vtop--;
@@ -2552,6 +2527,21 @@ void ggoto(void)
 {
     gcall_or_jmp(1);
     vtop--;
+}
+
+/* Save the stack pointer onto the stack and return the location of its address */
+ST_FUNC void gen_vla_sp_save(int addr) {
+    tcc_error("variable length arrays unsupported for this target");
+}
+
+/* Restore the SP from a location on the stack */
+ST_FUNC void gen_vla_sp_restore(int addr) {
+    tcc_error("variable length arrays unsupported for this target");
+}
+
+/* Subtract from the stack pointer, and push the resulting value onto the stack */
+ST_FUNC void gen_vla_alloc(CType *type, int align) {
+    tcc_error("variable length arrays unsupported for this target");
 }
 
 /* end of C67 code generator */
