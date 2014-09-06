@@ -1,0 +1,40 @@
+From b1bd47372fa3023e79f0296afd122c0720c7e516 Mon Sep 17 00:00:00 2001
+From: Matteo Cypriani <mcy@lm7.fr>
+Date: Fri, 5 Sep 2014 23:22:56 -0400
+Subject: Disable floating-point test for ARM soft-float
+
+tcc is not yet capable of doing softfloat floating-point operations on
+ARM, therefore we disable this test for these platforms. Note that tcc
+displays a warning to warn ARM users about this limitation.
+
+Origin: vendor
+Forwarded: no
+Last-Update: 2014-09-05
+---
+ tests/tests2/Makefile | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/tests/tests2/Makefile b/tests/tests2/Makefile
+index bfd37e5..f056341 100644
+--- a/tests/tests2/Makefile
++++ b/tests/tests2/Makefile
+@@ -37,8 +37,17 @@ TESTS =	\
+  18_include.test \
+  19_pointer_arithmetic.test \
+  20_pointer_comparison.test \
+- 21_char_array.test \
+- 22_floating_point.test \
++ 21_char_array.test
++
++ifeq ($(findstring -DTCC_ARM_EABI,$(NATIVE_DEFINES)),)
++	TESTS += 22_floating_point.test
++else
++	ifneq ($(findstring -DTCC_ARM_HARDFLOAT,$(NATIVE_DEFINES)),)
++		TESTS += 22_floating_point.test
++	endif
++endif
++
++TESTS += \
+  23_type_coercion.test \
+  24_math_library.test \
+  25_quicksort.test \

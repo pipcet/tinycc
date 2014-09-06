@@ -37,8 +37,17 @@ TESTS =	\
  18_include.test \
  19_pointer_arithmetic.test \
  20_pointer_comparison.test \
- 21_char_array.test \
- 22_floating_point.test \
+ 21_char_array.test
+
+ifeq ($(findstring -DTCC_ARM_EABI,$(NATIVE_DEFINES)),)
+	TESTS += 22_floating_point.test
+else
+	ifneq ($(findstring -DTCC_ARM_HARDFLOAT,$(NATIVE_DEFINES)),)
+		TESTS += 22_floating_point.test
+	endif
+endif
+
+TESTS += \
  23_type_coercion.test \
  24_math_library.test \
  25_quicksort.test \
