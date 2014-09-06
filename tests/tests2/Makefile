@@ -41,8 +41,13 @@ TESTS =	\
  18_include.test \
  19_pointer_arithmetic.test \
  20_pointer_comparison.test \
- 21_char_array.test \
- 22_floating_point.test \
+ 21_char_array.test
+
+ifneq ($(CONFIG_arm_eabi),yes) # not ARM soft-float
+	TESTS += 22_floating_point.test
+endif
+
+TESTS += \
  23_type_coercion.test \
  24_math_library.test \
  25_quicksort.test \
