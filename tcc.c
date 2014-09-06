@@ -78,7 +78,7 @@ static void help(void)
 #include <process.h>
 static int execvp_win32(const char *prog, char **argv)
 {
-    int ret = spawnvp(P_NOWAIT, prog, (char const*const*)argv);
+    int ret = spawnvp(P_NOWAIT, prog, (const char *const*)argv);
     if (-1 == ret)
         return ret;
     cwait(&ret, ret, WAIT_CHILD);
@@ -223,7 +223,7 @@ static void display_info(TCCState *s, int what)
         print_paths("crt", s->crt_paths, s->nb_crt_paths);
         print_paths("libraries", s->library_paths, s->nb_library_paths);
         print_paths("include", s->sysinclude_paths, s->nb_sysinclude_paths);
-        printf("elfinterp:\n  %s\n",  CONFIG_TCC_ELFINTERP);
+        printf("elfinterp:\n  %s\n",  DEFAULT_ELFINTERP(s));
         break;
     }
 }
@@ -252,6 +252,7 @@ int main(int argc, char **argv)
     s->output_type = TCC_OUTPUT_EXE;
 
     optind = tcc_parse_args(s, argc - 1, argv + 1);
+    tcc_set_environment(s);
 
     if (optind == 0) {
         help();
