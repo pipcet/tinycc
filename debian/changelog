@@ -5,6 +5,7 @@ tcc (0.9.27~git20140801.14745bd-1) UNRELEASED; urgency=low
   * Bump Standards-Version to 3.9.5.
   * Improve watch file (thanks Bart Martens).
   * Switch from texi2html to makeinfo.
+  * Override LDFLAGS for the tests.
 
  -- Matteo Cypriani <mcy@lm7.fr>  Fri, 05 Sep 2014 22:29:44 -0400
 
