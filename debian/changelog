@@ -1,8 +1,11 @@
-tcc (0.9.27~git20140907.87d879a-1) UNRELEASED; urgency=medium
+tcc (0.9.27~git20140907.87d879a-1) unstable; urgency=medium
 
   * Stop overriding LDFLAGS for the tests, since it is now done upstream.
+  * debian/patches:
+    + Disable BTESTS completely.
+    + Disable floating-point test for ARM soft-float: disable one more test.
 
- -- Matteo Cypriani <mcy@lm7.fr>  Sun, 07 Sep 2014 12:22:45 -0400
+ -- Matteo Cypriani <mcy@lm7.fr>  Sun, 07 Sep 2014 12:51:32 -0400
 
 tcc (0.9.27~git20140801.14745bd-1) unstable; urgency=medium
 
