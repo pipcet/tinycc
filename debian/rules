@@ -10,9 +10,6 @@ else ifeq (armhf,$(DEB_HOST_ARCH))
 endif
 endif
 
-override_dh_auto_test:
-	dh_auto_test -- LDFLAGS=
-
 override_dh_auto_clean:
 	[ ! -f config.mak ] || dh_auto_clean
 
