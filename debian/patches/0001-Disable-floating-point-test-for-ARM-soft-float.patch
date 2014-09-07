@@ -1,4 +1,4 @@
-From b1bd47372fa3023e79f0296afd122c0720c7e516 Mon Sep 17 00:00:00 2001
+From 2b9351a0c159c401a3bb71069a86f96e8b1e501e Mon Sep 17 00:00:00 2001
 From: Matteo Cypriani <mcy@lm7.fr>
 Date: Fri, 5 Sep 2014 23:22:56 -0400
 Subject: Disable floating-point test for ARM soft-float
@@ -15,10 +15,10 @@ Last-Update: 2014-09-05
  1 file changed, 11 insertions(+), 2 deletions(-)
 
 diff --git a/tests/tests2/Makefile b/tests/tests2/Makefile
-index bfd37e5..f056341 100644
+index 66d2f5a..1068105 100644
 --- a/tests/tests2/Makefile
 +++ b/tests/tests2/Makefile
-@@ -37,8 +37,17 @@ TESTS =	\
+@@ -41,8 +41,17 @@ TESTS =	\
   18_include.test \
   19_pointer_arithmetic.test \
   20_pointer_comparison.test \
