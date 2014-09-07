@@ -1,4 +1,4 @@
-From 2b9351a0c159c401a3bb71069a86f96e8b1e501e Mon Sep 17 00:00:00 2001
+From 3d5b6108c55860066aa1c4362f4372cf97b630ba Mon Sep 17 00:00:00 2001
 From: Matteo Cypriani <mcy@lm7.fr>
 Date: Fri, 5 Sep 2014 23:22:56 -0400
 Subject: Disable floating-point test for ARM soft-float
@@ -9,11 +9,32 @@ displays a warning to warn ARM users about this limitation.
 
 Origin: vendor
 Forwarded: no
-Last-Update: 2014-09-05
+Last-Update: 2014-09-07
 ---
+ tests/tcctest.c       |  2 ++
  tests/tests2/Makefile | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ 2 files changed, 13 insertions(+), 2 deletions(-)
 
+diff --git a/tests/tcctest.c b/tests/tcctest.c
+index cc8ffd8..78bb785 100644
+--- a/tests/tcctest.c
++++ b/tests/tcctest.c
+@@ -1760,6 +1760,7 @@ double ftab1[3] = { 1.2, 3.4, -5.6 };
+ 
+ void float_test(void)
+ {
++#if !defined(__arm__) || defined(__ARM_PCS_VFP)
+     float fa, fb;
+     double da, db;
+     int a;
+@@ -1785,6 +1786,7 @@ void float_test(void)
+     b = 4000000000;
+     db = b;
+     printf("db = %f\n", db);
++#endif
+ }
+ 
+ int fib(int n)
 diff --git a/tests/tests2/Makefile b/tests/tests2/Makefile
 index 66d2f5a..1068105 100644
 --- a/tests/tests2/Makefile
