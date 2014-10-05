@@ -1,3 +1,9 @@
+tcc (0.9.27~git20140923.9d7fb33-1) UNRELEASED; urgency=medium
+
+  * New upstream snapshot.
+
+ -- Matteo Cypriani <mcy@lm7.fr>  Sun, 05 Oct 2014 12:33:10 -0400
+
 tcc (0.9.27~git20140907.87d879a-1) unstable; urgency=medium
 
   * Stop overriding LDFLAGS for the tests, since it is now done upstream.
