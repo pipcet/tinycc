@@ -1,6 +1,7 @@
 tcc (0.9.27~git20140923.9d7fb33-1) UNRELEASED; urgency=medium
 
   * New upstream snapshot.
+  * Deactivate kfreebsd builds.
 
  -- Matteo Cypriani <mcy@lm7.fr>  Sun, 05 Oct 2014 12:33:10 -0400
 
