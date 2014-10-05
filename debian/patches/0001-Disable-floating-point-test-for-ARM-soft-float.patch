@@ -1,4 +1,4 @@
-From 3d5b6108c55860066aa1c4362f4372cf97b630ba Mon Sep 17 00:00:00 2001
+From 5b58c3786a9ae3b38c2139b394fc9e9b8c49a853 Mon Sep 17 00:00:00 2001
 From: Matteo Cypriani <mcy@lm7.fr>
 Date: Fri, 5 Sep 2014 23:22:56 -0400
 Subject: Disable floating-point test for ARM soft-float
