@@ -8,6 +8,7 @@ tcc (0.9.27~git20140923.9d7fb33-1) UNRELEASED; urgency=medium
 
 tcc (0.9.27~git20140907.87d879a-1) unstable; urgency=medium
 
+  * New upstream snapshot.
   * Stop overriding LDFLAGS for the tests, since it is now done upstream.
   * debian/patches:
     + Disable BTESTS completely.
