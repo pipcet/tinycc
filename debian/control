@@ -10,7 +10,7 @@ Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/tcc.git
 Vcs-Git: git://anonscm.debian.org/collab-maint/tcc.git
 
 Package: tcc
-Architecture: i386 amd64 armel armhf
+Architecture: hurd-i386 i386 amd64 armel armhf
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Recommends: libc6-dev | libc-dev
 Provides: c-compiler
@@ -29,7 +29,7 @@ Description: small ANSI C compiler
 
 Package: libtcc-dev
 Section: libdevel
-Architecture: i386 amd64 armel armhf
+Architecture: hurd-i386 i386 amd64 armel armhf
 Multi-Arch: same
 Depends: ${misc:Depends}
 Description: fast library for dynamic code generation
