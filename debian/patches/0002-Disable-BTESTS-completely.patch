@@ -1,4 +1,4 @@
-From 6c593a4abf9f029663f7c4fad779e8085332d6fc Mon Sep 17 00:00:00 2001
+From c6077e0547a9a0c3bfd005163beb4474dc32bb05 Mon Sep 17 00:00:00 2001
 From: Matteo Cypriani <mcy@lm7.fr>
 Date: Sun, 7 Sep 2014 12:32:27 -0400
 Subject: Disable BTESTS completely
@@ -13,7 +13,7 @@ Last-Update: 2014-09-07
  1 file changed, 1 deletion(-)
 
 diff --git a/tests/Makefile b/tests/Makefile
-index e6c5660..77c8481 100644
+index f2813ba..6b86c9c 100644
 --- a/tests/Makefile
 +++ b/tests/Makefile
 @@ -17,7 +17,6 @@ TESTS = \

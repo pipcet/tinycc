@@ -1,4 +1,4 @@
-From 5b58c3786a9ae3b38c2139b394fc9e9b8c49a853 Mon Sep 17 00:00:00 2001
+From 17f01d0d80c45bfc1dda7aa4e9ee7d7d257c9000 Mon Sep 17 00:00:00 2001
 From: Matteo Cypriani <mcy@lm7.fr>
 Date: Fri, 5 Sep 2014 23:22:56 -0400
 Subject: Disable floating-point test for ARM soft-float
@@ -9,12 +9,36 @@ displays a warning to warn ARM users about this limitation.
 
 Origin: vendor
 Forwarded: no
-Last-Update: 2014-09-07
+Last-Update: 2014-10-07
 ---
+ tests/Makefile        | 10 ++++++++--
  tests/tcctest.c       |  2 ++
- tests/tests2/Makefile | 13 +++++++++++--
- 2 files changed, 13 insertions(+), 2 deletions(-)
+ tests/tests2/Makefile |  9 +++++++--
+ 3 files changed, 17 insertions(+), 4 deletions(-)
 
+diff --git a/tests/Makefile b/tests/Makefile
+index e6c5660..f2813ba 100644
+--- a/tests/Makefile
++++ b/tests/Makefile
+@@ -214,10 +214,16 @@ abitest-cc$(EXESUF): abitest.c $(top_builddir)/$(LIBTCC)
+ abitest-tcc$(EXESUF): abitest.c libtcc.c
+ 	$(TCC) -o $@ $^ $(CPPFLAGS) $(CFLAGS) $(NATIVE_DEFINES) -DONE_SOURCE $(LIBS) $(LDFLAGS) -I$(top_srcdir)
+ 
+-abitest: abitest-cc$(EXESUF) abitest-tcc$(EXESUF)
++ABITESTS := abitest-cc$(EXESUF)
++ifneq ($(CONFIG_arm_eabi),yes) # not ARM soft-float
++	ABITESTS += abitest-tcc$(EXESUF)
++endif
++
++abitest: $(ABITESTS)
+ 	@echo ------------ $@ ------------
+ 	./abitest-cc$(EXESUF) lib_path=.. include="$(top_srcdir)/include"
+-	./abitest-tcc$(EXESUF) lib_path=.. include="$(top_srcdir)/include"
++	if [ $(CONFIG_arm_eabi) != "yes" ]; then \
++		./abitest-tcc$(EXESUF) lib_path=.. include="$(top_srcdir)/include"; fi
+ 
+ vla_test$(EXESUF): vla_test.c
+ 	$(TCC) -o $@ $^ $(CPPFLAGS) $(CFLAGS)
 diff --git a/tests/tcctest.c b/tests/tcctest.c
 index cc8ffd8..78bb785 100644
 --- a/tests/tcctest.c
@@ -36,10 +60,10 @@ index cc8ffd8..78bb785 100644
  
  int fib(int n)
 diff --git a/tests/tests2/Makefile b/tests/tests2/Makefile
-index 66d2f5a..1068105 100644
+index 66d2f5a..4da68d9 100644
 --- a/tests/tests2/Makefile
 +++ b/tests/tests2/Makefile
-@@ -41,8 +41,17 @@ TESTS =	\
+@@ -41,8 +41,13 @@ TESTS =	\
   18_include.test \
   19_pointer_arithmetic.test \
   20_pointer_comparison.test \
@@ -47,12 +71,8 @@ index 66d2f5a..1068105 100644
 - 22_floating_point.test \
 + 21_char_array.test
 +
-+ifeq ($(findstring -DTCC_ARM_EABI,$(NATIVE_DEFINES)),)
++ifneq ($(CONFIG_arm_eabi),yes) # not ARM soft-float
 +	TESTS += 22_floating_point.test
-+else
-+	ifneq ($(findstring -DTCC_ARM_HARDFLOAT,$(NATIVE_DEFINES)),)
-+		TESTS += 22_floating_point.test
-+	endif
 +endif
 +
 +TESTS += \
