@@ -5,6 +5,7 @@ tcc (0.9.27~git20140923.9d7fb33-1) UNRELEASED; urgency=medium
   * Deactivate one more test for armel.
   * debian/copyright: update packaging authors.
   * Bump Standards-Version to 3.9.6 (no changes needed).
+  * Fix cleaning (revert changes on examples' shebang).
 
  -- Matteo Cypriani <mcy@lm7.fr>  Sun, 05 Oct 2014 12:33:10 -0400
 

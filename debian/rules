@@ -16,6 +16,7 @@ override_dh_auto_clean:
 override_dh_installexamples:
 	sed -i 1s@/usr/local/bin/tcc@/usr/bin/tcc@ examples/*.c
 	dh_installexamples
+	sed -i 1s@/usr/bin/tcc@/usr/local/bin/tcc@ examples/*.c
 
 clean:
 	rm -f build
