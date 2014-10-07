@@ -43,12 +43,8 @@ TESTS =	\
  20_pointer_comparison.test \
  21_char_array.test
 
-ifeq ($(findstring -DTCC_ARM_EABI,$(NATIVE_DEFINES)),)
+ifneq ($(CONFIG_arm_eabi),yes) # not ARM soft-float
 	TESTS += 22_floating_point.test
-else
-	ifneq ($(findstring -DTCC_ARM_HARDFLOAT,$(NATIVE_DEFINES)),)
-		TESTS += 22_floating_point.test
-	endif
 endif
 
 TESTS += \
