@@ -1,4 +1,4 @@
-tcc (0.9.27~git20140923.9d7fb33-1) UNRELEASED; urgency=medium
+tcc (0.9.27~git20140923.9d7fb33-1) unstable; urgency=low
 
   * New upstream snapshot.
   * Deactivate kfreebsd builds.
@@ -7,7 +7,7 @@ tcc (0.9.27~git20140923.9d7fb33-1) UNRELEASED; urgency=medium
   * Bump Standards-Version to 3.9.6 (no changes needed).
   * Fix cleaning (revert changes on examples' shebang).
 
- -- Matteo Cypriani <mcy@lm7.fr>  Sun, 05 Oct 2014 12:33:10 -0400
+ -- Matteo Cypriani <mcy@lm7.fr>  Wed, 08 Oct 2014 10:16:49 -0400
 
 tcc (0.9.27~git20140907.87d879a-1) unstable; urgency=medium
 
