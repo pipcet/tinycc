@@ -1,3 +1,9 @@
+tcc (0.9.27~git20140923.9d7fb33-2) unstable; urgency=low
+
+  * Deactivate one more test for armel again.
+
+ -- Matteo Cypriani <mcy@lm7.fr>  Thu, 09 Oct 2014 09:44:01 -0400
+
 tcc (0.9.27~git20140923.9d7fb33-1) unstable; urgency=low
 
   * New upstream snapshot.
