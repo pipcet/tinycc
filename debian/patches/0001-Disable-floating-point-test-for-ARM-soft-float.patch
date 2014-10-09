@@ -1,4 +1,4 @@
-From 17f01d0d80c45bfc1dda7aa4e9ee7d7d257c9000 Mon Sep 17 00:00:00 2001
+From acc554209d8718603f1f4a7d4548eef09d97cb6f Mon Sep 17 00:00:00 2001
 From: Matteo Cypriani <mcy@lm7.fr>
 Date: Fri, 5 Sep 2014 23:22:56 -0400
 Subject: Disable floating-point test for ARM soft-float
@@ -8,19 +8,29 @@ ARM, therefore we disable this test for these platforms. Note that tcc
 displays a warning to warn ARM users about this limitation.
 
 Origin: vendor
-Forwarded: no
-Last-Update: 2014-10-07
+Forwarded: not-needed
+Last-Update: 2014-10-09
 ---
- tests/Makefile        | 10 ++++++++--
+ tests/Makefile        | 13 +++++++++++--
  tests/tcctest.c       |  2 ++
  tests/tests2/Makefile |  9 +++++++--
- 3 files changed, 17 insertions(+), 4 deletions(-)
+ 3 files changed, 20 insertions(+), 4 deletions(-)
 
 diff --git a/tests/Makefile b/tests/Makefile
-index e6c5660..f2813ba 100644
+index e6c5660..276ec7d 100644
 --- a/tests/Makefile
 +++ b/tests/Makefile
-@@ -214,10 +214,16 @@ abitest-cc$(EXESUF): abitest.c $(top_builddir)/$(LIBTCC)
+@@ -46,6 +46,9 @@ ifeq ($(ARCH),i386)
+ else ifneq ($(ARCH),x86-64)
+  TESTS := $(filter-out vla_test-run,$(TESTS))
+ endif
++ifeq ($(CONFIG_arm_eabi),yes)
++ TESTS := $(filter-out test3,$(TESTS))
++endif
+ 
+ ifdef DISABLE_STATIC
+  export LD_LIBRARY_PATH:=$(CURDIR)/..
+@@ -214,10 +217,16 @@ abitest-cc$(EXESUF): abitest.c $(top_builddir)/$(LIBTCC)
  abitest-tcc$(EXESUF): abitest.c libtcc.c
  	$(TCC) -o $@ $^ $(CPPFLAGS) $(CFLAGS) $(NATIVE_DEFINES) -DONE_SOURCE $(LIBS) $(LDFLAGS) -I$(top_srcdir)
  

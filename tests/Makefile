@@ -45,6 +45,9 @@ ifeq ($(ARCH),i386)
 else ifneq ($(ARCH),x86-64)
  TESTS := $(filter-out vla_test-run,$(TESTS))
 endif
+ifeq ($(CONFIG_arm_eabi),yes)
+ TESTS := $(filter-out test3,$(TESTS))
+endif
 
 ifdef DISABLE_STATIC
  export LD_LIBRARY_PATH:=$(CURDIR)/..
