@@ -1,3 +1,9 @@
+tcc (0.9.27~git20140923.9d7fb33-3) unstable; urgency=low
+
+  * New patch to fix tests2 on armel.
+
+ -- Matteo Cypriani <mcy@lm7.fr>  Fri, 17 Oct 2014 15:29:00 -0400
+
 tcc (0.9.27~git20140923.9d7fb33-2) unstable; urgency=low
 
   * Deactivate one more test for armel again.
