@@ -41,13 +41,8 @@ TESTS =	\
  18_include.test \
  19_pointer_arithmetic.test \
  20_pointer_comparison.test \
- 21_char_array.test
-
-ifneq ($(CONFIG_arm_eabi),yes) # not ARM soft-float
-	TESTS += 22_floating_point.test
-endif
-
-TESTS += \
+ 21_char_array.test \
+ 22_floating_point.test \
  23_type_coercion.test \
  24_math_library.test \
  25_quicksort.test \
@@ -100,6 +95,9 @@ TESTS += \
 SKIP = 34_array_assignment.test
 
 # some tests do not pass on all platforms, remove them for now
+ifeq ($(CONFIG_arm_eabi),yes) # not ARM soft-float
+ SKIP += 22_floating_point.test
+endif
 ifeq ($(TARGETOS),Darwin)
  SKIP += 40_stdio.test
 endif
@@ -118,10 +116,10 @@ all test: $(filter-out $(SKIP),$(TESTS))
 %.test: %.c %.expect
 	@echo Test: $*...
 
-	@$(TCC) -run $< $(ARGS) >$*.output 2>&1 || true
+	@$(TCC) -run $< $(ARGS) 2>&1 | grep -v 'warning: soft float ABI currently not supported: default to softfp' >$*.output || true
 	@diff -bu $*.expect $*.output && rm -f $*.output
 
-	@($(TCC) $< -o $*.exe && ./$*.exe $(ARGS)) >$*.output2 2>&1 || true
+	@($(TCC) $< -o $*.exe && ./$*.exe $(ARGS)) 2>&1 | grep -v 'warning: soft float ABI currently not supported: default to softfp' >$*.output2 || true
 	@diff -bu $*.expect $*.output2 && rm -f $*.output2 $*.exe
 
 clean:

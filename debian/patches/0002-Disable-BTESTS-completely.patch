@@ -1,4 +1,4 @@
-From 7fed46e2ea104cf29b72269b73c3a712f3207501 Mon Sep 17 00:00:00 2001
+From d1d6154777e062a69667a89c97ecbc040a31dfc7 Mon Sep 17 00:00:00 2001
 From: Matteo Cypriani <mcy@lm7.fr>
 Date: Sun, 7 Sep 2014 12:32:27 -0400
 Subject: Disable BTESTS completely

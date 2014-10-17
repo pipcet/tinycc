@@ -1,4 +1,4 @@
-From acc554209d8718603f1f4a7d4548eef09d97cb6f Mon Sep 17 00:00:00 2001
+From a9ff6b861109132c1e77e753598687f23d11caf6 Mon Sep 17 00:00:00 2001
 From: Matteo Cypriani <mcy@lm7.fr>
 Date: Fri, 5 Sep 2014 23:22:56 -0400
 Subject: Disable floating-point test for ARM soft-float
@@ -9,12 +9,12 @@ displays a warning to warn ARM users about this limitation.
 
 Origin: vendor
 Forwarded: not-needed
-Last-Update: 2014-10-09
+Last-Update: 2014-10-16
 ---
  tests/Makefile        | 13 +++++++++++--
  tests/tcctest.c       |  2 ++
- tests/tests2/Makefile |  9 +++++++--
- 3 files changed, 20 insertions(+), 4 deletions(-)
+ tests/tests2/Makefile |  3 +++
+ 3 files changed, 16 insertions(+), 2 deletions(-)
 
 diff --git a/tests/Makefile b/tests/Makefile
 index e6c5660..276ec7d 100644
@@ -70,22 +70,16 @@ index cc8ffd8..78bb785 100644
  
  int fib(int n)
 diff --git a/tests/tests2/Makefile b/tests/tests2/Makefile
-index 66d2f5a..4da68d9 100644
+index 66d2f5a..305d995 100644
 --- a/tests/tests2/Makefile
 +++ b/tests/tests2/Makefile
-@@ -41,8 +41,13 @@ TESTS =	\
-  18_include.test \
-  19_pointer_arithmetic.test \
-  20_pointer_comparison.test \
-- 21_char_array.test \
-- 22_floating_point.test \
-+ 21_char_array.test
-+
-+ifneq ($(CONFIG_arm_eabi),yes) # not ARM soft-float
-+	TESTS += 22_floating_point.test
+@@ -95,6 +95,9 @@ TESTS =	\
+ SKIP = 34_array_assignment.test
+ 
+ # some tests do not pass on all platforms, remove them for now
++ifeq ($(CONFIG_arm_eabi),yes) # not ARM soft-float
++ SKIP += 22_floating_point.test
 +endif
-+
-+TESTS += \
-  23_type_coercion.test \
-  24_math_library.test \
-  25_quicksort.test \
+ ifeq ($(TARGETOS),Darwin)
+  SKIP += 40_stdio.test
+ endif
