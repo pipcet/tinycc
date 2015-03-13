@@ -605,7 +605,8 @@ static void gcall_or_jmp(int is_jmp)
      *    ((int (*)(int))1000000000000)(3).
      * The constant is larger than 32 bits, but the relative call instruction
      * is limited to 32-bit offsets. */
-    if ((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST) {
+    if ((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST &&
+	vtop->c.ll == (int)vtop->c.ll) {
         /* constant case */
         if (vtop->r & VT_SYM) {
             /* relocation case */
