@@ -459,6 +459,7 @@ void load(int r, SValue *sv)
         } else if (v == VT_CMP) {
             orex(0,r,0,0);
 	    if ((fc & ~0x100) != TOK_NE)
+	      /* isn't this usually encoded as xor r,r ? */
               oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
 	    else
               oad(0xb8 + REG_VALUE(r), 1); /* mov $1, r */
@@ -1629,6 +1630,7 @@ void gen_opi(int op)
     case TOK_ADDC1: /* add with carry generation */
         opc = 0;
     gen_op8:
+        /* so I assume that's the idiom for checking 32-bit-ness */
         if (cc && (!ll || (int)vtop->c.ll == vtop->c.ll)) {
             /* constant case */
             vswap();
