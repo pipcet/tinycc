@@ -296,8 +296,14 @@ static void gen_gotpcrel(int r, Sym *sym, int c)
     greloc(cur_text_section, sym, ind, R_X86_64_PC32);
 #endif
     gen_le32(0);
-    if (c) {
         /* we use add c, %xxx for displacement */
+    if (c == 1) {
+	orex(1, r, 0, 0xff);
+	o(0xc0 + REG_VALUE(r));
+    } else if (c == -1) {
+	orex(1, r, 0, 0xff);
+	o(0xd0 + REG_VALUE(r));
+    } else if (c) {
         orex(1, r, 0, 0x81);
         o(0xc0 + REG_VALUE(r));
         gen_le32(c);
@@ -447,11 +453,21 @@ void load(int r, SValue *sv)
                 }
 #endif
             } else if (is64_type(ft)) {
-                orex(1,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
-                gen_le64(sv->c.ull);
+		if (sv->c.ull) {
+		    orex(1,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
+		    gen_le64(sv->c.ull);
+		} else {
+		    orex(1, r, r, 0x31);
+		    o(0xc0 + REG_VALUE(r) + REG_VALUE(r) * 8); /* xor r, r */
+		}
             } else {
-                orex(0,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
-                gen_le32(fc);
+		if (fc) {
+		    orex(0,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
+		    gen_le32(fc);
+		} else {
+		    orex(0, r, r, 0x31);
+		    o(0xc0 + REG_VALUE(r) + REG_VALUE(r) * 8); /* xor r, r */
+		}
             }
         } else if (v == VT_LOCAL) {
             orex(1,0,r,0x8d); /* lea xxx(%ebp), r */
@@ -1354,7 +1370,11 @@ void gfunc_call(int nb_args)
         }
     }
 
-    oad(0xb8, nb_sse_args < 8 ? nb_sse_args : 8); /* mov nb_sse_args, %eax */
+    if (nb_sse_args)
+      oad(0xb8, nb_sse_args < 8 ? nb_sse_args : 8); /* mov nb_sse_args, %eax */
+    else {
+      o(0xc031); /* xor %eax,%eax */
+    }
     gcall_or_jmp(0);
     if (args_size)
         gadd_sp(args_size);
@@ -1643,8 +1663,15 @@ void gen_opi(int op)
             r = gv(RC_INT);
             vswap();
             c = vtop->c.i;
-            if (c == (char)c) {
-                /* XXX: generate inc and dec for smaller code ? */
+	    if (c == 1 && opc == 0 || c == -1 && opc == 5) {
+		/* inc r */
+		orex(ll, r, 0, 0xff);
+		o(0xc0 + REG_VALUE(r));
+	    } else if (c == -1 && opc == 0 || c == 1 && opc == 5) {
+		/* dec r */
+		orex(ll, r, 0, 0xff);
+		o(0xc8 + REG_VALUE(r));
+	    } else if (c == (char)c) {
                 orex(ll, r, 0, 0x83);
                 o(0xc0 | (opc << 3) | REG_VALUE(r));
                 g(c);
