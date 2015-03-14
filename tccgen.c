@@ -4286,7 +4286,7 @@ static void expr_cond(void)
 #endif
                 }
                 else
-                    rc = RC_INT;
+                    rc = RC_FLAGS|RC_INT; /* XXX only where we have flags */
                 gv(rc);
                 save_regs(1);
             }

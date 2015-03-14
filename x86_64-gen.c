@@ -47,6 +47,7 @@
 #define RC_XMM5    0x20000
 #define RC_XMM6    0x40000
 #define RC_XMM7    0x80000
+#define RC_FLAGS  0x100000 /* check vtop->r to see which flag */
 #define RC_IRET    RC_RAX /* function return: integer register */
 #define RC_LRET    RC_RDX /* function return: second integer register */
 #define RC_FRET    RC_XMM0 /* function return: float register */
