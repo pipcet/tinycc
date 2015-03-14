@@ -1753,6 +1753,7 @@ void gfunc_epilog(void)
 /* generate a jump to a label */
 int gjmp(int t)
 {
+    ib();
     return psym(0xe9, t);
 }
 
@@ -1761,6 +1762,7 @@ void gjmp_addr(int a)
 {
     int r;
     r = a - ind - 2;
+    ib();
     if (r == (char)r) {
         g(0xeb);
         g(r);
