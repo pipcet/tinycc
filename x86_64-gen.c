@@ -174,13 +174,16 @@ void ib(void)
     last_instruction_boundary[0] = ind;
 }
 
-void uib(void)
+/* undo count instruction barriers */
+void uib(int count)
 {
     int i;
-    for(i=0; i<14; i++) {
-        last_instruction_boundary[i] = last_instruction_boundary[i+1];
+    while(count--) {
+	for(i=0; i<14; i++) {
+	    last_instruction_boundary[i] = last_instruction_boundary[i+1];
+	}
+	last_instruction_boundary[15] = 0;
     }
-    last_instruction_boundary[15] = 0;
 }
 
 int check_nth_last_instruction(int n, unsigned long long c, int length)
@@ -247,7 +250,7 @@ void check_baddies(void)
     /* mov $0x0, %eax -> xor %eax,%eax, but only if flags aren't used. */
     if (!flags_used() && check_nth_last_instruction(0, 0xb8, 5)) {
 	dump_ibs();
-        uib();
+        uib(1);
         ind -= 5;
         g(0x31);
         g(0xc0);
@@ -295,31 +298,17 @@ void check_baddies(void)
         check_nth_last_instruction(4, 0x07840f, 6)) {
         ind -= 6+5+2+5+2;
 
-        uib();
-        uib();
-        uib();
-        uib();
-        uib();
+        uib(5);
     }
     if (check_nth_last_instruction(0, 0xc085, 2) &&
         check_nth_last_instruction(1, 0x01b8, 5) &&
         check_nth_last_instruction(2, 0x05e9, 5) &&
         check_nth_last_instruction(3, 0xc031, 2) &&
         check_nth_last_instruction(4, 0x07e9, 5) &&
-        check_nth_last_instruction(5, 0x5840f, 6)) {
+        check_nth_last_instruction(5, 0x05840f, 6)) {
         ind -= 6+5+2+5+5+2;
-        *(int *)0 = 0;
 
-        g(0x90);
-        g(0x90);
-        g(0x90);
-        g(0x90);
-        uib();
-        uib();
-        uib();
-        uib();
-        uib();
-        uib();
+        uib(6);
     }
 }
 
@@ -1841,7 +1830,7 @@ int gtst(int inv, int t)
             /* and $constant, r  XXX byte constants instead generate 83 e0 XX */
             int test = 0xe081 + 0x100 * REG_VALUE(v);
             if (check_last_instruction(test, 6)) {
-		uib();
+		uib(1);
                 ind -= 6;
 		ib();
                 /* overwrite opcode to turn and $constant,r into test $constant,r */
@@ -1850,7 +1839,7 @@ int gtst(int inv, int t)
                 ind += 4;
                 dump_ibs();
 	    } else if (check_last_instruction(0xe083 + 0x100 * REG_VALUE(v), 3)) {
-		uib();
+		uib(1);
 		ind -= 3;
 		ib();
 		orex(0,v,v,0xf6);
