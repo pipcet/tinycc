@@ -1837,6 +1837,14 @@ int gtst(int inv, int t)
                 g(0xc0 + REG_VALUE(v));
                 ind += 4;
                 dump_ibs();
+	    } else if (check_last_instruction(0xe083 + 0x100 * REG_VALUE(v), 3)) {
+		uib();
+		ind -= 3;
+		ib();
+		orex(0,v,v,0xf6);
+		g(0xc0 + REG_VALUE(v));
+		ind++;
+		dump_ibs();
             } else {
 		ib();
                 orex(0,v,v,0x85);
