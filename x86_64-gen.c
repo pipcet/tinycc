@@ -204,6 +204,8 @@ int check_nth_last_instruction(int n, unsigned long long c, int length)
 
 void dump_ibs(void)
 {
+    return;
+
     int i=0;
     int n=0;
 
