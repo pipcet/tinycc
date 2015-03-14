@@ -227,7 +227,7 @@ void dump_ibs(void)
 void check_baddies(void)
 {
     /* mov $0x0, %eax -> xor %eax,%eax */
-    if (check_nth_last_instruction(0, 0xb8, 5)) {
+    if (0 && check_nth_last_instruction(0, 0xb8, 5)) {
         uib();
         ind -= 5;
         g(0x31);
@@ -269,7 +269,8 @@ void check_baddies(void)
      *    <check vtop depends only on E flag>
      */
 
-    if (check_nth_last_instruction(0, 0xc085, 2) &&
+    if (0 &&
+	check_nth_last_instruction(0, 0xc085, 2) &&
         check_nth_last_instruction(1, 0x01b8, 5) &&
         check_nth_last_instruction(2, 0x05e9, 5) &&
         check_nth_last_instruction(3, 0xc031, 2) &&
