@@ -207,8 +207,6 @@ int check_nth_last_instruction(int n, unsigned long long c, int length)
 
 void dump_ibs(void)
 {
-    return;
-
     int i=0;
     int n=0;
 
@@ -315,8 +313,6 @@ int check_baddies(int clobber_reg, int flags_okay)
 
 int check_last_instruction(unsigned int c, int length)
 {
-    dump_ibs();
-
     if(last_instruction_boundary[0] != ind - length) {
         return 0;
     }
@@ -1830,7 +1826,7 @@ int gtst(int inv, int t)
             /* test v,v
              * jXX t */
             v = gv(RC_INT);
-            /* and $constant, r  XXX byte constants instead generate 83 e0 XX */
+            /* and $constant, r */
             int test = 0xe081 + 0x100 * REG_VALUE(v);
             if (check_last_instruction(test, 6)) {
 		uib(1);
