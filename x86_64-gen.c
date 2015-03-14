@@ -180,6 +180,7 @@ void uib(void)
     for(i=0; i<14; i++) {
         last_instruction_boundary[i] = last_instruction_boundary[i+1];
     }
+    last_instruction_boundary[15] = 0;
 }
 
 int check_nth_last_instruction(int n, unsigned long long c, int length)
