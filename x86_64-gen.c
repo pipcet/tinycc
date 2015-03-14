@@ -1805,7 +1805,7 @@ int gtst(int inv, int t)
             v = gv(RC_INT);
             /* and $constant, r  XXX byte constants instead generate 83 e0 XX */
             int test = 0xe081 + 0x100 * REG_VALUE(v);
-            if (check_last_instruction(test, 6) && 0) {
+            if (check_last_instruction(test, 6)) {
 		uib();
                 ind -= 6;
 		ib();
@@ -1813,7 +1813,6 @@ int gtst(int inv, int t)
                 orex(0,v,v,0xf7);
                 g(0xc0 + REG_VALUE(v));
                 ind += 4;
-                g(0x90);
                 dump_ibs();
             } else {
 		ib();
