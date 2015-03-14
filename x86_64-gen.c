@@ -310,6 +310,8 @@ int check_baddies(int clobber_reg, int flags_okay)
 
         uib(6);
     }
+
+    return 0;
 }
 
 int check_last_instruction(unsigned int c, int length)
