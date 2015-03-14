@@ -1290,6 +1290,9 @@ ST_FUNC int handle_eob(void);
 
 ST_DATA const int reg_classes[NB_REGS];
 
+ST_FUNC void ib(void);
+ST_FUNC void check_baddies(void);
+
 ST_FUNC void gsym_addr(int t, int a);
 ST_FUNC void gsym(int t);
 ST_FUNC void load(int r, SValue *sv);
