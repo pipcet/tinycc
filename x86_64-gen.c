@@ -245,7 +245,8 @@ int flags_used(void)
     return 0;
 }
 
-void check_baddies(void)
+/* returns 1 only if flags_okay, to indicate inverted return value */
+int check_baddies(int clobber_reg, int flags_okay)
 {
     /* mov $0x0, %eax -> xor %eax,%eax, but only if flags aren't used. */
     if (!flags_used() && check_nth_last_instruction(0, 0xb8, 5)) {
@@ -660,7 +661,7 @@ void load(int r, SValue *sv)
               oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
             else
               oad(0xb8 + REG_VALUE(r), 1); /* mov $1, r */
-	    check_baddies();
+	    check_baddies(r, 0);
 	    ib();
             if (fc & 0x100)
               {
@@ -680,14 +681,14 @@ void load(int r, SValue *sv)
 	    ib();
             orex(0,r,0,0);
             oad(0xb8 + REG_VALUE(r), t); /* mov $1, r */
-	    check_baddies();
+	    check_baddies(r, 0);
 	    ib();
             o(0x05eb + (REX_BASE(r) << 8)); /* jmp after */
             gsym(fc);
 	    ib();
             orex(0,r,0,0);
             oad(0xb8 + REG_VALUE(r), t ^ 1); /* mov $0, r */
-	    check_baddies();
+	    check_baddies(r, 0);
 	    flags_used_counter--;
         } else if (v != r) {
             if ((r >= TREG_XMM0) && (r <= TREG_XMM7)) {
@@ -1567,7 +1568,7 @@ void gfunc_call(int nb_args)
     else {
       o(0xc031); /* xor %eax,%eax */
     }
-    check_baddies();
+    check_baddies(-1, 0);
     ib();
     gcall_or_jmp(0);
     if (args_size)
@@ -1798,6 +1799,8 @@ int gtst(int inv, int t)
 		t = psym(0x8a, t); /* jp t */
 	      }
 	  }
+	inv ^= check_baddies(-1, 1);
+	ib();
         g(0x0f);
         t = psym((vtop->c.i - 16) ^ inv, t);
     } else if (v == VT_JMP || v == VT_JMPI) {
@@ -1851,9 +1854,12 @@ int gtst(int inv, int t)
                 orex(0,v,v,0x85);
                 o(0xc0 + REG_VALUE(v) * 9);
             }
+	    /* Perl has lots of expressions of the form x ? 1 : 0. Handle those here. */
+	    inv ^= check_baddies(-1, 1);
 	    ib();
             g(0x0f);
             t = psym(0x85 ^ inv, t);
+	    check_baddies(-1, 0);
         }
     }
     vtop--;
