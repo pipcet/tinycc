@@ -1365,6 +1365,8 @@ static void gen_opl(int op)
         a = gtst(1, a);
         gsym(b);
         vseti(VT_JMPI, a);
+	check_baddies();
+	ib();
         break;
     }
 }
@@ -3712,6 +3714,7 @@ ST_FUNC void unary(void)
         else {
             save_regs(1);
             vseti(VT_JMP, gtst(1, 0));
+	    check_baddies();
         }
         break;
     case '~':
@@ -4208,6 +4211,7 @@ static void expr_land(void)
             t = gtst(1, t);
             if (tok != TOK_LAND) {
                 vseti(VT_JMPI, t);
+		check_baddies();
                 break;
             }
             next();
@@ -4228,6 +4232,7 @@ static void expr_lor(void)
             t = gtst(0, t);
             if (tok != TOK_LOR) {
                 vseti(VT_JMP, t);
+		check_baddies();
                 break;
             }
             next();

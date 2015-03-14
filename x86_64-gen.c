@@ -356,6 +356,7 @@ void gen_le64(int64_t c)
 
 void orex(int ll, int r, int r2, int b)
 {
+    ib();
     if ((r & VT_VALMASK) >= VT_CONST)
         r = 0;
     if ((r2 & VT_VALMASK) >= VT_CONST)
@@ -627,31 +628,39 @@ void load(int r, SValue *sv)
             orex(1,0,r,0x8d); /* lea xxx(%ebp), r */
             gen_modrm(r, VT_LOCAL, sv->sym, fc);
         } else if (v == VT_CMP) {
+	    ib();
             orex(0,r,0,0);
-	    if ((fc & ~0x100) != TOK_NE)
-	      /* isn't this usually encoded as xor r,r ? */
+            if ((fc & ~0x100) != TOK_NE)
+              /* isn't this usually encoded as xor r,r ? */
               oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
-	    else
+            else
               oad(0xb8 + REG_VALUE(r), 1); /* mov $1, r */
-	    if (fc & 0x100)
-	      {
-	        /* This was a float compare.  If the parity bit is
-		   set the result was unordered, meaning false for everything
-		   except TOK_NE, and true for TOK_NE.  */
-		fc &= ~0x100;
-		o(0x037a + (REX_BASE(r) << 8));
-	      }
+	    check_baddies();
+	    ib();
+            if (fc & 0x100)
+              {
+                /* This was a float compare.  If the parity bit is
+                   set the result was unordered, meaning false for everything
+                   except TOK_NE, and true for TOK_NE.  */
+                fc &= ~0x100;
+                o(0x037a + (REX_BASE(r) << 8));
+              }
             orex(0,r,0, 0x0f); /* setxx %br */
             o(fc);
             o(0xc0 + REG_VALUE(r));
         } else if (v == VT_JMP || v == VT_JMPI) {
             t = v & 1;
+	    ib();
             orex(0,r,0,0);
             oad(0xb8 + REG_VALUE(r), t); /* mov $1, r */
+	    check_baddies();
+	    ib();
             o(0x05eb + (REX_BASE(r) << 8)); /* jmp after */
             gsym(fc);
+	    ib();
             orex(0,r,0,0);
-            oad(0xb8 + REG_VALUE(r), t ^ 1); /* mov $0, r XXX */
+            oad(0xb8 + REG_VALUE(r), t ^ 1); /* mov $0, r */
+	    check_baddies();
         } else if (v != r) {
             if ((r >= TREG_XMM0) && (r <= TREG_XMM7)) {
                 if (v == TREG_ST0) {
@@ -1524,11 +1533,14 @@ void gfunc_call(int nb_args)
         }
     }
 
+    ib();
     if (nb_sse_args)
       oad(0xb8, nb_sse_args < 8 ? nb_sse_args : 8); /* mov nb_sse_args, %eax */
     else {
       o(0xc031); /* xor %eax,%eax */
     }
+    check_baddies();
+    ib();
     gcall_or_jmp(0);
     if (args_size)
         gadd_sp(args_size);
@@ -1784,9 +1796,27 @@ int gtst(int inv, int t)
             if ((vtop->c.i != 0) != inv)
                 t = gjmp(t);
         } else {
+            /* test v,v
+             * jXX t */
             v = gv(RC_INT);
-            orex(0,v,v,0x85);
-            o(0xc0 + REG_VALUE(v) * 9);
+            /* and $constant, r  XXX byte constants instead generate 83 e0 XX */
+            int test = 0xe081 + 0x100 * REG_VALUE(v);
+            if (check_last_instruction(test, 6) && 0) {
+		uib();
+                ind -= 6;
+		ib();
+                /* overwrite opcode to turn and $constant,r into test $constant,r */
+                orex(0,v,v,0xf7);
+                g(0xc0 + REG_VALUE(v));
+                ind += 4;
+                g(0x90);
+                dump_ibs();
+            } else {
+		ib();
+                orex(0,v,v,0x85);
+                o(0xc0 + REG_VALUE(v) * 9);
+            }
+	    ib();
             g(0x0f);
             t = psym(0x85 ^ inv, t);
         }
@@ -1817,15 +1847,16 @@ void gen_opi(int op)
             r = gv(RC_INT);
             vswap();
             c = vtop->c.i;
-	    if (c == 1 && opc == 0 || c == -1 && opc == 5) {
-		/* inc r */
-		orex(ll, r, 0, 0xff);
-		o(0xc0 + REG_VALUE(r));
-	    } else if (c == -1 && opc == 0 || c == 1 && opc == 5) {
-		/* dec r */
-		orex(ll, r, 0, 0xff);
-		o(0xc8 + REG_VALUE(r));
-	    } else if (c == (char)c) {
+	    ib();
+            if (c == 1 && opc == 0 || c == -1 && opc == 5) {
+                /* inc r */
+                orex(ll, r, 0, 0xff);
+                o(0xc0 + REG_VALUE(r));
+            } else if (c == -1 && opc == 0 || c == 1 && opc == 5) {
+                /* dec r */
+                orex(ll, r, 0, 0xff);
+                o(0xc8 + REG_VALUE(r));
+            } else if (c == (char)c) {
                 orex(ll, r, 0, 0x83);
                 o(0xc0 | (opc << 3) | REG_VALUE(r));
                 g(c);
@@ -1837,6 +1868,7 @@ void gen_opi(int op)
             gv2(RC_INT, RC_INT);
             r = vtop[-1].r;
             fr = vtop[0].r;
+	    ib();
             orex(ll, r, fr, (opc << 3) | 0x01);
             o(0xc0 + REG_VALUE(r) + REG_VALUE(fr) * 8);
         }
