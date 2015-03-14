@@ -224,10 +224,29 @@ void dump_ibs(void)
     }
 }
 
+static int flags_used_counter = 0;
+
+int flags_used(void)
+{
+    if(flags_used_counter)
+	return 1;
+
+    if (vtop >= vstack && ((vtop->r & VT_VALMASK) == VT_CMP ||
+			   (vtop->r & VT_VALMASK) == VT_JMP ||
+			   (vtop->r & VT_VALMASK) == VT_JMPI))
+	return 1;
+
+    return 1;
+
+    /* XXX can values on the stack further down use flags? */
+    return 0;
+}
+
 void check_baddies(void)
 {
-    /* mov $0x0, %eax -> xor %eax,%eax */
-    if (0 && check_nth_last_instruction(0, 0xb8, 5)) {
+    /* mov $0x0, %eax -> xor %eax,%eax, but only if flags aren't used. */
+    if (!flags_used() && check_nth_last_instruction(0, 0xb8, 5)) {
+	dump_ibs();
         uib();
         ind -= 5;
         g(0x31);
@@ -632,6 +651,7 @@ void load(int r, SValue *sv)
             orex(1,0,r,0x8d); /* lea xxx(%ebp), r */
             gen_modrm(r, VT_LOCAL, sv->sym, fc);
         } else if (v == VT_CMP) {
+	    flags_used_counter++;
 	    ib();
             orex(0,r,0,0);
             if ((fc & ~0x100) != TOK_NE)
@@ -652,7 +672,9 @@ void load(int r, SValue *sv)
             orex(0,r,0, 0x0f); /* setxx %br */
             o(fc);
             o(0xc0 + REG_VALUE(r));
+	    flags_used_counter--;
         } else if (v == VT_JMP || v == VT_JMPI) {
+	    flags_used_counter++;
             t = v & 1;
 	    ib();
             orex(0,r,0,0);
@@ -665,6 +687,7 @@ void load(int r, SValue *sv)
             orex(0,r,0,0);
             oad(0xb8 + REG_VALUE(r), t ^ 1); /* mov $0, r */
 	    check_baddies();
+	    flags_used_counter--;
         } else if (v != r) {
             if ((r >= TREG_XMM0) && (r <= TREG_XMM7)) {
                 if (v == TREG_ST0) {
