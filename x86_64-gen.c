@@ -155,6 +155,160 @@ ST_DATA const int reg_classes[NB_REGS] = {
 static unsigned long func_sub_sp_offset;
 static int func_ret_sub;
 
+#if 0 /* no last instructions */
+#define ib() do { } while(0)
+#define check_nth_last_instruction(n, c, length) do { (void)(n); (void)(c); (void)(length); } while(0)
+#else
+
+static int last_instruction_boundary[16] = { 0, };
+
+void ib(void)
+{
+    if(last_instruction_boundary[0] == ind)
+	return;
+
+    int i;
+    for(i=14; i>=0; i--) {
+        last_instruction_boundary[i+1] = last_instruction_boundary[i];
+    }
+    last_instruction_boundary[0] = ind;
+}
+
+void uib(void)
+{
+    int i;
+    for(i=0; i<14; i++) {
+        last_instruction_boundary[i] = last_instruction_boundary[i+1];
+    }
+}
+
+int check_nth_last_instruction(int n, unsigned long long c, int length)
+{
+    int previb = n ? last_instruction_boundary[n-1] : ind;
+    if((previb - last_instruction_boundary[n]) != length) {
+        return 0;
+    }
+
+    int i=0;
+
+    while(i<length) {
+        if((c&0xff) != (cur_text_section->data[last_instruction_boundary[n]+i]&0xff))
+            return 0;
+        i++;
+        c>>=8;
+    }
+
+    return 1;
+}
+
+void dump_ibs(void)
+{
+    int i=0;
+    int n=0;
+
+    int prev_ib = ind;
+    for(n=0; n<16 && last_instruction_boundary[n]; n++) {
+        int ib = last_instruction_boundary[n];
+
+        fprintf(stderr, "instruction %3d at %5d: ", n, ib);
+
+        while(ib<prev_ib) {
+            fprintf(stderr, "%02x ", cur_text_section->data[ib++]);
+        }
+        prev_ib = last_instruction_boundary[n];
+
+        fprintf(stderr, "\n");
+    }
+}
+
+void check_baddies(void)
+{
+    /* mov $0x0, %eax -> xor %eax,%eax */
+    if (check_nth_last_instruction(0, 0xb8, 5)) {
+        uib();
+        ind -= 5;
+        g(0x31);
+        g(0xc0);
+        ib();
+    }
+
+    /*
+     * 0x0000000001eb4a0c:	b8 00 00 00 00		mov    $0x0,%eax
+     * 0x0000000001eb4a11:	0f 94 c0		sete   %al
+     * 0x0000000001eb4a14:	85 c0			test   %eax,%eax
+     *
+     * 0x0000000001eb4a16:	0f 84 27 00 00 00	je     0x1eb4a43
+     */
+
+    /* jmpq blah -> jmp blah. Actually difficult to do. */
+
+    /*
+     *    0x0000000000fe861f:   0f 84 05 00 00 00       je     0xfe862a
+     *    0x0000000000fe8625:   e9 07 00 00 00  jmpq   0xfe8631
+     *    0x0000000000fe862a:   31 c0   xor    %eax,%eax
+     *    0x0000000000fe862c:   e9 05 00 00 00  jmpq   0xfe8636
+     *    0x0000000000fe8631:   b8 01 00 00 00  mov    $0x1,%eax
+     *    0x0000000000fe8636:   85 c0   test   %eax,%eax
+     *
+     *    <check vtop depends only on E flag>
+     */
+
+    /*
+     *  A very wordy nop:
+     *
+     *    0x0000000000fe861f:   0f 84 05 00 00 00       je     0xfe862a
+     *    0x0000000000fe8625:   e9 07 00 00 00  jmpq   0xfe8631
+     *    0x0000000000fe862a:   31 c0   xor    %eax,%eax
+     *    0x0000000000fe862c:   e9 05 00 00 00  jmpq   0xfe8636
+     *    0x0000000000fe8631:   b8 01 00 00 00  mov    $0x1,%eax
+     *    0x0000000000fe8636:   85 c0   test   %eax,%eax
+     *
+     *    <check vtop depends only on E flag>
+     */
+
+    if (check_nth_last_instruction(0, 0xc085, 2) &&
+        check_nth_last_instruction(1, 0x01b8, 5) &&
+        check_nth_last_instruction(2, 0x05e9, 5) &&
+        check_nth_last_instruction(3, 0xc031, 2) &&
+        check_nth_last_instruction(4, 0x07e9, 5) &&
+        check_nth_last_instruction(5, 0x5840f, 6)) {
+        ind -= 6+5+2+5+5+2;
+        *(int *)0 = 0;
+
+        g(0x90);
+        g(0x90);
+        g(0x90);
+        g(0x90);
+        uib();
+        uib();
+        uib();
+        uib();
+        uib();
+        uib();
+    }
+}
+
+int check_last_instruction(unsigned int c, int length)
+{
+    dump_ibs();
+
+    if(last_instruction_boundary[0] != ind - length) {
+        return 0;
+    }
+
+    int i=0;
+
+    while(c) {
+        if((c&0xff) != (cur_text_section->data[last_instruction_boundary[0]+i]&0xff))
+            return 0;
+        i++;
+        c>>=8;
+    }
+
+    return 1;
+}
+#endif
+
 /* XXX: make it faster ? */
 void g(int c)
 {
