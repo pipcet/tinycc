@@ -213,8 +213,6 @@ int check_nth_last_instruction(int n, unsigned long long c, int length)
 
 void dump_ibs(void)
 {
-    return;
-
     int i=0;
     int n=0;
 
@@ -256,7 +254,6 @@ int check_baddies(int clobber_reg, int flags_okay)
 {
     /* mov $0x0, %eax -> xor %eax,%eax, but only if flags aren't used. */
     if (!flags_used() && check_nth_last_instruction(0, 0xb8, 5)) {
-	dump_ibs();
         uib(1);
         ind -= 5;
 	memset(cur_text_section->data + ind, 0, 5);
@@ -305,7 +302,6 @@ int check_baddies(int clobber_reg, int flags_okay)
 	check_nth_last_instruction(1, 0xc085, 2) &&
 	check_nth_last_instruction(2, 0xc0940f, 3) &&
 	check_nth_last_instruction(3, 0xb8, 5)) {
-	dump_ibs();
     }
 
 
@@ -661,7 +657,6 @@ static void gen_modrm64(int opcode, int op_reg, int r, Sym *sym, int c)
     orex(1, r, op_reg, opcode);
     gen_modrm_impl(op_reg, r, sym, c, is_got);
 }
-
 
 /* load 'r' from value 'sv' */
 void load(int r, SValue *sv)
@@ -1967,7 +1962,6 @@ int gtst(int inv, int t)
                 orex(0,v,v,0xf7);
                 g(0xc0 + REG_VALUE(v));
                 ind += 4;
-                dump_ibs();
 	    } else if (check_last_instruction(0xe083 + 0x100 * REG_VALUE(v), 3)) {
 		uib(1);
 		ind -= 3;
@@ -1975,7 +1969,6 @@ int gtst(int inv, int t)
 		orex(0,v,v,0xf6);
 		g(0xc0 + REG_VALUE(v));
 		ind++;
-		dump_ibs();
             } else {
 		/* XXX we currently generate code like this:
 		 * 81c3d19:	48 8b 45 f0          	mov    -0x10(%rbp),%rax
