@@ -1941,16 +1941,19 @@ int gtst(int inv, int t)
 	    commit_instructions();
         }
     } else {
-        if (is_float(vtop->type.t) ||
-            is64_type(vtop->type.t)) {
+	int ll = 0;
+
+        if (is_float(vtop->type.t)) {
             vpushi(0);
             gen_op(TOK_NE);
-        }
+	}
         if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST) {
             /* constant jmp optimization */
             if ((vtop->c.i != 0) != inv)
                 t = gjmp(t);
         } else {
+	    if (is64_type(vtop->type.t))
+		ll = 1;
             /* test v,v
              * jXX t */
             v = gv(RC_INT);
@@ -1985,7 +1988,7 @@ int gtst(int inv, int t)
 		 * Which is buggy because only the low 32 bits of %rax are checked. */
 
 		ib();
-                orex(0,v,v,0x85);
+                orex(ll,v,v,0x85);
                 o(0xc0 + REG_VALUE(v) * 9);
             }
 	    /* Perl has lots of expressions of the form x ? 1 : 0. Handle those here. */
