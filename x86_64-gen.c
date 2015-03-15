@@ -208,6 +208,8 @@ int check_nth_last_instruction(int n, unsigned long long c, int length)
 
 void dump_ibs(void)
 {
+    return;
+
     int i=0;
     int n=0;
 
@@ -252,6 +254,8 @@ int check_baddies(int clobber_reg, int flags_okay)
 	dump_ibs();
         uib(1);
         ind -= 5;
+	memset(cur_text_section->data + ind, 0, 5);
+	
         g(0x31);
         g(0xc0);
         ib();
@@ -262,12 +266,18 @@ int check_baddies(int clobber_reg, int flags_okay)
      *  0x0000000000d2b867:	0f 94 c0		sete   %al
      *  0x0000000000d2b86a:	85 c0			test   %eax,%eax
      */
-    if (flags_okay &&
+    if (0 && flags_okay &&
+	(clobber_reg == TREG_RAX) &&
 	check_last_instruction(0xc085, 2) &&
 	check_nth_last_instruction(1, 0xc0940f, 3) &&
 	check_nth_last_instruction(2, 0xb8, 5)) {
+
 	ind -= 10;
 	uib(3);
+	
+	memset(cur_text_section->data + ind, 0, 10);
+
+	return 0;
     }
 
     /*
@@ -312,6 +322,7 @@ int check_baddies(int clobber_reg, int flags_okay)
         ind -= 6+5+2+5+2;
 
         uib(5);
+	memset(cur_text_section->data + ind, 0, 6+5+2+5+2);
     }
     if (check_nth_last_instruction(0, 0xc085, 2) &&
         check_nth_last_instruction(1, 0x01b8, 5) &&
@@ -322,6 +333,7 @@ int check_baddies(int clobber_reg, int flags_okay)
         ind -= 6+5+2+5+5+2;
 
         uib(6);
+	memset(cur_text_section->data + ind, 0, 6+5+2+5+5+2);
     }
 
     /*
@@ -346,6 +358,7 @@ int check_baddies(int clobber_reg, int flags_okay)
         check_nth_last_instruction(5, 0x05850f, 6)) {
 	if (flags_okay) {
 	    ind -= 6+5+2+5+5+2;
+	    memset(cur_text_section->data + ind, 0, 6+5+2+5+5+2);
 
 	    uib(6);
 
@@ -1898,7 +1911,7 @@ int gtst(int inv, int t)
                 o(0xc0 + REG_VALUE(v) * 9);
             }
 	    /* Perl has lots of expressions of the form x ? 1 : 0. Handle those here. */
-	    inv ^= check_baddies(-1, 1);
+	    inv ^= check_baddies(TREG_RAX, 1);
 	    ib();
             g(0x0f);
             t = psym(0x85 ^ inv, t);
