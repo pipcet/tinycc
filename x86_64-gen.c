@@ -522,6 +522,15 @@ int gsym_nocommit(int t)
     return gsym_addr(t, ind);
 }
 
+/* retrieve the current instruction index, committing all instructions so far to keep it valid */
+
+int get_index(void)
+{
+    commit_instructions();
+
+    return ind;
+}
+
 /* psym is used to put an instruction with a data field which is a
    reference to a symbol. It is in fact the same as oad ! */
 #define psym oad
