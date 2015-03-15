@@ -512,6 +512,13 @@ int gsym_addr(int t, int a)
 
 int gsym(int t)
 {
+    commit_instructions();
+
+    return gsym_addr(t, ind);
+}
+
+int gsym_nocommit(int t)
+{
     return gsym_addr(t, ind);
 }
 
@@ -787,7 +794,7 @@ void load(int r, SValue *sv)
 	    check_baddies(r, 0);
 	    ib();
             o(0x05eb + (REX_BASE(r) << 8)); /* jmp after */
-            if(gsym(fc) > 1)
+            if(gsym_nocommit(fc) > 1)
 	      commit_instructions();
 	    ib();
             orex(0,r,0,0);
@@ -1918,9 +1925,11 @@ int gtst(int inv, int t)
                 p = (int *)(cur_text_section->data + *p);
             *p = t;
             t = vtop->c.i;
+	    commit_instructions();
         } else {
             t = gjmp(t);
             gsym(vtop->c.i);
+	    commit_instructions();
         }
     } else {
         if (is_float(vtop->type.t) ||
