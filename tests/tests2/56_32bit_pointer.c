@@ -2,7 +2,8 @@
 
 int main (int argc, char **argv)
 {
-  if((void *)0x100000000)
+  void *ptr = (void *)0x100000000;
+  if(ptr)
     printf("good\n");
   else
     printf("bad\n");
