@@ -261,6 +261,13 @@ int check_baddies(int clobber_reg, int flags_okay)
         ib();
     }
 
+    /*  80886b4:       89 c0                   mov    %eax,%eax */
+
+    if (check_last_instruction(0xc089, 2)) {
+	ind -= 2;
+	uib(1);
+    }
+
     /*
       * 0x0000000000d6a931:	b8 00 00 00 00		mov    $0x0,%eax
      *  0x0000000000d2b867:	0f 94 c0		sete   %al
