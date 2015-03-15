@@ -187,6 +187,11 @@ void uib(int count)
     }
 }
 
+void commit_instructions(void)
+{
+  uib(16);
+}
+
 int check_nth_last_instruction(int n, unsigned long long c, int length)
 {
     int previb = n ? last_instruction_boundary[n-1] : ind;
@@ -484,20 +489,23 @@ void orex(int ll, int r, int r2, int b)
 }
 
 /* output a symbol and patch all calls to it */
-void gsym_addr(int t, int a)
+int gsym_addr(int t, int a)
 {
     int n, *ptr;
+    int ret = 0;
     while (t) {
         ptr = (int *)(cur_text_section->data + t);
         n = *ptr; /* next value */
         *ptr = a - t - 4;
         t = n;
+	ret++;
     }
+    return ret;
 }
 
-void gsym(int t)
+int gsym(int t)
 {
-    gsym_addr(t, ind);
+    return gsym_addr(t, ind);
 }
 
 /* psym is used to put an instruction with a data field which is a
@@ -776,7 +784,8 @@ void load(int r, SValue *sv)
 	    check_baddies(r, 0);
 	    ib();
             o(0x05eb + (REX_BASE(r) << 8)); /* jmp after */
-            gsym(fc);
+            if(gsym(fc) > 1)
+	      commit_instructions();
 	    ib();
             orex(0,r,0,0);
             oad(0xb8 + REG_VALUE(r), t ^ 1); /* mov $0, r */

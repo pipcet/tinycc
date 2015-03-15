@@ -1294,8 +1294,8 @@ ST_FUNC void ib(void);
 ST_FUNC int check_baddies(int clobber_reg, int flags_okay);
 ST_FUNC int check_last_instruction(unsigned int, int);
 
-ST_FUNC void gsym_addr(int t, int a);
-ST_FUNC void gsym(int t);
+ST_FUNC int gsym_addr(int t, int a);
+ST_FUNC int gsym(int t);
 ST_FUNC void load(int r, SValue *sv);
 ST_FUNC void store(int r, SValue *v);
 ST_FUNC int gfunc_sret(CType *vt, CType *ret, int *align);
