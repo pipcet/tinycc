@@ -4769,6 +4769,7 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
         c = 0;
         block(&a, csym, &b, &c, case_reg, 0);
         /* if no default, jmp after switch */
+	if (c == 0)
             c = get_index();
         /* default label */
         gsym_addr(b, c);
