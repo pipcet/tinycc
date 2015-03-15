@@ -180,7 +180,7 @@ void uib(int count)
 {
     int i;
     while(count--) {
-	for(i=0; i<14; i++) {
+	for(i=0; i<=14; i++) {
 	    last_instruction_boundary[i] = last_instruction_boundary[i+1];
 	}
 	last_instruction_boundary[15] = 0;
@@ -266,7 +266,7 @@ int check_baddies(int clobber_reg, int flags_okay)
      *  0x0000000000d2b867:	0f 94 c0		sete   %al
      *  0x0000000000d2b86a:	85 c0			test   %eax,%eax
      */
-    if (0 && flags_okay &&
+    if (flags_okay &&
 	(clobber_reg == TREG_RAX) &&
 	check_last_instruction(0xc085, 2) &&
 	check_nth_last_instruction(1, 0xc0940f, 3) &&
@@ -275,9 +275,10 @@ int check_baddies(int clobber_reg, int flags_okay)
 	ind -= 10;
 	uib(3);
 	
+	ib();
 	memset(cur_text_section->data + ind, 0, 10);
 
-	return 0;
+	return 1;
     }
 
     /*
