@@ -1293,6 +1293,8 @@ ST_DATA const int reg_classes[NB_REGS];
 ST_FUNC void ib(void);
 ST_FUNC int check_baddies(int clobber_reg, int flags_okay);
 ST_FUNC int check_last_instruction(unsigned int, int);
+ST_FUNC void commit_instructions(void);
+ST_FUNC int get_index(void);
 
 ST_FUNC int gsym_addr(int t, int a);
 ST_FUNC int gsym(int t);
