@@ -756,11 +756,7 @@ void load(int r, SValue *sv)
 	    flags_used_counter++;
 	    ib();
             orex(0,r,0,0);
-            if ((fc & ~0x100) != TOK_NE)
-              /* isn't this usually encoded as xor r,r ? */
-              oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
-            else
-              oad(0xb8 + REG_VALUE(r), 1); /* mov $1, r */
+	    oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
 	    check_baddies(r, 0);
 	    ib();
             if (fc & 0x100)
