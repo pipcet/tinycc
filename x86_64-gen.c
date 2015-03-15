@@ -192,6 +192,26 @@ void commit_instructions(void)
   uib(16);
 }
 
+int check_nth_last_instruction_mask(int n, unsigned long long c, unsigned long long mask, int length)
+{
+    int previb = n ? last_instruction_boundary[n-1] : ind;
+    if((previb - last_instruction_boundary[n]) != length) {
+        return 0;
+    }
+
+    int i=0;
+
+    while(i<length) {
+        if((c&mask&0xff) != (cur_text_section->data[last_instruction_boundary[n]+i]&mask&0xff))
+            return 0;
+        i++;
+        c>>=8;
+	mask>>=8;
+    }
+
+    return 1;
+}
+
 int check_nth_last_instruction(int n, unsigned long long c, int length)
 {
     int previb = n ? last_instruction_boundary[n-1] : ind;
@@ -409,6 +429,36 @@ int check_baddies(int clobber_reg, int flags_okay)
 	    uib(6);
 
 	    return 1 ^ check_baddies(clobber_reg, 1);
+	}
+    }
+
+    /*
+     * 81c28f2:	48 89 01 111 101 f8          	mov    %rdi,-0x8(%rbp)
+     * 81c28f6:	48 8b 01 000 101 f8          	mov    -0x8(%rbp),%rax
+     */
+
+    if (check_nth_last_instruction_mask(0, 0x00408b48, 0x00c0ffff, 4) &&
+	check_nth_last_instruction_mask(1, 0x00708948, 0x00c0ffff, 4)) {
+	int offset1 = cur_text_section->data[ind - 5];
+	int offset2 = cur_text_section->data[ind - 1];
+
+	if (offset1 == offset2) {
+	    int reg12 = REG_VALUE(cur_text_section->data[ind - 6]);
+	    int reg22 = REG_VALUE(cur_text_section->data[ind - 2]);
+
+	    if (reg12 == reg22) {
+		int reg11 = REG_VALUE(cur_text_section->data[ind - 6] >> 3);
+		int reg21 = REG_VALUE(cur_text_section->data[ind - 2] >> 3);
+
+		uib(1);
+		ind -= 4; /* but don't replace the first store operation */
+
+		if (reg11 != reg21) {
+		    g(0x48);
+		    g(0x8b);
+		    g(0xc0 | (reg21 << 3) | reg11);
+		}
+	    }
 	}
     }
 
