@@ -284,6 +284,7 @@ int check_baddies(int clobber_reg, int flags_okay)
 	check_nth_last_instruction(1, 0xc0940f, 3) &&
 	check_nth_last_instruction(2, 0xb8, 5)) {
 
+      return 0;
 	ind -= 10;
 	uib(3);
 	
@@ -347,6 +348,8 @@ int check_baddies(int clobber_reg, int flags_okay)
         check_nth_last_instruction(2, 0x05eb, 2) &&
         check_nth_last_instruction(3, 0xb8, 5) &&
         check_nth_last_instruction(4, 0x07840f, 6)) {
+      return 0;
+
         ind -= 6+5+2+5+2;
 
         uib(5);
@@ -373,6 +376,8 @@ int check_baddies(int clobber_reg, int flags_okay)
         check_nth_last_instruction(3, 0xc031, 2) &&
         check_nth_last_instruction(4, 0x07e9, 5) &&
         check_nth_last_instruction(5, 0x05840f, 6)) {
+
+      return 0;
         ind -= 6+5+2+5+5+2;
 
         uib(6);
@@ -399,6 +404,8 @@ int check_baddies(int clobber_reg, int flags_okay)
         check_nth_last_instruction(3, 0xc031, 2) &&
         check_nth_last_instruction(4, 0x07e9, 5) &&
         check_nth_last_instruction(5, 0x05850f, 6)) {
+      return 0;
+
 	if (flags_okay) {
 	    ind -= 6+5+2+5+5+2;
 	    memset(cur_text_section->data + ind, 0, 6+5+2+5+5+2);
