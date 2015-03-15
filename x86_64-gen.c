@@ -1974,6 +1974,16 @@ int gtst(int inv, int t)
 		ind++;
 		dump_ibs();
             } else {
+		/* XXX we currently generate code like this:
+		 * 81c3d19:	48 8b 45 f0          	mov    -0x10(%rbp),%rax
+		 * 81c3d1d:	85 c0                	test   %eax,%eax
+		 * 81c3d1f:	0f 84 52 00 00 00    	je     81c3d77 <Perl_sv_2num+0x183>
+		 * 81c3d25:	48 8b 45 f0          	mov    -0x10(%rbp),%rax
+		 * 81c3d29:	48 83 c0 0c          	add    $0xc,%rax
+		 * 81c3d2d:	8b 08                	mov    (%rax),%ecx
+		 *
+		 * Which is buggy because only the low 32 bits of %rax are checked. */
+
 		ib();
                 orex(0,v,v,0x85);
                 o(0xc0 + REG_VALUE(v) * 9);
