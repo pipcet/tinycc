@@ -316,6 +316,41 @@ static int many_struct_test_2(void) {
 }
 
 /*
+ * Win64 calling convention test.
+ */
+
+typedef struct many_struct_test_3_type_s {int a, b;} many_struct_test_3_type;
+typedef many_struct_test_3_type (*many_struct_test_3_function_type) (many_struct_test_3_type,many_struct_test_3_type,many_struct_test_3_type,many_struct_test_3_type,many_struct_test_3_type,many_struct_test_3_type);
+typedef struct many_struct_test_3_struct_type { many_struct_test_3_function_type f; many_struct_test_3_function_type f2; } many_struct_test_3_struct_type;
+
+static void dummy(many_struct_test_3_struct_type *s)
+{
+  s->f2 = s->f;
+}
+
+static int many_struct_test_3_callback(void *ptr) {
+  many_struct_test_3_struct_type s = { ptr, ptr };
+  many_struct_test_3_struct_type *s2 = &s;
+  dummy(s2);
+  many_struct_test_3_function_type f = s2->f2;
+  many_struct_test_3_type v = {1,2};
+  many_struct_test_3_type r = f(v,v,v,v,v,v);
+  return ((r.a == 6) && (r.b == 12))?0:-1;
+}
+
+static int many_struct_test_3(void) {
+  const char *src =
+  "typedef struct many_struct_test_3_type_s {int a, b;} many_struct_test_3_type;\n"
+  "many_struct_test_3_type f(many_struct_test_3_type x1, many_struct_test_3_type x2, many_struct_test_3_type x3, many_struct_test_3_type x4, many_struct_test_3_type x5, many_struct_test_3_type x6) {\n"
+  "  many_struct_test_3_type y;\n"
+  "  y.a = x1.a + x2.a + x3.a + x4.a + x5.a + x6.a;\n"
+  "  y.b = x1.b + x2.b + x3.b + x4.b + x5.b + x6.b;\n"
+  "  return y;\n"
+  "}\n";
+  return run_callback(src, many_struct_test_3_callback);
+}
+
+/*
  * stdarg_test: Test variable argument list ABI
  */
 
@@ -448,6 +483,7 @@ int main(int argc, char **argv) {
   RUN_TEST(two_member_union_test);
   RUN_TEST(many_struct_test);
   RUN_TEST(many_struct_test_2);
+  RUN_TEST(many_struct_test_3);
   RUN_TEST(stdarg_test);
   RUN_TEST(stdarg_struct_test);
   RUN_TEST(arg_align_test);
