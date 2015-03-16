@@ -755,7 +755,7 @@ ST_FUNC int get_reg(int rc)
             return r;
         }
     }
-    /* Should never comes here */
+    /* Should never come here */
     return -1;
 }
 
@@ -1767,7 +1767,7 @@ ST_FUNC void gen_op(int op)
         
     if (bt1 == VT_PTR || bt2 == VT_PTR) {
         /* at least one operand is a pointer */
-        /* relationnal op: must be both pointers */
+        /* relational op: must be both pointers */
         if (op >= TOK_ULT && op <= TOK_LOR) {
             check_comparison_pointer_types(vtop - 1, vtop, op);
             /* pointers are handled are unsigned */
@@ -1913,7 +1913,7 @@ ST_FUNC void gen_op(int op)
         else
             gen_opic(op);
         if (op >= TOK_ULT && op <= TOK_GT) {
-            /* relationnal op: the result is an int */
+            /* relational op: the result is an int */
             vtop->type.t = VT_INT;
         } else {
             vtop->type.t = t;
