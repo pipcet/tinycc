@@ -683,6 +683,21 @@ ST_FUNC int get_reg_ex(int rc, int rc2)
 }
 #endif
 
+ST_FUNC int get_specific_reg(int r)
+{
+    SValue *p;
+
+    for(p=vstack;p<=vtop;p++) {
+	if ((p->r & VT_VALMASK) == r ||
+	    (p->r2 & VT_VALMASK) == r)
+	    return -1;
+    }
+    if (register_contents[r].special_use)
+	return -1;
+    uncache_value_by_register(r);
+    return r;
+ }
+
 /* find a free register of class 'rc'. If none, save one register */
 ST_FUNC int get_reg(int rc)
 {
