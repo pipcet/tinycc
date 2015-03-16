@@ -875,8 +875,7 @@ void load(int r, SValue *sv)
                 fc &= ~0x100;
                 o(0x047a + (REX_BASE(r) << 8));
               }
-	    o(0x40);
-            orex(0,r,0, 0x0f); /* setxx %br */
+            orex_always(0,r,0, 0x0f); /* setxx %br */
             o(fc);
             o(0xc0 + REG_VALUE(r));
 	    flags_used_counter--;
