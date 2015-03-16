@@ -978,17 +978,17 @@ static void gcall_or_jmp(int is_jmp)
      *    ((int (*)(int))1000000000000)(3).
      * The constant is larger than 32 bits, but the relative call instruction
      * is limited to 32-bit offsets. */
-    if ((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST &&
-	(vtop->c.ll-4) == (int)(vtop->c.ll-4)) {
+    if (((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST) &&
+	((vtop->r & VT_SYM) || ((vtop->c.ll-4) == (int)(vtop->c.ll-4)))) {
         /* constant case */
         if (vtop->r & VT_SYM) {
             /* relocation case */
             greloc(cur_text_section, vtop->sym,
-                   ind + 1, R_X86_64_PC32);
+                   get_index() + 1, R_X86_64_PC32);
         } else {
             /* put an empty PC32 relocation */
             put_elf_reloc(symtab_section, cur_text_section,
-                          ind + 1, R_X86_64_PC32, 0);
+                          get_index() + 1, R_X86_64_PC32, 0);
         }
         oad(0xe8 + is_jmp, vtop->c.ul - 4); /* call/jmp im */
     } else {
