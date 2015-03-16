@@ -462,6 +462,19 @@ int check_baddies(int clobber_reg, int flags_okay)
 	}
     }
 
+    /*
+     *  81c0d6c:	0f 84 05 00 00 00    	je     81c0d77 <Perl_sv_2num+0x29>
+     *  81c0d72:	e9 09 00 00 00       	jmpq   81c0d80 <Perl_sv_2num+0x32>
+     *
+     * impossible to catch because of committed instructions, but should be jne 81c0d80.
+     */
+
+    if(check_nth_last_instruction_mask(0, 0xe9, 0xff, 5) &&
+       check_nth_last_instruction_mask(1, 0x05840f, 0xffffff, 6)) {
+	*(int *)0 = 0;
+    }
+
+
     return 0;
 }
 
