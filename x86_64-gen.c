@@ -2191,7 +2191,7 @@ void gen_opi(int op)
 		r = vtop[-1].r;
 		fr = vtop[0].r;
 		ib();
-		orex4(ll, fr&1, r, or, 0x8d); /* XXX */
+		orex4(ll, fr, r, or, 0x8d); /* XXX */
 		o(0x04 + REG_VALUE(or) * 8);
 		g(0x00 + REG_VALUE(r) * 8 + REG_VALUE(fr));
 
