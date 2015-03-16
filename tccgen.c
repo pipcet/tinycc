@@ -556,6 +556,8 @@ ST_FUNC void uncache_value_by_register(int r)
 {
     if(r >= 0 && r<NB_REGS) {
 	register_contents[r].v.type.t = VT_VOID;
+	register_contents[r].v.r = VT_CONST;
+	register_contents[r].v.c.ull = 0;
     }
 }
 
@@ -573,7 +575,7 @@ ST_FUNC void uncache_values(void)
     int r;
 
     for(r=0; r<NB_REGS; r++) {
-	register_contents[r].v.type.t = VT_VOID;
+	uncache_value_by_register(r);
     }
 }
 

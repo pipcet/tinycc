@@ -754,6 +754,8 @@ void load(int r, SValue *sv)
     int v, t, ft, fc, fr;
     SValue v1;
 
+    uncache_value_by_register(r);
+
 #ifdef TCC_TARGET_PE
     SValue v2;
     sv = pe_getimport(sv, &v2);
@@ -823,6 +825,7 @@ void load(int r, SValue *sv)
             orex_always(ll, fr, r, b);
             gen_modrm(r, fr, sv->sym, fc);
         }
+	uncache_value_by_register(r);
     } else {
         if (v == VT_CONST) {
             if (fr & VT_SYM) {
@@ -2159,7 +2162,8 @@ void gen_opi(int op)
     case '+':
     case TOK_ADDC1: /* add with carry generation */
         opc = 0;
-    gen_op8:
+    gen_op8: ;
+	int uncache = 1;
         /* so I assume that's the idiom for checking 32-bit-ness */
         if (cc && (!ll || (int)vtop->c.ll == vtop->c.ll) &&
 	    find_cached_value(vtop) == -1) {
@@ -2173,11 +2177,14 @@ void gen_opi(int op)
 	    if (opc == 0) {
 		int or = get_reg(RC_INT);
 
+		uncache_value_by_register(or);
+
 		orex(ll, r, or, 0x8d);
 		oad(0x80 | (REG_VALUE(or) << 3) | REG_VALUE(r), c);
 
 		vtop[-1].r = or;
 		cache_value(&vtop[0], vtop[0].r);
+		uncache = 0;
 	    } else if (c == 1 && opc == 0 || c == -1 && opc == 5) {
                 /* inc r */
                 orex(ll, r, 0, 0xff);
@@ -2209,6 +2216,7 @@ void gen_opi(int op)
 		cache_value(&vtop[0], vtop[0].r);
 		cache_value(&vtop[-1], vtop[-1].r);
 		vtop[-1].r = or;
+		uncache = 0;
 	    } else {
 		gv2(RC_INT, RC_INT);
 		r = vtop[-1].r;
@@ -2219,6 +2227,8 @@ void gen_opi(int op)
 	    }
         }
         vtop--;
+	if (uncache)
+	    uncache_value(&vtop[0]);
         if (op >= TOK_ULT && op <= TOK_GT) {
             vtop->r = VT_CMP;
             vtop->c.i = op;
@@ -2250,6 +2260,7 @@ void gen_opi(int op)
         orex(ll, fr, r, 0xaf0f); /* imul fr, r */
         o(0xc0 + REG_VALUE(fr) + REG_VALUE(r) * 8);
         vtop--;
+	uncache_value(&vtop[0]);
         break;
     case TOK_SHL:
         opc = 4;
@@ -2277,6 +2288,8 @@ void gen_opi(int op)
             o(opc | REG_VALUE(r));
         }
         vtop--;
+	uncache_value_by_register(r);
+	uncache_value(&vtop[0]);
         break;
     case TOK_UDIV:
     case TOK_UMOD:
@@ -2302,6 +2315,7 @@ void gen_opi(int op)
         else
             r = TREG_RAX;
         vtop->r = r;
+	uncache_value(&vtop[0]);
         break;
     default:
         opc = 7;
