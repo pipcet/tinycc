@@ -557,6 +557,17 @@ void orex(int ll, int r, int r2, int b)
     o(b);
 }
 
+void orex_always(int ll, int r, int r2, int b)
+{
+    ib();
+    if ((r & VT_VALMASK) >= VT_CONST)
+        r = 0;
+    if ((r2 & VT_VALMASK) >= VT_CONST)
+        r2 = 0;
+    o(0x40 | REX_BASE(r) | (REX_BASE(r2) << 2) | (ll << 3));
+    o(b);
+}
+
 /* always emit rex prefix. */
 void orex4(int ll, int r3, int r, int r2, int b)
 {
