@@ -1108,7 +1108,7 @@ static int func_scratch;
 
 void gen_offs_sp(int b, int r, int d)
 {
-    orex(1,0,r & 0x100 ? 0 : r, b);
+    orex(1,r,0,b);
     if (d == (char)d) {
         o(0x2444 | (REG_VALUE(r) << 3));
         g(d);
