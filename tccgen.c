@@ -668,21 +668,75 @@ ST_FUNC int get_reg_ex(int rc, int rc2)
 /* find a free register of class 'rc'. If none, save one register */
 ST_FUNC int get_reg(int rc)
 {
+    static int last_r = -1;
     int r;
     SValue *p;
 
-    /* find a free register */
+    if (last_r == -1) {
+	for(r=0; r<NB_REGS; r++) {
+	    register_contents[r].type.t = VT_VOID;
+	}
+    }
+
+    /* find a free register that doesn't have cached data in it */
     for(r=0;r<NB_REGS;r++) {
         if (reg_classes[r] & rc) {
             for(p=vstack;p<=vtop;p++) {
                 if ((p->r & VT_VALMASK) == r ||
                     (p->r2 & VT_VALMASK) == r)
-                    goto notfound;
+                    goto notfound1;
             }
+	    if ((register_contents[r].type.t & VT_BTYPE) == VT_VOID)
+		goto notfound1;
+	    last_r = r;
             return r;
         }
-    notfound: ;
+    notfound1: ;
     }
+
+    /* find a free register */
+    for(r=last_r+1;r<NB_REGS;r++) {
+        if (reg_classes[r] & rc) {
+            for(p=vstack;p<=vtop;p++) {
+                if ((p->r & VT_VALMASK) == r ||
+                    (p->r2 & VT_VALMASK) == r)
+                    goto notfound2;
+            }
+	    last_r = r;
+	    uncache_value_by_register(r);
+            return r;
+        }
+    notfound2: ;
+    }
+
+    /* find a free register */
+    for(r=0;r<=last_r;r++) {
+        if (reg_classes[r] & rc) {
+            for(p=vstack;p<=vtop;p++) {
+                if ((p->r & VT_VALMASK) == r ||
+                    (p->r2 & VT_VALMASK) == r)
+                    goto notfound3;
+            }
+	    last_r = r;
+	    uncache_value_by_register(r);
+            return r;
+        }
+    notfound3: ;
+    }
+
+     for(r=0;r<NB_REGS;r++) {
+         if (reg_classes[r] & rc) {
+             for(p=vstack;p<=vtop;p++) {
+                 if ((p->r & VT_VALMASK) == r ||
+                     (p->r2 & VT_VALMASK) == r)
+                    goto notfound;
+             }
+	     uncache_value_by_register(r);
+             return r;
+         }
+    notfound: ;
+     }
+
     
     /* no register left : free the first one on the stack (VERY
        IMPORTANT to start from the bottom to ensure that we don't
@@ -696,6 +750,8 @@ ST_FUNC int get_reg(int rc)
         if (r < VT_CONST && (reg_classes[r] & rc)) {
         save_found:
             save_reg(r);
+	    last_r = r;
+	    uncache_value_by_register(r);
             return r;
         }
     }
