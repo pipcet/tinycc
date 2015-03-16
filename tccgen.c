@@ -61,6 +61,7 @@ ST_DATA int *vla_sp_loc; /* Pointer to variable holding location to store stack 
 ST_DATA int vla_flags; /* VLA_* flags */
 
 ST_DATA SValue __vstack[1+VSTACK_SIZE], *vtop;
+ST_DATA SValue register_contents[NB_REGS];
 
 ST_DATA int const_wanted; /* true if constant wanted */
 ST_DATA int nocode_wanted; /* true if no code generation wanted for an expression */
@@ -528,6 +529,52 @@ ST_FUNC void vpushv(SValue *v)
 static void vdup(void)
 {
     vpushv(vtop);
+}
+
+ST_FUNC void cache_value(SValue *v, int r)
+{
+    if(r<NB_REGS) {
+	register_contents[r] = *v;
+    }
+}
+
+ST_FUNC int find_cached_value(SValue *v);
+
+ST_FUNC void uncache_value_by_register(int r)
+{
+    register_contents[r].type.t = VT_VOID;
+}
+
+ST_FUNC void uncache_value(SValue *v)
+{
+    int r;
+
+    while ((r = find_cached_value(v)) > 0) {
+	uncache_value_by_register(r);
+    }
+}
+
+ST_FUNC void uncache_values(void)
+{
+    int r;
+
+    for(r=0; r<NB_REGS; r++) {
+	register_contents[r].type.t = VT_VOID;
+    }
+}
+
+ST_FUNC int find_cached_value(SValue *v)
+{
+    int r;
+
+    for(r=0; r<NB_REGS; r++) {
+	if(register_contents[r].type.t == v->type.t &&
+	   register_contents[r].c.ul == v->c.ul) {
+	    return r;
+	}
+    }
+
+    return -1;
 }
 
 /* save r to the memory stack, and mark it as being free */
