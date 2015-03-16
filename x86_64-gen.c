@@ -920,8 +920,7 @@ void load(int r, SValue *sv)
     }
 }
 
-/* store register 'r' in lvalue 'v' */
-void store(int r, SValue *v)
+void store_pic(int r,SValue *v)
 {
     int fr, bt, ft, fc;
     int op64 = 0;
@@ -938,15 +937,10 @@ void store(int r, SValue *v)
     fr = v->r & VT_VALMASK;
     bt = ft & VT_BTYPE;
 
-#ifndef TCC_TARGET_PE
-    /* we need to access the variable via got */
-    if (fr == VT_CONST && (v->r & VT_SYM)) {
-        /* mov xx(%rip), %r11 */
-        o(0x1d8b4c);
-        gen_gotpcrel(TREG_R11, v->sym, v->c.ul);
-        pic = is64_type(bt) ? 0x49 : 0x41;
-    }
-#endif
+    /* mov xx(%rip), %r11 */
+    o(0x1d8b4c);
+    gen_gotpcrel(TREG_R11, v->sym, v->c.ul);
+    pic = is64_type(bt) ? 0x49 : 0x41;
 
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
@@ -966,37 +960,74 @@ void store(int r, SValue *v)
         r = 7;
     } else {
         if (bt == VT_SHORT)
-            o(0x66);
-        o(pic);
+	    orex_always(0, 11, r, 0x66);
         if (bt == VT_BYTE || bt == VT_BOOL) {
-	    if(!pic) o(0x40);
-            orex(0, 0, r, 0x88);
-        } else if (is64_type(bt))
-            op64 = 0x89;
-        else
-            orex(0, 0, r, 0x89);
+            orex_always(0, 11, r, 0x88);
+        } else if (is64_type(bt)) {
+	    orex_always(1, 11, r, 0x89);
+        } else {
+	    orex_always(0, 11, r, 0x89);
+	}
     }
-    if (pic) {
-        /* xxx r, (%r11) where xxx is mov, movq, fld, or etc */
-        if (op64)
-            o(op64);
-        o(3 + (r << 3));
-    } else if (op64) {
-        if (fr == VT_CONST || fr == VT_LOCAL || (v->r & VT_LVAL)) {
-            gen_modrm64(op64, r, v->r, v->sym, fc);
-        } else if (fr != r) {
-            /* XXX: don't we really come here? */
-            abort();
-            o(0xc0 + fr + r * 8); /* mov r, fr */
-        }
+
+    o(REG_VALUE(11) + (REG_VALUE(r) << 3));
+}
+
+/* store register 'r' in lvalue 'v' */
+void store(int r, SValue *v)
+{
+    int fr, bt, ft, fc;
+    int op64 = 0;
+
+#ifdef TCC_TARGET_PE
+    SValue v2;
+    v = pe_getimport(v, &v2);
+#endif
+
+    ft = v->type.t;
+    fc = v->c.ul;
+    fr = v->r & VT_VALMASK;
+    bt = ft & VT_BTYPE;
+
+#ifndef TCC_TARGET_PE
+    /* we need to access the variable via got */
+    if (fr == VT_CONST && (v->r & VT_SYM)) {
+	store_pic(r, v);
+	return;
+    }
+#endif
+
+    /* XXX: incorrect if float reg to reg */
+    if (bt == VT_FLOAT) {
+        o(0x66);
+        o(0x7e0f); /* movd */
+        r = REG_VALUE(r);
+    } else if (bt == VT_DOUBLE) {
+        o(0x66);
+        o(0xd60f); /* movq */
+        r = REG_VALUE(r);
+    } else if (bt == VT_LDOUBLE) {
+        o(0xc0d9); /* fld %st(0) */
+        o(0xdb); /* fstpt */
+        r = 7;
     } else {
-        if (fr == VT_CONST || fr == VT_LOCAL || (v->r & VT_LVAL)) {
-            gen_modrm(r, v->r, v->sym, fc);
-        } else if (fr != r) {
-            /* XXX: don't we really come here? */
-            abort();
-            o(0xc0 + fr + r * 8); /* mov r, fr */
-        }
+        if (bt == VT_SHORT)
+	    orex_always(0, v->r, r, 0x66);
+        if (bt == VT_BYTE || bt == VT_BOOL) {
+            orex_always(0, v->r, r, 0x88);
+        } else if (is64_type(bt)) {
+	    orex_always(1, v->r, r, 0x89);
+        } else {
+	    orex_always(0, v->r, r, 0x89);
+	}
+    }
+
+    if (fr == VT_CONST || fr == VT_LOCAL || (v->r & VT_LVAL)) {
+	gen_modrm(r, v->r, v->sym, fc);
+    } else if (fr != r) {
+	/* XXX: don't we really come here? */
+	abort();
+	o(0xc0 + REG_VALUE(fr) + REG_VALUE(r) * 8); /* mov r, fr */
     }
 }
 
