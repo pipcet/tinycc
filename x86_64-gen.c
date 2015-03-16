@@ -2114,7 +2114,16 @@ void gen_opi(int op)
             vswap();
             c = vtop->c.i;
 	    ib();
-            if (c == 1 && opc == 0 || c == -1 && opc == 5) {
+	    /* lea 0xXXXX(r), or */
+	    if (opc == 0) {
+		int or = get_reg(RC_INT);
+
+		orex(ll, r, or, 0x8d);
+		oad(0x80 | (REG_VALUE(or) << 3) | REG_VALUE(r), c);
+
+		vtop[-1].r = or;
+		cache_value(&vtop[0], vtop[0].r);
+	    } else if (c == 1 && opc == 0 || c == -1 && opc == 5) {
                 /* inc r */
                 orex(ll, r, 0, 0xff);
                 o(0xc0 + REG_VALUE(r));
@@ -2131,12 +2140,27 @@ void gen_opi(int op)
                 oad(0xc0 | (opc << 3) | REG_VALUE(r), c);
             }
         } else {
-            gv2(RC_INT, RC_INT);
-            r = vtop[-1].r;
-            fr = vtop[0].r;
-	    ib();
-            orex(ll, r, fr, (opc << 3) | 0x01);
-            o(0xc0 + REG_VALUE(r) + REG_VALUE(fr) * 8);
+	    if (opc == 0) {
+		int or = get_reg(RC_INT);
+		gv2(RC_INT, RC_INT);
+		r = vtop[-1].r;
+		fr = vtop[0].r;
+		ib();
+		orex4(ll, fr&1, r, or, 0x8d); /* XXX */
+		o(0x04 + REG_VALUE(or) * 8);
+		g(0x00 + REG_VALUE(r) * 8 + REG_VALUE(fr));
+
+		cache_value(&vtop[0], vtop[0].r);
+		cache_value(&vtop[-1], vtop[-1].r);
+		vtop[-1].r = or;
+	    } else {
+		gv2(RC_INT, RC_INT);
+		r = vtop[-1].r;
+		fr = vtop[0].r;
+		ib();
+		orex(ll, r, fr, (opc << 3) | 0x01);
+		o(0xc0 + REG_VALUE(r) + REG_VALUE(fr) * 8);
+	    }
         }
         vtop--;
         if (op >= TOK_ULT && op <= TOK_GT) {
