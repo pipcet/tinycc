@@ -854,7 +854,7 @@ void load(int r, SValue *sv)
 		}
             } else {
 		if (fc) {
-		    orex(0,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
+		    orex_always(0,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
 		    gen_le32(fc);
 		} else {
 		    orex(0, r, r, 0x31);
@@ -867,7 +867,7 @@ void load(int r, SValue *sv)
         } else if (v == VT_CMP) {
 	    flags_used_counter++;
 	    ib();
-            orex(0,r,0,0);
+            orex_always(0,r,0,0);
 	    oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
 	    check_baddies(r, 0);
 	    ib();
@@ -887,7 +887,7 @@ void load(int r, SValue *sv)
 	    flags_used_counter++;
             t = v & 1;
 	    ib();
-            orex(0,r,0,0);
+            orex_always(0,r,0,0);
             oad(0xb8 + REG_VALUE(r), t); /* mov $1, r */
 	    check_baddies(r, 0);
 	    ib();
