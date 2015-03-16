@@ -4765,6 +4765,7 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
         vpop();
         skip(')');
         a = 0;
+	commit_instructions();
         b = gjmp(0); /* jump to first case */
         c = 0;
         block(&a, csym, &b, &c, case_reg, 0);
@@ -4877,7 +4878,6 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
             } else {
                 s = label_push(&global_label_stack, b, LABEL_DEFINED);
             }
-	    commit_instructions();
             s->jnext = get_index();
             if (vla_flags & VLA_IN_SCOPE) {
                 gen_vla_sp_restore(*vla_sp_loc);
