@@ -165,6 +165,8 @@ static int last_instruction_boundary[16] = { 0, };
 
 void ib(void)
 {
+    check_baddies(-1, 0);
+
     if(last_instruction_boundary[0] == ind)
 	return;
 
