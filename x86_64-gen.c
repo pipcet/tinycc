@@ -440,7 +440,8 @@ int check_baddies(int clobber_reg, int flags_okay)
      * 81c28f6:	48 8b 01 000 101 f8          	mov    -0x8(%rbp),%rax
      */
 
-    if (check_nth_last_instruction_mask(0, 0x00408b48, 0x00c0ffff, 4) &&
+    if (0 &&
+	check_nth_last_instruction_mask(0, 0x00408b48, 0x00c0ffff, 4) &&
 	check_nth_last_instruction_mask(1, 0x00708948, 0x00c0ffff, 4)) {
 	int offset1 = cur_text_section->data[ind - 5];
 	int offset2 = cur_text_section->data[ind - 1];
