@@ -994,6 +994,12 @@ static void gcall_or_jmp(int is_jmp)
     } else {
         /* otherwise, indirect call */
         r = TREG_R11;
+	/* I don't think this load is okay. Usually it will load the
+	   function pointer right into %r11, but occasionally it will
+	   use an intermediate value; in the upstream source code,
+	   that means clobbering %rax, which is usually (but not
+	   always) harmless.  With modifications, %rcx sometimes gets
+	   clobbered instead, and that causes segfaults. */
         load(r, vtop);
         o(0x41); /* REX */
         o(0xff); /* call/jmp *r */
