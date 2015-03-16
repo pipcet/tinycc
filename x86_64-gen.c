@@ -126,19 +126,19 @@ ST_DATA const int reg_classes[NB_REGS] = {
     /* eax */ RC_INT | RC_RAX,
     /* ecx */ RC_INT | RC_RCX,
     /* edx */ RC_INT | RC_RDX,
+    /* rbx, callee-saved */ 0,
     0,
     0,
-    0,
-    0,
+    RC_INT,
     0,
     RC_R8,
     RC_R9,
     RC_R10,
     RC_R11,
-    0,
-    0,
-    0,
-    0,
+    /* %r12, callee-saved */ 0,
+    /* %r13, callee-saved */ 0,
+    /* %r14, callee-saved */ 0,
+    /* %r15, callee-saved */ 0,
     /* xmm0 */ RC_FLOAT | RC_XMM0,
     /* xmm1 */ RC_FLOAT | RC_XMM1,
     /* xmm2 */ RC_FLOAT | RC_XMM2,
@@ -791,9 +791,9 @@ void load(int r, SValue *sv)
         } else if ((ft & VT_BTYPE) == VT_LDOUBLE) {
             b = 0xdb, r = 5; /* fldt */
         } else if ((ft & VT_TYPE) == VT_BYTE || (ft & VT_TYPE) == VT_BOOL) {
-            b = 0xbe0f;   /* movsbl */
+            b = 0xbe0f40;   /* movsbl */
         } else if ((ft & VT_TYPE) == (VT_BYTE | VT_UNSIGNED)) {
-            b = 0xb60f;   /* movzbl */
+            b = 0xb60f40;   /* movzbl */
         } else if ((ft & VT_TYPE) == VT_SHORT) {
             b = 0xbf0f;   /* movswl */
         } else if ((ft & VT_TYPE) == (VT_SHORT | VT_UNSIGNED)) {
@@ -862,8 +862,9 @@ void load(int r, SValue *sv)
                    set the result was unordered, meaning false for everything
                    except TOK_NE, and true for TOK_NE.  */
                 fc &= ~0x100;
-                o(0x037a + (REX_BASE(r) << 8));
+                o(0x047a + (REX_BASE(r) << 8));
               }
+	    o(0x40);
             orex(0,r,0, 0x0f); /* setxx %br */
             o(fc);
             o(0xc0 + REG_VALUE(r));
@@ -967,9 +968,10 @@ void store(int r, SValue *v)
         if (bt == VT_SHORT)
             o(0x66);
         o(pic);
-        if (bt == VT_BYTE || bt == VT_BOOL)
+        if (bt == VT_BYTE || bt == VT_BOOL) {
+	    if(!pic) o(0x40);
             orex(0, 0, r, 0x88);
-        else if (is64_type(bt))
+        } else if (is64_type(bt))
             op64 = 0x89;
         else
             orex(0, 0, r, 0x89);
@@ -1030,9 +1032,6 @@ static void gcall_or_jmp(int is_jmp)
 	   always) harmless.  With modifications, %rcx sometimes gets
 	   clobbered instead, and that causes segfaults. */
         load(r, vtop);
-        o(0xd2894c); /* mov %r10, %rdx */
-	o(0xe9894c); /* mov %r13, %rcx */
-	o(0xe0894c); /* mov %r12, %rax */
         o(0x41); /* REX */
         o(0xff); /* call/jmp *r */
         o(0xd0 + REG_VALUE(r) + (is_jmp << 4));
@@ -1175,6 +1174,7 @@ void gfunc_call(int nb_args)
             } else {
                 d = arg_prepare_reg(arg);
                 gen_offs_sp(0x8d, d, struct_size);
+		start_special_use(d);
             }
             struct_size += size;
         } else {
@@ -1192,6 +1192,7 @@ void gfunc_call(int nb_args)
                     o(0x66);
                     orex(1,d,0, 0x7e0f);
                     o(0xc0 + REG_VALUE(d));
+		    start_special_use(d);
                 }
             } else {
                 if (bt == VT_STRUCT) {
@@ -1207,6 +1208,7 @@ void gfunc_call(int nb_args)
                     d = arg_prepare_reg(arg);
                     orex(1,d,r,0x89); /* mov */
                     o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
+		    start_special_use(d);
                 }
             }
         }
@@ -1220,9 +1222,6 @@ void gfunc_call(int nb_args)
         if (nb_args > 1) {
             o(0xda894c); /* mov %r11, %rdx */
         }
-    } else {
-	o(0xcb8949) /* mov %rcx, %r10 */;
-	o(0xd28949); /* mov %rdx, %r11 */
     }
     
     gcall_or_jmp(0);
@@ -1650,7 +1649,7 @@ void gfunc_call(int nb_args)
                 break;
             }
             
-            /* And swap the argument back to it's original position.  */
+            /* And swap the argument back to its original position.  */
             tmp = vtop[0];
             vtop[0] = vtop[-i];
             vtop[-i] = tmp;
@@ -1743,10 +1742,12 @@ void gfunc_call(int nb_args)
             int d = arg_prepare_reg(gen_reg);
             orex(1,d,r,0x89); /* mov */
             o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
+	    start_special_use(d);
             if (reg_count == 2) {
                 d = arg_prepare_reg(gen_reg+1);
                 orex(1,d,vtop->r2,0x89); /* mov */
                 o(0xc0 + REG_VALUE(vtop->r2) * 8 + REG_VALUE(d));
+		start_special_use(d);
             }
         }
         vtop--;
@@ -1763,16 +1764,12 @@ void gfunc_call(int nb_args)
     /* Copy R10 and R11 into RDX and RCX, respectively */
     if (nb_reg_args > 2) {
         o(0xd2894c); /* mov %r10, %rdx */
+	start_special_use(TREG_RDX);
         if (nb_reg_args > 3) {
             o(0xd9894c); /* mov %r11, %rcx */
-        } else {
-	    o(0xcb8949); /* mov %rcx, %r11 */;
+	    start_special_use(TREG_RCX);
 	}
-    } else {
-	o(0xcb8949); /* mov %rcx, %r11 */;
-	o(0xd28949); /* mov %rdx, %r10 */
     }
-    o(0xcd8949); /* mov %rcx, %r13 */;
 
     ib();
     if (nb_sse_args)
@@ -1780,11 +1777,20 @@ void gfunc_call(int nb_args)
     else {
       o(0xc031); /* xor %eax,%eax */
     }
-    o(0xc48949); /* mov %rax, %r12 */
+    start_special_use(TREG_RAX);
 
     check_baddies(-1, 0);
     ib();
     gcall_or_jmp(0);
+    end_special_use(TREG_RAX);
+    end_special_use(TREG_RCX);
+    end_special_use(TREG_RDX);
+    end_special_use(TREG_RSI);
+    end_special_use(TREG_RDI);
+    end_special_use(TREG_R8);
+    end_special_use(TREG_R9);
+    end_special_use(TREG_R10);
+    end_special_use(TREG_R11);
     if (args_size)
         gadd_sp(args_size);
     vtop--;
@@ -2015,10 +2021,12 @@ int gtst(int inv, int t)
 		t = psym(0x8a, t); /* jp t */
 	      }
 	  }
+	commit_instructions();
 	inv ^= check_baddies(-1, 1);
 	ib();
         g(0x0f);
         t = psym((vtop->c.i - 16) ^ inv, t);
+	commit_instructions();
     } else if (v == VT_JMP || v == VT_JMPI) {
         /* && or || optimization */
         if ((v & 1) == inv) {
@@ -2111,7 +2119,8 @@ void gen_opi(int op)
         opc = 0;
     gen_op8:
         /* so I assume that's the idiom for checking 32-bit-ness */
-        if (cc && (!ll || (int)vtop->c.ll == vtop->c.ll)) {
+        if (cc && (!ll || (int)vtop->c.ll == vtop->c.ll) &&
+	    find_cached_value(vtop) == -1) {
             /* constant case */
             vswap();
             r = gv(RC_INT);
@@ -2136,6 +2145,7 @@ void gen_opi(int op)
                 orex(ll, r, 0, 0xff);
                 o(0xc8 + REG_VALUE(r));
             } else if (c == (char)c) {
+		g(0x40);
                 orex(ll, r, 0, 0x83);
                 o(0xc0 | (opc << 3) | REG_VALUE(r));
                 g(c);

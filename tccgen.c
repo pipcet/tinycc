@@ -61,7 +61,7 @@ ST_DATA int *vla_sp_loc; /* Pointer to variable holding location to store stack 
 ST_DATA int vla_flags; /* VLA_* flags */
 
 ST_DATA SValue __vstack[1+VSTACK_SIZE], *vtop;
-ST_DATA SValue register_contents[NB_REGS];
+ST_DATA RContents register_contents[NB_REGS];
 
 ST_DATA int const_wanted; /* true if constant wanted */
 ST_DATA int nocode_wanted; /* true if no code generation wanted for an expression */
@@ -531,10 +531,22 @@ static void vdup(void)
     vpushv(vtop);
 }
 
+ST_FUNC void start_special_use(int r)
+{
+    if(register_contents[r].special_use)
+	tcc_error("register already in special use");
+    register_contents[r].special_use = 1;
+}
+
+ST_FUNC void end_special_use(int r)
+{
+    register_contents[r].special_use = 0;
+}
+
 ST_FUNC void cache_value(SValue *v, int r)
 {
-    if(r<NB_REGS) {
-	register_contents[r] = *v;
+    if(r >= 0 && r<NB_REGS) {
+	register_contents[r].v = *v;
     }
 }
 
@@ -542,7 +554,9 @@ ST_FUNC int find_cached_value(SValue *v);
 
 ST_FUNC void uncache_value_by_register(int r)
 {
-    register_contents[r].type.t = VT_VOID;
+    if(r >= 0 && r<NB_REGS) {
+	register_contents[r].v.type.t = VT_VOID;
+    }
 }
 
 ST_FUNC void uncache_value(SValue *v)
@@ -559,7 +573,7 @@ ST_FUNC void uncache_values(void)
     int r;
 
     for(r=0; r<NB_REGS; r++) {
-	register_contents[r].type.t = VT_VOID;
+	register_contents[r].v.type.t = VT_VOID;
     }
 }
 
@@ -568,8 +582,12 @@ ST_FUNC int find_cached_value(SValue *v)
     int r;
 
     for(r=0; r<NB_REGS; r++) {
-	if(register_contents[r].type.t == v->type.t &&
-	   register_contents[r].c.ul == v->c.ul) {
+	/* as a special case, never return vtop */
+	if(vtop->r == r)
+	    continue;
+
+	if(register_contents[r].v.type.t == v->type.t &&
+	   register_contents[r].v.c.ul == v->c.ul) {
 	    return r;
 	}
     }
@@ -674,7 +692,7 @@ ST_FUNC int get_reg(int rc)
 
     if (last_r == -1) {
 	for(r=0; r<NB_REGS; r++) {
-	    register_contents[r].type.t = VT_VOID;
+	    register_contents[r].v.type.t = VT_VOID;
 	}
     }
 
@@ -686,7 +704,9 @@ ST_FUNC int get_reg(int rc)
                     (p->r2 & VT_VALMASK) == r)
                     goto notfound1;
             }
-	    if ((register_contents[r].type.t & VT_BTYPE) == VT_VOID)
+	    if ((register_contents[r].v.type.t & VT_BTYPE) == VT_VOID)
+		goto notfound1;
+	    if (register_contents[r].special_use)
 		goto notfound1;
 	    last_r = r;
             return r;
@@ -702,6 +722,8 @@ ST_FUNC int get_reg(int rc)
                     (p->r2 & VT_VALMASK) == r)
                     goto notfound2;
             }
+	    if (register_contents[r].special_use)
+		goto notfound2;
 	    last_r = r;
 	    uncache_value_by_register(r);
             return r;
@@ -717,6 +739,8 @@ ST_FUNC int get_reg(int rc)
                     (p->r2 & VT_VALMASK) == r)
                     goto notfound3;
             }
+	    if (register_contents[r].special_use)
+		goto notfound3;
 	    last_r = r;
 	    uncache_value_by_register(r);
             return r;
@@ -731,6 +755,8 @@ ST_FUNC int get_reg(int rc)
                      (p->r2 & VT_VALMASK) == r)
                     goto notfound;
              }
+	     if (register_contents[r].special_use)
+		 goto notfound;
 	     uncache_value_by_register(r);
              return r;
          }
@@ -749,6 +775,8 @@ ST_FUNC int get_reg(int rc)
         r = p->r & VT_VALMASK;
         if (r < VT_CONST && (reg_classes[r] & rc)) {
         save_found:
+	    if(register_contents[r].special_use)
+		tcc_error("register already in special use");
             save_reg(r);
 	    last_r = r;
 	    uncache_value_by_register(r);
