@@ -1001,6 +1001,9 @@ static void gcall_or_jmp(int is_jmp)
 	   always) harmless.  With modifications, %rcx sometimes gets
 	   clobbered instead, and that causes segfaults. */
         load(r, vtop);
+        o(0xd2894c); /* mov %r10, %rdx */
+	o(0xe9894c); /* mov %r13, %rcx */
+	o(0xe0894c); /* mov %r12, %rax */
         o(0x41); /* REX */
         o(0xff); /* call/jmp *r */
         o(0xd0 + REG_VALUE(r) + (is_jmp << 4));
@@ -1188,6 +1191,9 @@ void gfunc_call(int nb_args)
         if (nb_args > 1) {
             o(0xda894c); /* mov %r11, %rdx */
         }
+    } else {
+	o(0xcb8949) /* mov %rcx, %r10 */;
+	o(0xd28949); /* mov %rdx, %r11 */
     }
     
     gcall_or_jmp(0);
@@ -1730,8 +1736,14 @@ void gfunc_call(int nb_args)
         o(0xd2894c); /* mov %r10, %rdx */
         if (nb_reg_args > 3) {
             o(0xd9894c); /* mov %r11, %rcx */
-        }
+        } else {
+	    o(0xcb8949); /* mov %rcx, %r11 */;
+	}
+    } else {
+	o(0xcb8949); /* mov %rcx, %r11 */;
+	o(0xd28949); /* mov %rdx, %r10 */
     }
+    o(0xcd8949); /* mov %rcx, %r13 */;
 
     ib();
     if (nb_sse_args)
@@ -1739,6 +1751,8 @@ void gfunc_call(int nb_args)
     else {
       o(0xc031); /* xor %eax,%eax */
     }
+    o(0xc48949); /* mov %rax, %r12 */
+
     check_baddies(-1, 0);
     ib();
     gcall_or_jmp(0);
