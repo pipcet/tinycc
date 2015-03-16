@@ -189,7 +189,8 @@ void uib(int count)
 
 void commit_instructions(void)
 {
-  uib(16);
+    uib(16);
+    uncache_values();
 }
 
 int check_nth_last_instruction_mask(int n, unsigned long long c, unsigned long long mask, int length)
