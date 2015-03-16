@@ -774,7 +774,8 @@ void load(int r, SValue *sv)
             v1.r = VT_LOCAL | VT_LVAL;
             v1.c.ul = fc;
             fr = r;
-            if (!(reg_classes[fr] & RC_INT))
+	    /* when we load %r11, use %r11 as a temp register, not another integer register. */
+            if (!(reg_classes[fr] & (RC_R11 | RC_INT)))
                 fr = get_reg(RC_INT);
             load(fr, &v1);
         }
