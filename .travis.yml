@@ -1,5 +1,10 @@
 language: C
+
+install:
+  - git clone --branch pipcet https://www.github.com/pipcet/perl5
+
 script:
   - ./configure && make -k && sudo make -k install && make test
   - make distclean
   - CC="tcc" ./configure && make -k && sudo make -k install && make test
+  - cd perl5; ./Configure -Uusedl -Dusedevel -Dcc=tcc -Dld=ld -Ddynamic_ext=none -Dccflags=-I/usr/local/include -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -Dccdlflags=-fPIC -de && make -k
