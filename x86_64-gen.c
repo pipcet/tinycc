@@ -819,7 +819,7 @@ void load(int r, SValue *sv)
         if (ll) {
             gen_modrm64(b, r, fr, sv->sym, fc);
         } else {
-            orex(ll, fr, r, b);
+            orex_always(ll, fr, r, b);
             gen_modrm(r, fr, sv->sym, fc);
         }
     } else {
@@ -888,11 +888,11 @@ void load(int r, SValue *sv)
             oad(0xb8 + REG_VALUE(r), t); /* mov $1, r */
 	    check_baddies(r, 0);
 	    ib();
-            o(0x05eb + (REX_BASE(r) << 8)); /* jmp after */
+            o(0x06eb + (REX_BASE(r) << 8)); /* jmp after */
             if(gsym_nocommit(fc) > 1)
 	      commit_instructions();
 	    ib();
-            orex(0,r,0,0);
+            orex_always(0,r,0,0);
             oad(0xb8 + REG_VALUE(r), t ^ 1); /* mov $0, r */
 	    check_baddies(r, 0);
 	    flags_used_counter--;
