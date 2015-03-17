@@ -1093,11 +1093,7 @@ static const uint8_t arg_regs[REGN] = {
 /* Prepare arguments in R10 and R11 rather than RCX and RDX
    because gv() will not ever use these */
 static int arg_prepare_reg(int idx) {
-  if (idx == 0 || idx == 1)
-      /* idx=0: r10, idx=1: r11 */
-      return idx + 10;
-  else
-      return arg_regs[idx];
+    return arg_regs[idx];
 }
 
 static int func_scratch;
@@ -1536,11 +1532,7 @@ static const uint8_t arg_regs[REGN] = {
 };
 
 static int arg_prepare_reg(int idx) {
-  if (idx == 2 || idx == 3)
-      /* idx=2: r10, idx=3: r11 */
-      return idx + 8;
-  else
-      return arg_regs[idx];
+    return arg_regs[idx];
 }
 
 /* Generate function call. The function address is pushed first, then
@@ -1818,16 +1810,6 @@ void gfunc_call(int nb_args)
        (or edx/ecx) currently, which the below writes would clobber.
        So evict all remaining operands here.  */
     save_regs(0);
-
-    /* Copy R10 and R11 into RDX and RCX, respectively */
-    if (nb_reg_args > 2) {
-        o(0xd2894c); /* mov %r10, %rdx */
-	start_special_use(TREG_RDX);
-        if (nb_reg_args > 3) {
-            o(0xd9894c); /* mov %r11, %rcx */
-	    start_special_use(TREG_RCX);
-	}
-    }
 
     ib();
     if (nb_sse_args)
