@@ -904,7 +904,7 @@ void load(int r, SValue *sv)
                 fc &= ~0x100;
                 o(0x047a);
               }
-            orex_new(8,r,0, 0x0f); /* setxx %br XXX mov $0,r; setxx %rb -> setxx, and */
+            orex_always(8,r,0, 0x0f); /* setxx %br XXX mov $0,r; setxx %rb -> setxx, and */
             o(fc);
             o(0xc0 + REG_VALUE(r));
 	    flags_used_counter--;
@@ -989,21 +989,21 @@ void store_pic(int r,SValue *v)
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
         o(0x66);
-        orex_new(bs, pic_reg, r, 0x0f);
+        orex_new(0, pic_reg, r, 0x0f);
         o(0x7e); /* movd */
         r = REG_VALUE(r);
     } else if (bt == VT_DOUBLE) {
         o(0x66);
-        orex_new(bs, pic_reg, r, 0x0f);
+        orex_new(0, pic_reg, r, 0x0f);
         o(0xd6); /* movq */
         r = REG_VALUE(r);
     } else if (bt == VT_LDOUBLE) {
         o(0xc0d9); /* fld %st(0) */
-        orex_new(bs, pic_reg, r, 0xdb); /* fstpt */
         r = 7;
+        orex_new(0, pic_reg, r, 0xdb); /* fstpt */
     } else {
         if (bt == VT_SHORT)
-	    orex_new(16, pic_reg, r, 0x66);
+	    o(0x66);
         if (bt == VT_BYTE || bt == VT_BOOL) {
             orex_new(8, pic_reg, r, 0x88);
         } else if (is64_type(bt)) {
@@ -1044,19 +1044,19 @@ void store(int r, SValue *v)
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
         o(0x66);
-	orex_new(32, v->r, r, 0x0f);
+	orex_new(0, v->r, r, 0x0f);
         o(0x7e); /* movd */
     } else if (bt == VT_DOUBLE) {
         o(0x66);
-	orex_new(64, v->r, r, 0x0f);
+	orex_new(0, v->r, r, 0x0f);
         o(0xd6); /* movq */
     } else if (bt == VT_LDOUBLE) {
         o(0xc0d9); /* fld %st(0) */
         r = 7;
-	orex_new(32, v->r, r, 0xdb); /* fstpt */
+	orex_new(0, v->r, 0, 0xdb); /* fstpt */
     } else {
         if (bt == VT_SHORT)
-	    orex_new(16, v->r, r, 0x66); /* XXX that's a prefix, shouldn't have orex */
+	    o(0x66);
         if (bt == VT_BYTE || bt == VT_BOOL) {
             orex_new(8, v->r, r, 0x88);
         } else if (is64_type(bt)) {
