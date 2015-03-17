@@ -2558,7 +2558,8 @@ void gen_cvt_itof(int t)
         if ((vtop->type.t & VT_BTYPE) == VT_LLONG) {
             /* signed long long to float/double/long double (unsigned case
                is handled generically) */
-            o(0x50 + (vtop->r & VT_VALMASK)); /* push r */
+	    orex_new(0, vtop->r, 0, 0);
+            o(0x50 + REG_VALUE(vtop->r)); /* push r */
             o(0x242cdf); /* fildll (%rsp) */
             o(0x08c48348); /* add $8, %rsp */
         } else if ((vtop->type.t & (VT_BTYPE | VT_UNSIGNED)) ==
@@ -2566,12 +2567,16 @@ void gen_cvt_itof(int t)
             /* unsigned int to float/double/long double */
             o(0x6a); /* push $0 */
             g(0x00);
-            o(0x50 + (vtop->r & VT_VALMASK)); /* push r */
+	    orex_new(0, vtop->r, 0, 0);
+	    /* er, we're using the top 32 bits? */
+            o(0x50 + REG_VALUE(vtop->r)); /* push r */
             o(0x242cdf); /* fildll (%rsp) */
             o(0x10c48348); /* add $16, %rsp */
         } else {
             /* int to float/double/long double */
-            o(0x50 + (vtop->r & VT_VALMASK)); /* push r */
+	    orex_new(0, vtop->r, 0, 0);
+	    /* er, we're using the top 32 bits? */
+            o(0x50 + REG_VALUE(vtop->r)); /* push r */
             o(0x2404db); /* fildl (%rsp) */
             o(0x08c48348); /* add $8, %rsp */
         }
@@ -2604,14 +2609,17 @@ void gen_cvt_ftof(int t)
     if (bt == VT_FLOAT) {
         gv(RC_FLOAT);
         if (tbt == VT_DOUBLE) {
+	    orex_new(0, vtop->r, vtop->r, 0);
             o(0x140f); /* unpcklps */
             o(0xc0 + REG_VALUE(vtop->r)*9);
+	    orex_new(0, vtop->r, vtop->r, 0);
             o(0x5a0f); /* cvtps2pd */
             o(0xc0 + REG_VALUE(vtop->r)*9);
         } else if (tbt == VT_LDOUBLE) {
             save_reg(RC_ST0);
             /* movss %xmm0,-0x10(%rsp) */
             o(0x110ff3);
+	    orex_new(0, vtop->r, 0, 0);
             o(0x44 + REG_VALUE(vtop->r)*8);
             o(0xf024);
             o(0xf02444d9); /* flds -0x10(%rsp) */
@@ -2620,13 +2628,16 @@ void gen_cvt_ftof(int t)
     } else if (bt == VT_DOUBLE) {
         gv(RC_FLOAT);
         if (tbt == VT_FLOAT) {
+	    orex_new(0, vtop->r, vtop->r, 0);
             o(0x140f66); /* unpcklpd */
             o(0xc0 + REG_VALUE(vtop->r)*9);
+	    orex_new(0, vtop->r, vtop->r, 0);
             o(0x5a0f66); /* cvtpd2ps */
             o(0xc0 + REG_VALUE(vtop->r)*9);
         } else if (tbt == VT_LDOUBLE) {
             save_reg(RC_ST0);
             /* movsd %xmm0,-0x10(%rsp) */
+	    orex_new(0, 0, vtop->r, 0);
             o(0x110ff2);
             o(0x44 + REG_VALUE(vtop->r)*8);
             o(0xf024);
@@ -2640,6 +2651,7 @@ void gen_cvt_ftof(int t)
         if (tbt == VT_DOUBLE) {
             o(0xf0245cdd); /* fstpl -0x10(%rsp) */
             /* movsd -0x10(%rsp),%xmm0 */
+	    orex_new(0, 0, r, 0);
             o(0x100ff2);
             o(0x44 + REG_VALUE(r)*8);
             o(0xf024);
@@ -2647,6 +2659,7 @@ void gen_cvt_ftof(int t)
         } else if (tbt == VT_FLOAT) {
             o(0xf0245cd9); /* fstps -0x10(%rsp) */
             /* movss -0x10(%rsp),%xmm0 */
+	    orex_new(0, 0, r, 0);
             o(0x100ff3);
             o(0x44 + REG_VALUE(r)*8);
             o(0xf024);
@@ -2680,7 +2693,8 @@ void gen_cvt_ftoi(int t)
     } else {
         assert(0);
     }
-    orex_new(size * 8, r, 0, 0x2c0f); /* cvttss2si or cvttsd2si */
+    orex_new(size * 8, r, 0, 0); /* cvttss2si or cvttsd2si */
+    o(0x2c0f);
     o(0xc0 + REG_VALUE(vtop->r) + REG_VALUE(r)*8);
     vtop->r = r;
 }
