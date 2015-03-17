@@ -1072,7 +1072,7 @@ static void gcall_or_jmp(int is_jmp)
         }
         oad(0xe8 + is_jmp, vtop->c.ul - 4); /* call/jmp im */
     } else {
-        /* otherwise, indirect call */
+        /* otherwise, indirect call. XXX use gv(RC_INT) instead. */
         r = get_reg(RC_INT);
 	save_reg(r);
 	start_special_use(r);
@@ -1081,6 +1081,7 @@ static void gcall_or_jmp(int is_jmp)
         o(0xd0 + REG_VALUE(r) + (is_jmp << 4));
 	end_special_use(r);
     }
+    commit_instructions(); /* all caller-saved registers have been clobbered */
 }
 
 #ifdef TCC_TARGET_PE
