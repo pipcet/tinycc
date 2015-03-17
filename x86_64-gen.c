@@ -940,6 +940,7 @@ void store_pic(int r,SValue *v)
     int op64 = 0;
     /* store the REX prefix in this variable when PIC is enabled */
     int pic = 0;
+    int pic_reg = -1;
 
 #ifdef TCC_TARGET_PE
     SValue v2;
@@ -951,40 +952,43 @@ void store_pic(int r,SValue *v)
     fr = v->r & VT_VALMASK;
     bt = ft & VT_BTYPE;
 
-    /* mov xx(%rip), %r11 */
-    o(0x1d8b4c);
-    gen_gotpcrel(TREG_R11, v->sym, v->c.ul);
+    pic_reg = get_reg(RC_INT);
+    start_special_use(pic_reg);
+    /* mov xx(%rip), %rXX */
+    orex_always(1, 0, pic_reg, 0x8b);
+    o(0x05 | REG_VALUE(pic_reg) * 8);
+    gen_gotpcrel(pic_reg, v->sym, v->c.ul);
     pic = is64_type(bt) ? 0x49 : 0x41;
 
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
         o(0x66);
-        o(pic);
-        o(0x7e0f); /* movd */
+        orex_always(is64_type(bt), pic_reg, r, 0x0f);
+        o(0x7e); /* movd */
         r = REG_VALUE(r);
     } else if (bt == VT_DOUBLE) {
         o(0x66);
-        o(pic);
-        o(0xd60f); /* movq */
+        orex_always(is64_type(bt), pic_reg, r, 0x0f);
+        o(0xd6); /* movq */
         r = REG_VALUE(r);
     } else if (bt == VT_LDOUBLE) {
         o(0xc0d9); /* fld %st(0) */
-        o(pic);
-        o(0xdb); /* fstpt */
+        orex_always(is64_type(bt), pic_reg, r, 0xdb); /* fstpt */
         r = 7;
     } else {
         if (bt == VT_SHORT)
-	    orex_always(0, 11, r, 0x66);
+	    orex_always(0, pic_reg, r, 0x66);
         if (bt == VT_BYTE || bt == VT_BOOL) {
-            orex_always(0, 11, r, 0x88);
+            orex_always(0, pic_reg, r, 0x88);
         } else if (is64_type(bt)) {
-	    orex_always(1, 11, r, 0x89);
+	    orex_always(1, pic_reg, r, 0x89);
         } else {
-	    orex_always(0, 11, r, 0x89);
+	    orex_always(0, pic_reg, r, 0x89);
 	}
     }
 
-    o(REG_VALUE(11) + (REG_VALUE(r) << 3));
+    g(REG_VALUE(pic_reg) + (REG_VALUE(r) << 3));
+    end_special_use(pic_reg);
 }
 
 /* store register 'r' in lvalue 'v' */
@@ -1022,8 +1026,8 @@ void store(int r, SValue *v)
         o(0xd6); /* movq */
     } else if (bt == VT_LDOUBLE) {
         o(0xc0d9); /* fld %st(0) */
-        o(0xdb); /* fstpt */
         r = 7;
+	orex_always(0, v->r, r, 0xdb); /* fstpt */
     } else {
         if (bt == VT_SHORT)
 	    orex_always(0, v->r, r, 0x66); /* XXX that's a prefix, shouldn't have orex */
@@ -1069,17 +1073,13 @@ static void gcall_or_jmp(int is_jmp)
         oad(0xe8 + is_jmp, vtop->c.ul - 4); /* call/jmp im */
     } else {
         /* otherwise, indirect call */
-        r = TREG_R11;
-	/* I don't think this load is okay. Usually it will load the
-	   function pointer right into %r11, but occasionally it will
-	   use an intermediate value; in the upstream source code,
-	   that means clobbering %rax, which is usually (but not
-	   always) harmless.  With modifications, %rcx sometimes gets
-	   clobbered instead, and that causes segfaults. */
+        r = get_reg(RC_INT);
+	save_reg(r);
+	start_special_use(r);
         load(r, vtop);
-        o(0x41); /* REX */
-        o(0xff); /* call/jmp *r */
+	orex_always(0, r, 0, 0xff);
         o(0xd0 + REG_VALUE(r) + (is_jmp << 4));
+	end_special_use(r);
     }
 }
 
