@@ -1026,7 +1026,7 @@ void store(int r, SValue *v)
         r = 7;
     } else {
         if (bt == VT_SHORT)
-	    orex_always(0, v->r, r, 0x66);
+	    orex_always(0, v->r, r, 0x66); /* XXX that's a prefix, shouldn't have orex */
         if (bt == VT_BYTE || bt == VT_BOOL) {
             orex_always(0, v->r, r, 0x88);
         } else if (is64_type(bt)) {
@@ -1472,6 +1472,8 @@ static X86_64_Mode classify_x86_64_arg(CType *ty, CType *ret, int *psize, int *p
             switch (mode) {
             case x86_64_mode_integer:
                 if (size > 8) {
+		    /* what happens if there are 5 single-word
+		       arguments and one double-word argument? */
                     *reg_count = 2;
                     ret_t = VT_QLONG;
                 } else {
