@@ -892,7 +892,10 @@ void load(int r, SValue *sv)
 	    flags_used_counter++;
 	    ib();
             orex_new(32,r,0,0);
-	    oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
+	    if ((fc &  ~0x100) == TOK_NE)
+		oad(0xb8 + REG_VALUE(r), 1);
+	    else
+		oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
 	    check_baddies(r, 0);
 	    ib();
             if (fc & 0x100)
