@@ -8,7 +8,7 @@ script:
   - CFLAGS="-O0 -g" ./configure && make -k && sudo make -k install && make test
   - make distclean
   - CC="tcc" ./configure && make -k && sudo make -k install && make test
-  - if test "${BUILD_PERL}n" != n; then (cd perl5; ./Configure -Uusedl -Dusedevel -Dcc='gdb --ex run --ex bt --batch --args tcc' -Dld=ld -Ddynamic_ext=none -Dccflags=-I/usr/local/include -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -Dccdlflags=-fPIC -de && make -k); else true; fi
+  - if test "${BUILD_PERL}n" != n; then (cd perl5; ./Configure -Duselongdouble -Uusedl -Dusedevel -Dcc=tcc -Dld=ld -Ddynamic_ext=none -Dccflags=-I/usr/local/include -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -Dccdlflags=-fPIC -de && make -k); else true; fi
 
 env:
   - BUILD_PERL="y"
