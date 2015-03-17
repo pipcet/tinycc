@@ -2687,13 +2687,13 @@ ST_FUNC void gen_vla_alloc(CType *type, int align) {
     int r;
     r = gv(RC_INT); /* allocation size */
     /* sub r,%rsp */
-    o(0x2b48);
+    orex_always(1, r, 0, 0x2b);
     o(0xe0 | REG_VALUE(r));
     /* We align to 16 bytes rather than align */
     /* and ~15, %rsp */
     o(0xf0e48348);
     /* mov %rsp, r */
-    o(0x8948);
+    orex_always(1, r, 0, 0x89);
     o(0xe0 | REG_VALUE(r));
     vpop();
     vset(type, r, 0);
