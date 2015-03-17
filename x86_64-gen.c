@@ -850,6 +850,7 @@ void load(int r, SValue *sv)
             gen_modrm(r, fr, sv->sym, fc);
         }
 	uncache_value_by_register(r);
+	cache_value(sv, r);
     } else {
         if (v == VT_CONST) {
             if (fr & VT_SYM) {
@@ -2240,8 +2241,6 @@ void gen_opi(int op)
 		o(0x04 + REG_VALUE(or) * 8);
 		g(0x00 + REG_VALUE(r) * 8 + REG_VALUE(fr));
 
-		cache_value(&vtop[0], vtop[0].r);
-		cache_value(&vtop[-1], vtop[-1].r);
 		vtop[-1].r = or;
 		uncache = 0;
 	    } else {

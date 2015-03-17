@@ -591,12 +591,19 @@ ST_FUNC int find_cached_value(SValue *v)
     int r;
 
     for(r=0; r<NB_REGS; r++) {
-	/* as a special case, never return vtop */
-	if(vtop->r == r)
+	/* never return registers, those are "cached" anyway */
+	if((v->r&VT_VALMASK) < VT_CONST)
 	    continue;
 
-	if(register_contents[r].v.type.t == v->type.t &&
-	   register_contents[r].v.c.ul == v->c.ul) {
+	if((v->r&VT_VALMASK) == VT_LLOCAL &&
+	   (register_contents[r].v.r & VT_VALMASK) == VT_LLOCAL &&
+	   v->c.ul == register_contents[r].v.c.ul) {
+	    return r;
+	}
+
+	if((v->r&VT_VALMASK) == VT_LOCAL &&
+	   (register_contents[r].v.r & VT_VALMASK) == VT_LOCAL &&
+	   v->c.ul == register_contents[r].v.c.ul) {
 	    return r;
 	}
     }
@@ -986,7 +993,26 @@ ST_FUNC int gv(int rc)
 #endif
             )
         {
-            r = get_reg(rc);
+	    int r1 = find_cached_value(vtop);
+	    r = -1;
+
+	    if (r1 != -1)
+		/* XXX understand why this is ever false */
+		if(reg_classes[r1] & rc)
+		    r = get_specific_reg(r1);
+	    if (r == -1)
+		r = get_reg(rc);
+
+	    if(r1 != -1) {
+		//fprintf(stderr, "found cached value %d -> %d (%08x)\n", r1, r, vtop->type.t);
+
+		if (r1 == r) {
+		    int i;
+		    for(i=0; i<r+1; i++)
+			g(0x90);
+		}
+	    }
+
 #ifdef TCC_TARGET_X86_64
             if (((vtop->type.t & VT_BTYPE) == VT_QLONG) || ((vtop->type.t & VT_BTYPE) == VT_QFLOAT)) {
                 int addr_type = VT_LLONG, load_size = 8, load_type = ((vtop->type.t & VT_BTYPE) == VT_QLONG) ? VT_LLONG : VT_DOUBLE;
@@ -2755,6 +2781,7 @@ ST_FUNC void vstore(void)
                 load(t, &sv);
                 vtop[-1].r = t | VT_LVAL;
             }
+	    cache_value(&vtop[-1], r);
             /* two word case handling : store second register at word + 4 (or +8 for x86-64)  */
 #ifdef TCC_TARGET_X86_64
             if (((ft & VT_BTYPE) == VT_QLONG) || ((ft & VT_BTYPE) == VT_QFLOAT)) {
