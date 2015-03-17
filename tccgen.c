@@ -535,6 +535,13 @@ ST_FUNC void start_special_use(int r)
 {
     if(register_contents[r].special_use)
 	tcc_error("register already in special use");
+
+    SValue *p;
+
+    for(p=vstack;p<=vtop;p++) {
+        if ((p->r & VT_VALMASK) == r)
+	    tcc_error("register already in ordinary use");
+    }
     register_contents[r].special_use = 1;
 }
 
