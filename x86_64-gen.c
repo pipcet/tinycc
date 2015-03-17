@@ -584,13 +584,16 @@ void orex_new(int bitsize, int r, int r2, int b)
 	emit = 1;
     if (bitsize == 8 && r2 >= 4)
 	emit = 1;
+    int rex = 0x40 | REX_BASE(r) | (REX_BASE(r2) << 2) | ((bitsize == 64) << 3);
+    if (rex != 0x40)
+	emit = 1;
     ib();
     if ((r & VT_VALMASK) >= VT_CONST)
         r = 0;
     if ((r2 & VT_VALMASK) >= VT_CONST)
         r2 = 0;
     if (emit)
-        o(0x40 | REX_BASE(r) | (REX_BASE(r2) << 2) | ((bitsize == 64) << 3));
+        o(rex);
     o(b);
 }
 
