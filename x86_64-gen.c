@@ -1787,7 +1787,7 @@ void gfunc_call(int nb_args)
 	       not be pretty or efficient, but it appears to work. */
 	    if((vtop[0].type.t & VT_BTYPE) == VT_QLONG) {
 		assert(reg_count == 2);
-		lexpand();
+		qexpand();
 		vswap();
 		save_regs(1); /* we might need the register the high word occupies */
 	    } else {

@@ -1128,8 +1128,23 @@ static int reg_fret(int t)
     return REG_FRET;
 }
 
+/* expand quad long on stack in two long long/long registers */
+ST_FUNC void qexpand(void)
+{
+    int u;
+
+    u = vtop->type.t & VT_UNSIGNED;
+    gv(RC_INT);
+    vdup();
+    vtop[0].r = vtop[-1].r2;
+    vtop[0].r2 = VT_CONST;
+    vtop[-1].r2 = VT_CONST;
+    vtop[0].type.t = VT_LLONG | u;
+    vtop[-1].type.t = VT_LLONG | u;
+}
+
 /* expand long long on stack in two int registers */
-static void lexpand(void)
+ST_FUNC void lexpand(void)
 {
     int u;
 
