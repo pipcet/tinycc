@@ -2478,7 +2478,7 @@ void gen_opf(int op)
             
             if ((vtop->type.t & VT_BTYPE) == VT_DOUBLE)
                 o(0x66);
-            o(0x2e0f); /* ucomisd */
+	    orex_new(0, r, vtop[-1].r, 0x2e0f); /* ucomisd */
             
             if (vtop->r & VT_LVAL) {
                 gen_modrm(vtop[-1].r, r, vtop->sym, fc);
