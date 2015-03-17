@@ -2214,7 +2214,6 @@ void gen_opi(int op)
                 orex_new(ll?64:32, r, 0, 0xff);
                 o(0xc8 + REG_VALUE(r));
             } else if (c == (char)c) {
-		g(0x40);
                 orex_new(ll?64:32, r, 0, 0x83);
                 o(0xc0 | (opc << 3) | REG_VALUE(r));
                 g(c);
