@@ -580,7 +580,6 @@ void orex4(int ll, int r3, int r, int r2, int b)
 void orex_new(int bitsize, int r, int r2, int b)
 {
     int emit = bitsize == 64;
-    emit = 1; /* XXX */
     if (bitsize == 8 && r >= 4)
 	emit = 1;
     if (bitsize == 8 && r2 >= 4)
