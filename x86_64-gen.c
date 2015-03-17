@@ -131,7 +131,7 @@ ST_DATA const int reg_classes[NB_REGS] = {
     0,
     RC_INT,
     RC_INT,
-    RC_R8,
+    RC_INT | RC_R8,
     RC_R9,
     RC_R10,
     RC_R11,
