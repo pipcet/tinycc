@@ -703,13 +703,13 @@ static void gen_gotpcrel(int r, Sym *sym, int c)
     gen_le32(0);
         /* we use add c, %xxx for displacement */
     if (c == 1) {
-	orex(1, r, 0, 0xff);
+	orex_new(64, r, 0, 0xff);
 	o(0xc0 + REG_VALUE(r));
     } else if (c == -1) {
-	orex(1, r, 0, 0xff);
+	orex_new(64, r, 0, 0xff);
 	o(0xd0 + REG_VALUE(r));
     } else if (c) {
-        orex(1, r, 0, 0x81);
+        orex_new(64, r, 0, 0x81);
         o(0xc0 + REG_VALUE(r));
         gen_le32(c);
     }
@@ -760,7 +760,7 @@ static void gen_modrm64(int opcode, int op_reg, int r, Sym *sym, int c)
 {
     int is_got;
     is_got = (op_reg & TREG_MEM) && !(sym->type.t & VT_STATIC);
-    orex(1, r, op_reg, opcode);
+    orex_new(64, r, op_reg, opcode);
     gen_modrm_impl(op_reg, r, sym, c, is_got);
 }
 
@@ -800,7 +800,7 @@ void load(int r, SValue *sv)
 
     v = fr & VT_VALMASK;
     if (fr & VT_LVAL) {
-        int b, ll;
+        int b, ll, bs;
         if (v == VT_LLOCAL) {
             v1.type.t = VT_PTR;
             v1.r = VT_LOCAL | VT_LVAL;
@@ -815,30 +815,38 @@ void load(int r, SValue *sv)
         if ((ft & VT_BTYPE) == VT_FLOAT) {
 	    o(0x66);
             b = 0x6e0f;
+	    bs = 0;
         } else if ((ft & VT_BTYPE) == VT_DOUBLE) {
 	    o(0xf3);
             b = 0x7e0f; /* movq */
+	    bs = 0;
         } else if ((ft & VT_BTYPE) == VT_LDOUBLE) {
             b = 0xdb, r = 5; /* fldt */
+	    bs = 0;
         } else if ((ft & VT_TYPE) == VT_BYTE || (ft & VT_TYPE) == VT_BOOL) {
             b = 0xbe0f;   /* movsbl */
+	    bs = 8;
         } else if ((ft & VT_TYPE) == (VT_BYTE | VT_UNSIGNED)) {
             b = 0xb60f;   /* movzbl */
+	    bs = 8;
         } else if ((ft & VT_TYPE) == VT_SHORT) {
             b = 0xbf0f;   /* movswl */
+	    bs = 16;
         } else if ((ft & VT_TYPE) == (VT_SHORT | VT_UNSIGNED)) {
             b = 0xb70f;   /* movzwl */
+	    bs = 16;
         } else {
             assert(((ft & VT_BTYPE) == VT_INT) || ((ft & VT_BTYPE) == VT_LLONG)
                    || ((ft & VT_BTYPE) == VT_PTR) || ((ft & VT_BTYPE) == VT_ENUM)
                    || ((ft & VT_BTYPE) == VT_FUNC));
             ll = is64_type(ft);
             b = 0x8b;
+	    bs = is64_type(ft) ? 64 : 32;
         }
         if (ll) {
             gen_modrm64(b, r, fr, sv->sym, fc);
         } else {
-            orex_always(ll, fr, r, b);
+            orex_new(bs, fr, r, b);
             gen_modrm(r, fr, sv->sym, fc);
         }
 	uncache_value_by_register(r);
@@ -846,44 +854,44 @@ void load(int r, SValue *sv)
         if (v == VT_CONST) {
             if (fr & VT_SYM) {
 #ifdef TCC_TARGET_PE
-                orex(1,0,r,0x8d);
+                orex_new(64,0,r,0x8d);
                 o(0x05 + REG_VALUE(r) * 8); /* lea xx(%rip), r */
                 gen_addrpc32(fr, sv->sym, fc);
 #else
                 if (sv->sym->type.t & VT_STATIC) {
-                    orex(1,0,r,0x8d);
+                    orex_new(64,0,r,0x8d);
                     o(0x05 + REG_VALUE(r) * 8); /* lea xx(%rip), r */
                     gen_addrpc32(fr, sv->sym, fc);
                 } else {
-                    orex(1,0,r,0x8b);
+                    orex_new(64,0,r,0x8b);
                     o(0x05 + REG_VALUE(r) * 8); /* mov xx(%rip), r */
                     gen_gotpcrel(r, sv->sym, fc);
                 }
 #endif
             } else if (is64_type(ft)) {
 		if (sv->c.ull) {
-		    orex(1,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
+		    orex_new(64,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
 		    gen_le64(sv->c.ull);
 		} else {
-		    orex(1, r, r, 0x31);
+		    orex_new(64, r, r, 0x31);
 		    o(0xc0 + REG_VALUE(r) + REG_VALUE(r) * 8); /* xor r, r */
 		}
             } else {
 		if (fc) {
-		    orex_always(0,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
+		    orex_new(32,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
 		    gen_le32(fc);
 		} else {
-		    orex(0, r, r, 0x31);
+		    orex_new(32, r, r, 0x31);
 		    o(0xc0 + REG_VALUE(r) + REG_VALUE(r) * 8); /* xor r, r */
 		}
             }
         } else if (v == VT_LOCAL) {
-            orex(1,0,r,0x8d); /* lea xxx(%ebp), r */
+            orex_new(64,0,r,0x8d); /* lea xxx(%ebp), r */
             gen_modrm(r, VT_LOCAL, sv->sym, fc);
         } else if (v == VT_CMP) {
 	    flags_used_counter++;
 	    ib();
-            orex_always(0,r,0,0);
+            orex_new(32,r,0,0);
 	    oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
 	    check_baddies(r, 0);
 	    ib();
@@ -895,7 +903,7 @@ void load(int r, SValue *sv)
                 fc &= ~0x100;
                 o(0x047a);
               }
-            orex_always(0,r,0, 0x0f); /* setxx %br */
+            orex_new(8,r,0, 0x0f); /* setxx %br XXX mov $0,r; setxx %rb -> setxx, and */
             o(fc);
             o(0xc0 + REG_VALUE(r));
 	    flags_used_counter--;
@@ -903,7 +911,7 @@ void load(int r, SValue *sv)
 	    flags_used_counter++;
             t = v & 1;
 	    ib();
-            orex_always(0,r,0,0);
+            orex_new(32,r,0,0);
             oad(0xb8 + REG_VALUE(r), t); /* mov $1, r */
 	    check_baddies(r, 0);
 	    ib();
@@ -911,7 +919,7 @@ void load(int r, SValue *sv)
             if(gsym_nocommit(fc) > 1)
 	      commit_instructions();
 	    ib();
-            orex_always(0,r,0,0);
+            orex_always(0,r,0,0); /* not orex_new! */
             oad(0xb8 + REG_VALUE(r), t ^ 1); /* mov $0, r */
 	    check_baddies(r, 0);
 	    flags_used_counter--;
@@ -943,7 +951,7 @@ void load(int r, SValue *sv)
                 o(0xf024);
                 o(0xf02444dd); /* fldl -0x10(%rsp) */
             } else {
-                orex(1,r,v, 0x89);
+                orex_new(64,r,v, 0x89);
                 o(0xc0 + REG_VALUE(r) + REG_VALUE(v) * 8); /* mov v, r */
             }
         }
@@ -957,6 +965,7 @@ void store_pic(int r,SValue *v)
     /* store the REX prefix in this variable when PIC is enabled */
     int pic = 0;
     int pic_reg = -1;
+    int bs;
 
 #ifdef TCC_TARGET_PE
     SValue v2;
@@ -971,35 +980,35 @@ void store_pic(int r,SValue *v)
     pic_reg = get_reg(RC_INT);
     start_special_use(pic_reg);
     /* mov xx(%rip), %rXX */
-    orex_always(1, 0, pic_reg, 0x8b);
+    orex_new(64, 0, pic_reg, 0x8b);
     o(0x05 | REG_VALUE(pic_reg) * 8);
     gen_gotpcrel(pic_reg, v->sym, v->c.ul);
-    pic = is64_type(bt) ? 0x49 : 0x41;
+    bs = is64_type(bt) ? 64 : 32;
 
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
         o(0x66);
-        orex_always(is64_type(bt), pic_reg, r, 0x0f);
+        orex_new(bs, pic_reg, r, 0x0f);
         o(0x7e); /* movd */
         r = REG_VALUE(r);
     } else if (bt == VT_DOUBLE) {
         o(0x66);
-        orex_always(is64_type(bt), pic_reg, r, 0x0f);
+        orex_new(bs, pic_reg, r, 0x0f);
         o(0xd6); /* movq */
         r = REG_VALUE(r);
     } else if (bt == VT_LDOUBLE) {
         o(0xc0d9); /* fld %st(0) */
-        orex_always(is64_type(bt), pic_reg, r, 0xdb); /* fstpt */
+        orex_new(bs, pic_reg, r, 0xdb); /* fstpt */
         r = 7;
     } else {
         if (bt == VT_SHORT)
-	    orex_always(0, pic_reg, r, 0x66);
+	    orex_new(16, pic_reg, r, 0x66);
         if (bt == VT_BYTE || bt == VT_BOOL) {
-            orex_always(0, pic_reg, r, 0x88);
+            orex_new(8, pic_reg, r, 0x88);
         } else if (is64_type(bt)) {
-	    orex_always(1, pic_reg, r, 0x89);
+	    orex_new(64, pic_reg, r, 0x89);
         } else {
-	    orex_always(0, pic_reg, r, 0x89);
+	    orex_new(32, pic_reg, r, 0x89);
 	}
     }
 
@@ -1034,25 +1043,25 @@ void store(int r, SValue *v)
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
         o(0x66);
-	orex_always(0, v->r, r, 0x0f);
+	orex_new(32, v->r, r, 0x0f);
         o(0x7e); /* movd */
     } else if (bt == VT_DOUBLE) {
         o(0x66);
-	orex_always(1, v->r, r, 0x0f);
+	orex_new(64, v->r, r, 0x0f);
         o(0xd6); /* movq */
     } else if (bt == VT_LDOUBLE) {
         o(0xc0d9); /* fld %st(0) */
         r = 7;
-	orex_always(0, v->r, r, 0xdb); /* fstpt */
+	orex_new(32, v->r, r, 0xdb); /* fstpt */
     } else {
         if (bt == VT_SHORT)
-	    orex_always(0, v->r, r, 0x66); /* XXX that's a prefix, shouldn't have orex */
+	    orex_new(16, v->r, r, 0x66); /* XXX that's a prefix, shouldn't have orex */
         if (bt == VT_BYTE || bt == VT_BOOL) {
-            orex_always(0, v->r, r, 0x88);
+            orex_new(8, v->r, r, 0x88);
         } else if (is64_type(bt)) {
-	    orex_always(1, v->r, r, 0x89);
+	    orex_new(64, v->r, r, 0x89);
         } else {
-	    orex_always(0, v->r, r, 0x89);
+	    orex_new(32, v->r, r, 0x89);
 	}
     }
 
@@ -1093,7 +1102,7 @@ static void gcall_or_jmp(int is_jmp)
 	save_reg(r);
 	start_special_use(r);
         load(r, vtop);
-	orex_always(0, r, 0, 0xff);
+	orex_new(32 /* XXX or 64? */, r, 0, 0xff);
         o(0xd0 + REG_VALUE(r) + (is_jmp << 4));
 	end_special_use(r);
     }
@@ -1121,7 +1130,7 @@ static int func_scratch;
 
 void gen_offs_sp(int b, int r, int d)
 {
-    orex(1,r,0,b);
+    orex_new(64,r,0,b);
     if (d == (char)d) {
         o(0x2444 | (REG_VALUE(r) << 3));
         g(d);
@@ -1248,7 +1257,7 @@ void gfunc_call(int nb_args)
                     d = arg_prepare_reg(arg);
                     /* mov %xmm0, %rxx */
                     o(0x66);
-                    orex(1,d,0, 0x7e0f);
+                    orex_new(64,d,0, 0x7e0f);
                     o(0xc0 + REG_VALUE(d));
 		    start_special_use(d);
                 }
@@ -1264,7 +1273,7 @@ void gfunc_call(int nb_args)
                     gen_offs_sp(0x89, r, arg*8);
                 } else {
                     d = arg_prepare_reg(arg);
-                    orex(1,d,r,0x89); /* mov */
+                    orex_new(64,d,r,0x89); /* mov */
                     o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
 		    start_special_use(d);
                 }
@@ -1660,7 +1669,7 @@ void gfunc_call(int nb_args)
                     oad(0xec81, size); /* sub $xxx, %rsp */
                     /* generate structure store */
                     r = get_reg(RC_INT);
-                    orex(1, r, 0, 0x89); /* mov %rsp, r */
+                    orex_new(64, r, 0, 0x89); /* mov %rsp, r */
                     o(0xe0 + REG_VALUE(r));
                     vset(&vtop->type, r | VT_LVAL, 0);
                     vswap();
@@ -1697,7 +1706,7 @@ void gfunc_call(int nb_args)
                 if (gen_reg > REGN) {
                     --gen_reg;
                     r = gv(RC_INT);
-                    orex(0,r,0,0x50 + REG_VALUE(r)); /* push r */
+                    orex_new(32,r,0,0x50 + REG_VALUE(r)); /* push r */
                     args_size += size;
                 } else {
                     arg_stored = 0;
@@ -1746,7 +1755,7 @@ void gfunc_call(int nb_args)
                 oad(0xec81, size); /* sub $xxx, %rsp */
                 /* generate structure store */
                 r = get_reg(RC_INT);
-                orex(1, r, 0, 0x89); /* mov %rsp, r */
+                orex_new(64, r, 0, 0x89); /* mov %rsp, r */
                 o(0xe0 + REG_VALUE(r));
                 vset(&vtop->type, r | VT_LVAL, 0);
                 vswap();
@@ -1809,7 +1818,7 @@ void gfunc_call(int nb_args)
 		int d = arg_prepare_reg(gen_reg+i);
 		r = gv(RC_INT);
 		if (d!=r) {
-		    orex(1,d,r,0x89); /* mov */
+		    orex_new(64,d,r,0x89); /* mov */
 		    o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
 		}
 		vtop--;
@@ -2122,13 +2131,13 @@ int gtst(int inv, int t)
 		uib(1);
 		ib();
                 /* overwrite opcode to turn and $constant,r into test $constant,r */
-                orex(0,v,v,0xf7);
+                orex_new(0,v,v,0xf7); /* XXX v twice? */
                 g(0xc0 + REG_VALUE(v));
                 ind += 4;
 	    } else if (check_last_instruction(0xe083 + 0x100 * REG_VALUE(v), 3)) {
 		uib(1);
 		ib();
-		orex(0,v,v,0xf6);
+		orex_new(8,v,v,0xf6); /* XXX v twice? */
 		g(0xc0 + REG_VALUE(v));
 		ind++;
             } else {
@@ -2143,7 +2152,7 @@ int gtst(int inv, int t)
 		 * Which is buggy because only the low 32 bits of %rax are checked. */
 
 		ib();
-                orex(ll,v,v,0x85);
+                orex_new(ll ? 64 : 32,v,v,0x85);
                 o(0xc0 + REG_VALUE(v) * 9);
             }
 	    /* Perl has lots of expressions of the form x ? 1 : 0. Handle those here. */
@@ -2189,7 +2198,7 @@ void gen_opi(int op)
 
 		uncache_value_by_register(or);
 
-		orex(ll, r, or, 0x8d);
+		orex_new(ll?64:32, r, or, 0x8d);
 		oad(0x80 | (REG_VALUE(or) << 3) | REG_VALUE(r), c);
 
 		vtop[-1].r = or;
@@ -2197,19 +2206,19 @@ void gen_opi(int op)
 		uncache = 0;
 	    } else if (c == 1 && opc == 0 || c == -1 && opc == 5) {
                 /* inc r */
-                orex(ll, r, 0, 0xff);
+                orex_new(ll?64:32, r, 0, 0xff);
                 o(0xc0 + REG_VALUE(r));
             } else if (c == -1 && opc == 0 || c == 1 && opc == 5) {
                 /* dec r */
-                orex(ll, r, 0, 0xff);
+                orex_new(ll?64:32, r, 0, 0xff);
                 o(0xc8 + REG_VALUE(r));
             } else if (c == (char)c) {
 		g(0x40);
-                orex(ll, r, 0, 0x83);
+                orex_new(ll?64:32, r, 0, 0x83);
                 o(0xc0 | (opc << 3) | REG_VALUE(r));
                 g(c);
             } else {
-                orex(ll, r, 0, 0x81);
+                orex_new(ll?64:32, r, 0, 0x81);
                 oad(0xc0 | (opc << 3) | REG_VALUE(r), c);
             }
         } else {
@@ -2232,7 +2241,7 @@ void gen_opi(int op)
 		r = vtop[-1].r;
 		fr = vtop[0].r;
 		ib();
-		orex(ll, r, fr, (opc << 3) | 0x01);
+		orex_new(ll?64:32, r, fr, (opc << 3) | 0x01);
 		o(0xc0 + REG_VALUE(r) + REG_VALUE(fr) * 8);
 	    }
         }
@@ -2267,7 +2276,7 @@ void gen_opi(int op)
         gv2(RC_INT, RC_INT);
         r = vtop[-1].r;
         fr = vtop[0].r;
-        orex(ll, fr, r, 0xaf0f); /* imul fr, r */
+        orex_new(ll?64:32, fr, r, 0xaf0f); /* imul fr, r */
         o(0xc0 + REG_VALUE(fr) + REG_VALUE(r) * 8);
         vtop--;
 	uncache_value(&vtop[0]);
@@ -2283,18 +2292,19 @@ void gen_opi(int op)
     gen_shift:
         opc = 0xc0 | (opc << 3);
         if (cc) {
+	    /* XXX cc = 1,2,3 -> lea */
             /* constant case */
             vswap();
             r = gv(RC_INT);
             vswap();
-            orex(ll, r, 0, 0xc1); /* shl/shr/sar $xxx, r */
+            orex_new(ll?64:32, r, 0, 0xc1); /* shl/shr/sar $xxx, r */
             o(opc | REG_VALUE(r));
             g(vtop->c.i & (ll ? 63 : 31));
         } else {
             /* we generate the shift in ecx */
             gv2(RC_INT, RC_RCX);
             r = vtop[-1].r;
-            orex(ll, r, 0, 0xd3); /* shl/shr/sar %cl, r */
+            orex_new(ll?64:32, r, 0, 0xd3); /* shl/shr/sar %cl, r */
             o(opc | REG_VALUE(r));
         }
         vtop--;
@@ -2317,8 +2327,8 @@ void gen_opi(int op)
         fr = vtop[0].r;
         vtop--;
         save_reg(TREG_RDX);
-        orex(ll, 0, 0, uu ? 0xd231 : 0x99); /* xor %edx,%edx : cqto */
-        orex(ll, fr, 0, 0xf7); /* div fr, %eax */
+        orex_new(ll?64:32, 0, 0, uu ? 0xd231 : 0x99); /* xor %edx,%edx : cqto */
+        orex_new(ll?64:32, fr, 0, 0xf7); /* div fr, %eax */
         o((uu ? 0xf0 : 0xf8) + REG_VALUE(fr));
         if (op == '%' || op == TOK_UMOD)
             r = TREG_RDX;
@@ -2565,14 +2575,15 @@ void gen_cvt_itof(int t)
         vtop->r = TREG_ST0;
     } else {
         int r = get_reg(RC_FLOAT);
+	int bs = 32;
         gv(RC_INT);
         o(0xf2 + ((t & VT_BTYPE) == VT_FLOAT?1:0));
         if ((vtop->type.t & (VT_BTYPE | VT_UNSIGNED)) ==
             (VT_INT | VT_UNSIGNED) ||
             (vtop->type.t & VT_BTYPE) == VT_LLONG) {
-            o(0x48); /* REX */
+	    bs = 64;
         }
-        o(0x2a0f);
+	orex_new(bs, vtop->r, r, 0x2a0f);
         o(0xc0 + (vtop->r & VT_VALMASK) + REG_VALUE(r)*8); /* cvtsi2sd */
         vtop->r = r;
     }
@@ -2666,7 +2677,7 @@ void gen_cvt_ftoi(int t)
     } else {
         assert(0);
     }
-    orex(size == 8, r, 0, 0x2c0f); /* cvttss2si or cvttsd2si */
+    orex_new(size * 8, r, 0, 0x2c0f); /* cvttss2si or cvttsd2si */
     o(0xc0 + REG_VALUE(vtop->r) + REG_VALUE(r)*8);
     vtop->r = r;
 }
@@ -2701,13 +2712,13 @@ ST_FUNC void gen_vla_alloc(CType *type, int align) {
     int r;
     r = gv(RC_INT); /* allocation size */
     /* sub r,%rsp */
-    orex_always(1, r, 0, 0x2b);
+    orex_new(64, r, 0, 0x2b);
     o(0xe0 | REG_VALUE(r));
     /* We align to 16 bytes rather than align */
     /* and ~15, %rsp */
     o(0xf0e48348);
     /* mov %rsp, r */
-    orex_always(1, r, 0, 0x89);
+    orex_new(64, r, 0, 0x89);
     o(0xe0 | REG_VALUE(r));
     vpop();
     vset(type, r, 0);
