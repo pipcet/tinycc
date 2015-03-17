@@ -2132,15 +2132,19 @@ int gtst(int inv, int t)
 		uib(1);
 		ib();
                 /* overwrite opcode to turn and $constant,r into test $constant,r */
-                orex_new(0,v,v,0xf7); /* XXX v twice? */
+                orex_new(32,v,0,0xf7);
                 g(0xc0 + REG_VALUE(v));
                 ind += 4;
 	    } else if (check_last_instruction(0xe083 + 0x100 * REG_VALUE(v), 3)) {
-		uib(1);
-		ib();
-		orex_new(8,v,v,0xf6); /* XXX v twice? */
-		g(0xc0 + REG_VALUE(v));
-		ind++;
+		char c = cur_text_section->data[ind-1];
+		/* XXX check necessary? sign extension... */
+		if ((c&0x80) == 0) {
+		    uib(1);
+		    ib();
+		    orex_new(8,v,0,0xf6);
+		    g(0xc0 + REG_VALUE(v));
+		    g(c);
+		}
             } else {
 		/* XXX we currently generate code like this:
 		 * 81c3d19:	48 8b 45 f0          	mov    -0x10(%rbp),%rax
