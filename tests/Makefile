@@ -12,6 +12,8 @@ TESTS = \
  hello-exe \
  hello-run \
  libtest \
+ test1 \
+ test2 \
  test3 \
  abitest \
  vla_test-run \
@@ -86,27 +88,29 @@ moretests:
 
 # test.ref - generate using gcc
 # copy only tcclib.h so GCC's stddef and stdarg will be used
-test.ref: tcctest.c
+test.ref: ../tests/tcctest.c
 	gcc -o tcctest.gcc $< -I$(top_srcdir) $(CPPFLAGS) -w $(CFLAGS) $(NATIVE_DEFINES) -std=gnu99 -O0 -fno-omit-frame-pointer $(LDFLAGS)
 	./tcctest.gcc > $@
 
 # auto test
 test1: test.ref
 	@echo ------------ $@ ------------
+	$(TCC) $(SRCDIR)/tcctest.c -g -o tcctest1
 	$(TCC) -run $(SRCDIR)/tcctest.c > test.out1
-	@if diff -u test.ref test.out1 ; then echo "Auto Test OK"; fi
+	diff -u test.ref test.out1
+
 
 # iterated test2 (compile tcc then compile tcctest.c !)
 test2: test.ref
 	@echo ------------ $@ ------------
 	$(TCC) $(RUN_TCC) $(RUN_TCC) -run $(SRCDIR)/tcctest.c > test.out2
-	@if diff -u test.ref test.out2 ; then echo "Auto Test2 OK"; fi
+	diff -u test.ref test.out2
 
 # iterated test3 (compile tcc then compile tcc then compile tcctest.c !)
 test3: test.ref
 	@echo ------------ $@ ------------
 	$(TCC) $(RUN_TCC) $(RUN_TCC) $(RUN_TCC) -run $(SRCDIR)/tcctest.c > test.out3
-	@if diff -u test.ref test.out3 ; then echo "Auto Test3 OK"; fi
+	diff -u test.ref test.out3
 
 # binary output test
 test4: test.ref
