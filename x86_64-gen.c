@@ -797,11 +797,11 @@ void load(int r, SValue *sv)
         }
         ll = 0;
         if ((ft & VT_BTYPE) == VT_FLOAT) {
-            b = 0x6e0f66;
-            r = REG_VALUE(r); /* movd */
+	    o(0x66);
+            b = 0x6e0f;
         } else if ((ft & VT_BTYPE) == VT_DOUBLE) {
-            b = 0x7e0ff3; /* movq */
-            r = REG_VALUE(r);
+	    o(0xf3);
+            b = 0x7e0f; /* movq */
         } else if ((ft & VT_BTYPE) == VT_LDOUBLE) {
             b = 0xdb, r = 5; /* fldt */
         } else if ((ft & VT_TYPE) == VT_BYTE || (ft & VT_TYPE) == VT_BOOL) {
@@ -877,7 +877,7 @@ void load(int r, SValue *sv)
                    set the result was unordered, meaning false for everything
                    except TOK_NE, and true for TOK_NE.  */
                 fc &= ~0x100;
-                o(0x047a + (REX_BASE(r) << 8));
+                o(0x047a);
               }
             orex_always(0,r,0, 0x0f); /* setxx %br */
             o(fc);
@@ -891,7 +891,7 @@ void load(int r, SValue *sv)
             oad(0xb8 + REG_VALUE(r), t); /* mov $1, r */
 	    check_baddies(r, 0);
 	    ib();
-            o(0x06eb + (REX_BASE(r) << 8)); /* jmp after */
+            o(0x06eb); /* jmp after */
             if(gsym_nocommit(fc) > 1)
 	      commit_instructions();
 	    ib();
@@ -1014,12 +1014,12 @@ void store(int r, SValue *v)
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
         o(0x66);
-        o(0x7e0f); /* movd */
-        r = REG_VALUE(r);
+	orex_always(0, v->r, r, 0x0f);
+        o(0x7e); /* movd */
     } else if (bt == VT_DOUBLE) {
         o(0x66);
-        o(0xd60f); /* movq */
-        r = REG_VALUE(r);
+	orex_always(1, v->r, r, 0x0f);
+        o(0xd6); /* movq */
     } else if (bt == VT_LDOUBLE) {
         o(0xc0d9); /* fld %st(0) */
         o(0xdb); /* fstpt */
