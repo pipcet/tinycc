@@ -1783,17 +1783,28 @@ void gfunc_call(int nb_args)
             /* simple type */
             /* XXX: implicit cast ? */
             gen_reg -= reg_count;
-            r = gv(RC_INT);
-            int d = arg_prepare_reg(gen_reg);
-            orex(1,d,r,0x89); /* mov */
-            o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
-	    start_special_use(d);
-            if (reg_count == 2) {
-                d = arg_prepare_reg(gen_reg+1);
-                orex(1,d,vtop->r2,0x89); /* mov */
-                o(0xc0 + REG_VALUE(vtop->r2) * 8 + REG_VALUE(d));
+	    /* 128-bit types complicate everything. This code might
+	       not be pretty or efficient, but it appears to work. */
+	    if((vtop[0].type.t & VT_BTYPE) == VT_QLONG) {
+		assert(reg_count == 2);
+		lexpand();
+		vswap();
+		save_regs(1); /* we might need the register the high word occupies */
+	    } else {
+		assert(reg_count == 1);
+	    }
+	    int i;
+	    for(i=0; i<reg_count; i++) {
+		int d = arg_prepare_reg(gen_reg+i);
+		r = gv(RC_INT);
+		if (d!=r) {
+		    orex(1,d,r,0x89); /* mov */
+		    o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
+		}
+		vtop--;
 		start_special_use(d);
-            }
+	    }
+	    vtop++;
         }
         vtop--;
     }
