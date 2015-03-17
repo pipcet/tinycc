@@ -575,6 +575,25 @@ void orex4(int ll, int r3, int r, int r2, int b)
     o(b);
 }
 
+/* bitsize is the "maximum" bitsize according to 64 > 8 > 32/16 > 0,
+   where 0 is for floats and other legacy instructions. */
+void orex_new(int bitsize, int r, int r2, int b)
+{
+    int emit = bitsize == 64;
+    if (bitsize == 8 && r >= 4)
+	emit = 1;
+    if (bitsize == 8 && r2 >= 4)
+	emit = 1;
+    ib();
+    if ((r & VT_VALMASK) >= VT_CONST)
+        r = 0;
+    if ((r2 & VT_VALMASK) >= VT_CONST)
+        r2 = 0;
+    if (emit)
+        o(0x40 | REX_BASE(r) | (REX_BASE(r2) << 2) | ((bitsize == 64) << 3));
+    o(b);
+}
+
 /* output a symbol and patch all calls to it */
 int gsym_addr(int t, int a)
 {
