@@ -182,6 +182,7 @@ void uib(int count)
 {
     int i;
     while(count--) {
+	ind = last_instruction_boundary[0];
 	for(i=0; i<=14; i++) {
 	    last_instruction_boundary[i] = last_instruction_boundary[i+1];
 	}
@@ -191,7 +192,9 @@ void uib(int count)
 
 void commit_instructions(void)
 {
+    int ind1 = ind;
     uib(16);
+    ind = ind1;
     uncache_values();
 }
 
@@ -278,7 +281,6 @@ int check_baddies(int clobber_reg, int flags_okay)
     /* mov $0x0, %eax -> xor %eax,%eax, but only if flags aren't used. */
     if (!flags_used() && check_nth_last_instruction(0, 0xb8, 5)) {
         uib(1);
-        ind -= 5;
 	memset(cur_text_section->data + ind, 0, 5);
 	
         g(0x31);
@@ -369,8 +371,6 @@ int check_baddies(int clobber_reg, int flags_okay)
         check_nth_last_instruction(4, 0x07840f, 6)) {
       return 0;
 
-        ind -= 6+5+2+5+2;
-
         uib(5);
 	memset(cur_text_section->data + ind, 0, 6+5+2+5+2);
     }
@@ -397,8 +397,6 @@ int check_baddies(int clobber_reg, int flags_okay)
         check_nth_last_instruction(5, 0x05840f, 6)) {
 
       return 0;
-        ind -= 6+5+2+5+5+2;
-
         uib(6);
 	memset(cur_text_section->data + ind, 0, 6+5+2+5+5+2);
     }
@@ -426,9 +424,6 @@ int check_baddies(int clobber_reg, int flags_okay)
       return 0;
 
 	if (flags_okay) {
-	    ind -= 6+5+2+5+5+2;
-	    memset(cur_text_section->data + ind, 0, 6+5+2+5+5+2);
-
 	    uib(6);
 
 	    return 1 ^ check_baddies(clobber_reg, 1);
@@ -455,7 +450,6 @@ int check_baddies(int clobber_reg, int flags_okay)
 		int reg21 = REG_VALUE(cur_text_section->data[ind - 2] >> 3);
 
 		uib(1);
-		ind -= 4; /* but don't replace the first store operation */
 
 		if (reg11 != reg21) {
 		    g(0x48);
@@ -2104,7 +2098,6 @@ int gtst(int inv, int t)
             int test = 0xe081 + 0x100 * REG_VALUE(v);
             if (check_last_instruction(test, 6)) {
 		uib(1);
-                ind -= 6;
 		ib();
                 /* overwrite opcode to turn and $constant,r into test $constant,r */
                 orex(0,v,v,0xf7);
@@ -2112,7 +2105,6 @@ int gtst(int inv, int t)
                 ind += 4;
 	    } else if (check_last_instruction(0xe083 + 0x100 * REG_VALUE(v), 3)) {
 		uib(1);
-		ind -= 3;
 		ib();
 		orex(0,v,v,0xf6);
 		g(0xc0 + REG_VALUE(v));
