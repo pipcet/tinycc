@@ -2596,7 +2596,7 @@ void gen_cvt_itof(int t)
 	    bs = 64;
         }
 	orex_new(bs, vtop->r, r, 0x2a0f);
-        o(0xc0 + (vtop->r & VT_VALMASK) + REG_VALUE(r)*8); /* cvtsi2sd */
+        o(0xc0 + REG_VALUE(vtop->r & VT_VALMASK) + REG_VALUE(r)*8); /* cvtsi2sd */
         vtop->r = r;
     }
 }
@@ -2697,7 +2697,7 @@ void gen_cvt_ftoi(int t)
     } else {
         assert(0);
     }
-    orex_new(size * 8, r, 0, 0); /* cvttss2si or cvttsd2si */
+    orex_new(size * 8, vtop->r&8, r, 0); /* cvttss2si or cvttsd2si */
     o(0x2c0f);
     o(0xc0 + REG_VALUE(vtop->r) + REG_VALUE(r)*8);
     vtop->r = r;
