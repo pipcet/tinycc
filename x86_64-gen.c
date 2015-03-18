@@ -1110,6 +1110,12 @@ static const uint8_t arg_regs[REGN] = {
     TREG_RCX, TREG_RDX, TREG_R8, TREG_R9
 };
 
+/* Prepare arguments in R10 and R11 rather than RCX and RDX
+   because gv() will not ever use these */
+static int arg_prepare_reg(int idx) {
+    return arg_regs[idx];
+}
+
 static int func_scratch;
 
 /* Generate function call. The function address is pushed first, then
@@ -1227,7 +1233,7 @@ void gfunc_call(int nb_args)
                 gen_offs_sp(0x8d, d, struct_size);
                 gen_offs_sp(0x89, d, arg*8);
             } else {
-                d = arg;
+                d = arg_prepare_reg(arg);
                 gen_offs_sp(0x8d, d, struct_size);
 		start_special_use(d);
             }
@@ -1242,7 +1248,7 @@ void gfunc_call(int nb_args)
                     /* movaps %xmm0, %xmmN */
                     o(0x280f);
                     o(0xc0 + (arg << 3));
-                    d = arg;
+                    d = arg_prepare_reg(arg);
                     /* mov %xmm0, %rxx */
                     o(0x66);
                     orex(64,d,0, 0x7e0f);
@@ -1260,7 +1266,7 @@ void gfunc_call(int nb_args)
                 if (arg >= REGN) {
                     gen_offs_sp(0x89, r, arg*8);
                 } else {
-                    d = arg;
+                    d = arg_prepare_reg(arg);
                     orex(64,d,r,0x89); /* mov */
                     o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
 		    start_special_use(d);
@@ -1545,6 +1551,10 @@ static const uint8_t arg_regs[REGN] = {
     TREG_RDI, TREG_RSI, TREG_RDX, TREG_RCX, TREG_R8, TREG_R9
 };
 
+static int arg_prepare_reg(int idx) {
+    return arg_regs[idx];
+}
+
 /* Generate function call. The function address is pushed first, then
    all the parameters in call order. This functions pops all the
    parameters and the function address. */
@@ -1755,6 +1765,10 @@ void gfunc_call(int nb_args)
     /* XXX This should be superfluous.  */
     save_regs(0); /* save used temporary registers */
 
+    /* then, we prepare register passing arguments.
+       Note that we cannot set RDX and RCX in this loop because gv()
+       may break these temporary registers. Let's use R10 and R11
+       instead of them */
     assert(gen_reg <= REGN);
     assert(sse_reg <= 8);
     for(i = 0; i < nb_args; i++) {
@@ -1800,7 +1814,7 @@ void gfunc_call(int nb_args)
 	    }
 	    int i;
 	    for(i=0; i<reg_count; i++) {
-		int d = arg;
+		int d = arg_prepare_reg(gen_reg+i);
 		r = gv(RC_INT);
 		if (d!=r) {
 		    orex(64,d,r,0x89); /* mov */
