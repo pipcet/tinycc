@@ -1790,7 +1790,13 @@ void gfunc_call(int nb_args)
         if (mode == x86_64_mode_sse) {
             if (reg_count == 2) {
                 sse_reg -= 2;
+		vdup();
+		qexpand();
+		vswap();
+                gv(RC_QRET);
+		vtop--;
                 gv(RC_FRET); /* Use pair load into xmm0 & xmm1 */
+		vtop--;
                 if (sse_reg) { /* avoid redundant movaps %xmm0, %xmm0 */
                     /* movaps %xmm0, %xmmN */
                     o(0x280f);
@@ -1814,7 +1820,6 @@ void gfunc_call(int nb_args)
 	    if((vtop[0].type.t & VT_BTYPE) == VT_QLONG) {
 		assert(reg_count == 2);
 		qexpand();
-		vswap();
 		save_regs(1); /* we might need the register the high word occupies */
 	    } else {
 		assert(reg_count == 1);
@@ -1849,6 +1854,8 @@ void gfunc_call(int nb_args)
     else {
       o(0xc031); /* xor %eax,%eax */
     }
+    save_reg(TREG_RAX);
+    get_specific_reg(TREG_RAX);
     start_special_use(TREG_RAX);
 
     check_baddies(-1, 0);

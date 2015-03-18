@@ -359,7 +359,6 @@ static void vsetc(CType *type, int r, CValue *vc)
     vtop++;
     vtop->type = *type;
     vtop->r = r;
-    vtop->r2 = VT_CONST;
     vtop->c = *vc;
 }
 
@@ -526,7 +525,7 @@ ST_FUNC void vpushv(SValue *v)
     *vtop = *v;
 }
 
-static void vdup(void)
+ST_FUNC void vdup(void)
 {
     vpushv(vtop);
 }
@@ -622,8 +621,7 @@ ST_FUNC void save_reg(int r)
     saved = 0;
     l = 0;
     for(p=vstack;p<=vtop;p++) {
-        if ((p->r & VT_VALMASK) == r ||
-            ((p->type.t & VT_BTYPE) == VT_LLONG && (p->r2 & VT_VALMASK) == r)) {
+        if ((p->r & VT_VALMASK) == r) {
             /* must save value on stack if not already done */
             if (!saved) {
                 /* NOTE: must reload 'r' because r might be equal to r2 */
@@ -668,7 +666,6 @@ ST_FUNC void save_reg(int r)
             } else {
                 p->r = lvalue_type(p->type.t) | VT_LOCAL;
             }
-            p->r2 = VT_CONST;
             p->c.ul = l;
         }
     }
@@ -687,8 +684,7 @@ ST_FUNC int get_reg_ex(int rc, int rc2)
             int n;
             n=0;
             for(p = vstack; p <= vtop; p++) {
-                if ((p->r & VT_VALMASK) == r ||
-                    (p->r2 & VT_VALMASK) == r)
+                if ((p->r & VT_VALMASK) == r)
                     n++;
             }
             if (n <= 1)
@@ -704,8 +700,7 @@ ST_FUNC int get_specific_reg(int r)
     SValue *p;
 
     for(p=vstack;p<=vtop;p++) {
-	if ((p->r & VT_VALMASK) == r ||
-	    (p->r2 & VT_VALMASK) == r)
+	if ((p->r & VT_VALMASK) == r)
 	    return -1;
     }
     if (register_contents[r].special_use)
@@ -731,8 +726,7 @@ ST_FUNC int get_reg(int rc)
     for(r=0;r<NB_REGS;r++) {
         if (reg_classes[r] & rc) {
             for(p=vstack;p<=vtop;p++) {
-                if ((p->r & VT_VALMASK) == r ||
-                    (p->r2 & VT_VALMASK) == r)
+                if ((p->r & VT_VALMASK) == r)
                     goto notfound1;
             }
 	    if ((register_contents[r].v.type.t & VT_BTYPE) == VT_VOID)
@@ -749,8 +743,7 @@ ST_FUNC int get_reg(int rc)
     for(r=last_r+1;r<NB_REGS;r++) {
         if (reg_classes[r] & rc) {
             for(p=vstack;p<=vtop;p++) {
-                if ((p->r & VT_VALMASK) == r ||
-                    (p->r2 & VT_VALMASK) == r)
+                if ((p->r & VT_VALMASK) == r)
                     goto notfound2;
             }
 	    if (register_contents[r].special_use)
@@ -766,8 +759,7 @@ ST_FUNC int get_reg(int rc)
     for(r=0;r<=last_r;r++) {
         if (reg_classes[r] & rc) {
             for(p=vstack;p<=vtop;p++) {
-                if ((p->r & VT_VALMASK) == r ||
-                    (p->r2 & VT_VALMASK) == r)
+                if ((p->r & VT_VALMASK) == r)
                     goto notfound3;
             }
 	    if (register_contents[r].special_use)
@@ -782,8 +774,7 @@ ST_FUNC int get_reg(int rc)
      for(r=0;r<NB_REGS;r++) {
          if (reg_classes[r] & rc) {
              for(p=vstack;p<=vtop;p++) {
-                 if ((p->r & VT_VALMASK) == r ||
-                     (p->r2 & VT_VALMASK) == r)
+                 if ((p->r & VT_VALMASK) == r)
                     goto notfound;
              }
 	     if (register_contents[r].special_use)
@@ -800,12 +791,8 @@ ST_FUNC int get_reg(int rc)
        spill registers used in gen_opi()) */
     for(p=vstack;p<=vtop;p++) {
         /* look at second register (if long long) */
-        r = p->r2 & VT_VALMASK;
-        if (r < VT_CONST && (reg_classes[r] & rc))
-            goto save_found;
         r = p->r & VT_VALMASK;
         if (r < VT_CONST && (reg_classes[r] & rc)) {
-        save_found:
 	    if(register_contents[r].special_use)
 		tcc_error("register already in special use");
             save_reg(r);
@@ -897,6 +884,10 @@ ST_FUNC int gv(int rc)
     int r, bit_pos, bit_size, size, align, i;
     int rc2;
 
+    if ((vtop->type.t & VT_VALMASK) == VT_QLONG ||
+	(vtop->type.t & VT_VALMASK) == VT_QFLOAT)
+	tcc_error("cannot gv() a QLONG");
+
     /* NOTE: get_reg can modify vstack[] */
     if (vtop->type.t & VT_BITFIELD) {
         CType type;
@@ -986,10 +977,9 @@ ST_FUNC int gv(int rc)
          || (vtop->r & VT_LVAL)
          || !(reg_classes[r] & rc)
 #ifdef TCC_TARGET_X86_64
-         || ((vtop->type.t & VT_BTYPE) == VT_QLONG && !(reg_classes[vtop->r2] & rc2))
-         || ((vtop->type.t & VT_BTYPE) == VT_QFLOAT && !(reg_classes[vtop->r2] & rc2))
+         || ((vtop->type.t & VT_BTYPE) == VT_QLONG)
+         || ((vtop->type.t & VT_BTYPE) == VT_QFLOAT)
 #else
-         || ((vtop->type.t & VT_BTYPE) == VT_LLONG && !(reg_classes[vtop->r2] & rc2))
 #endif
             )
         {
@@ -1058,17 +1048,8 @@ ST_FUNC int gv(int rc)
                     /* move registers */
                     load(r, vtop);
                     vdup();
-                    vtop[-1].r = r; /* save register value */
-                    vtop->r = vtop[-1].r2;
                 }
-                /* Allocate second register. Here we rely on the fact that
-                   get_reg() tries first to free r2 of an SValue. */
-                r2 = get_reg(rc2);
-                load(r2, vtop);
-                vpop();
-                /* write second register */
-                vtop->r2 = r2;
-                vtop->type.t = original_type;
+		vpop();
             } else if ((vtop->r & VT_LVAL) && !is_float(vtop->type.t)) {
                 int t1, t;
                 /* lvalue of scalar type : need to use lvalue type
@@ -1164,16 +1145,13 @@ static int reg_fret(int t)
 /* expand quad long on stack in two long long/long registers */
 ST_FUNC void qexpand(void)
 {
-    int u;
+    //assert((vtop->type.t & VT_VALMASK) == VT_LOCAL);
+    int addr_type = VT_LLONG, load_size = 8, load_type = ((vtop->type.t & VT_BTYPE) == VT_QLONG) ? VT_LLONG : VT_DOUBLE;
 
-    u = vtop->type.t & VT_UNSIGNED;
-    gv(RC_INT);
     vdup();
-    vtop[0].r = vtop[-1].r2;
-    vtop[0].r2 = VT_CONST;
-    vtop[-1].r2 = VT_CONST;
-    vtop[0].type.t = VT_LLONG | u;
-    vtop[-1].type.t = VT_LLONG | u;
+    vtop[-1].c.ul += 8;
+    vtop[-1].type.t = load_type;
+    vtop[0].type.t = load_type;
 }
 
 /* expand long long on stack in two int registers */
@@ -1182,11 +1160,11 @@ ST_FUNC void lexpand(void)
     int u;
 
     u = vtop->type.t & VT_UNSIGNED;
-    gv(RC_INT);
     vdup();
-    vtop[0].r = vtop[-1].r2;
-    vtop[0].r2 = VT_CONST;
-    vtop[-1].r2 = VT_CONST;
+    vtop[0].type.t = VT_LLONG | u;
+    vpushi(32);
+    gen_op(TOK_SHR);
+    gv2(RC_INT, RC_INT);
     vtop[0].type.t = VT_INT | u;
     vtop[-1].type.t = VT_INT | u;
 }
@@ -1222,10 +1200,18 @@ ST_FUNC void lexpand_nr(void)
 /* build a long long from two ints */
 static void lbuild(int t)
 {
-    gv2(RC_INT, RC_INT);
-    vtop[-1].r2 = vtop[0].r;
-    vtop[-1].type.t = t;
-    vpop();
+    vswap();
+    vtop[0].type.t = t;
+    vpushi(32);
+    gen_op(TOK_SHL);
+    vswap();
+    vtop[0].type.t = t;
+    vpushi(32);
+    gen_op(TOK_SHL);
+    vpushi(32);
+    gen_op(TOK_SHR);
+    gen_op('+');
+    gv(RC_INT);
 }
 
 /* rotate n first stack elements to the bottom 
@@ -1290,7 +1276,7 @@ static void gv_dup(void)
     SValue sv;
 
     t = vtop->type.t;
-    if ((t & VT_BTYPE) == VT_LLONG) {
+    if (0 && (t & VT_BTYPE) == VT_LLONG) {
         lexpand();
         gv_dup();
         vswap();
@@ -1307,7 +1293,7 @@ static void gv_dup(void)
     } else {
         /* duplicate value */
         rc = RC_INT;
-        sv.type.t = VT_INT;
+        sv.type.t = ((t & VT_BTYPE) == VT_LLONG) ? t : VT_INT;
         if (is_float(t)) {
             rc = RC_FLOAT;
 #ifdef TCC_TARGET_X86_64
@@ -2059,7 +2045,6 @@ static void gen_cvt_ftoi1(int t)
         gfunc_call(1);
         vpushi(0);
         vtop->r = REG_IRET;
-        vtop->r2 = REG_LRET;
     } else {
         gen_cvt_ftoi(t);
     }
@@ -2263,8 +2248,6 @@ static void gen_cast(CType *type)
                 /* scalar to int */
                 if (sbt == VT_LLONG) {
                     /* from long long: just take low order word */
-                    lexpand();
-                    vpop();
                 } 
                 /* if lvalue and single word type, nothing to do because
                    the lvalue already contains the real type size (see
@@ -2755,34 +2738,6 @@ ST_FUNC void vstore(void)
         }
 #endif
         if (!nocode_wanted) {
-            rc = RC_INT;
-            if (is_float(ft)) {
-                rc = RC_FLOAT;
-#ifdef TCC_TARGET_X86_64
-                if ((ft & VT_BTYPE) == VT_LDOUBLE) {
-                    rc = RC_ST0;
-                } else if ((ft & VT_BTYPE) == VT_QFLOAT) {
-                    rc = RC_FRET;
-                }
-#endif
-            }
-            r = gv(rc);  /* generate value */
-            /* if lvalue was saved on stack, must read it */
-            if ((vtop[-1].r & VT_VALMASK) == VT_LLOCAL) {
-                SValue sv;
-                t = get_reg(RC_INT);
-#ifdef TCC_TARGET_X86_64
-                sv.type.t = VT_PTR;
-#else
-                sv.type.t = VT_INT;
-#endif
-                sv.r = VT_LOCAL | VT_LVAL;
-                sv.c.ul = vtop[-1].c.ul;
-                load(t, &sv);
-                vtop[-1].r = t | VT_LVAL;
-            }
-	    cache_value(&vtop[-1], r);
-            /* two word case handling : store second register at word + 4 (or +8 for x86-64)  */
 #ifdef TCC_TARGET_X86_64
             if (((ft & VT_BTYPE) == VT_QLONG) || ((ft & VT_BTYPE) == VT_QFLOAT)) {
                 int addr_type = VT_LLONG, load_size = 8, load_type = ((vtop->type.t & VT_BTYPE) == VT_QLONG) ? VT_LLONG : VT_DOUBLE;
@@ -2790,9 +2745,13 @@ ST_FUNC void vstore(void)
             if ((ft & VT_BTYPE) == VT_LLONG) {
                 int addr_type = VT_INT, load_size = 4, load_type = VT_INT;
 #endif
+		/* QD QS */
+		vdup();
+		vrotb(3);
+		/* QS QS QD */
+
+		vdup();
                 vtop[-1].type.t = load_type;
-                store(r, vtop - 1);
-                vswap();
                 /* convert to int to increment easily */
                 vtop->type.t = addr_type;
                 gaddrof();
@@ -2801,11 +2760,55 @@ ST_FUNC void vstore(void)
                 vtop->r |= VT_LVAL;
                 vswap();
                 vtop[-1].type.t = load_type;
-                /* XXX: it works because r2 is spilled last ! */
-                store(vtop->r2, vtop - 1);
+		/* QS QS LD1 LD2 */
+
+		vrotb(3);
+
+		/* LD1 LD2 QS */
+		qexpand();
+
+		/* QS LD1 LD2 LS1 LS2 */
+		vrott(3);
+		/* QS LD1 LS2 LD2 LS1 */
+		vrotb(4);
+		/* QS LS2 LD2 LS1 LD1 */
+		vstore();
+		vtop--;
+		/* QS LD1 LS1 */
+		vstore();
+		/* QS LS1 */
+		vswap();
             } else {
-                store(r, vtop - 1);
-            }
+		rc = RC_INT;
+		if (is_float(ft)) {
+		    rc = RC_FLOAT;
+#ifdef TCC_TARGET_X86_64
+		    if ((ft & VT_BTYPE) == VT_LDOUBLE) {
+			rc = RC_ST0;
+		    } else if ((ft & VT_BTYPE) == VT_QFLOAT) {
+			rc = RC_FRET;
+		    }
+#endif
+		}
+		r = gv(rc);  /* generate value */
+		/* if lvalue was saved on stack, must read it */
+		if ((vtop[-1].r & VT_VALMASK) == VT_LLOCAL) {
+		    SValue sv;
+		    t = get_reg(RC_INT);
+#ifdef TCC_TARGET_X86_64
+		    sv.type.t = VT_PTR;
+#else
+		    sv.type.t = VT_INT;
+#endif
+		    sv.r = VT_LOCAL | VT_LVAL;
+		    sv.c.ul = vtop[-1].c.ul;
+		    load(t, &sv);
+		    vtop[-1].r = t | VT_LVAL;
+		}
+		cache_value(&vtop[-1], r);
+	    }
+
+	    store(r, vtop - 1);
         }
         vswap();
         vtop--; /* NOT vpop() because on x86 it would flush the fp stack */
@@ -4174,9 +4177,9 @@ ST_FUNC void unary(void)
             indir();
             skip(']');
         } else if (tok == '(') {
-            SValue ret;
+            SValue ret, ret1, ret2;
             Sym *sa;
-            int nb_args, sret;
+            int nb_args, nb_ret, sret;
 
             /* function call  */
             if ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
@@ -4197,7 +4200,7 @@ ST_FUNC void unary(void)
             next();
             sa = s->next; /* first parameter */
             nb_args = 0;
-            ret.r2 = VT_CONST;
+	    nb_ret = 1;
             /* compute first implicit argument if a structure is returned */
             if ((s->type.t & VT_BTYPE) == VT_STRUCT) {
                 int ret_align;
@@ -4224,8 +4227,11 @@ ST_FUNC void unary(void)
                 if (is_float(ret.type.t)) {
                     ret.r = reg_fret(ret.type.t);
 #ifdef TCC_TARGET_X86_64
-                    if ((ret.type.t & VT_BTYPE) == VT_QFLOAT)
-                      ret.r2 = REG_QRET;
+                    if ((ret.type.t & VT_BTYPE) == VT_QFLOAT) {
+			nb_ret = 2;
+			ret2.r = REG_QRET;
+			ret1.type.t = ret2.type.t = VT_DOUBLE;
+		    }
 #endif
                 } else {
 #ifdef TCC_TARGET_X86_64
@@ -4233,7 +4239,11 @@ ST_FUNC void unary(void)
 #else
                     if ((ret.type.t & VT_BTYPE) == VT_LLONG)
 #endif
-                        ret.r2 = REG_LRET;
+		    {
+			nb_ret = 2;
+			ret2.r = REG_LRET;
+			ret1.type.t = ret2.type.t = VT_LLONG;
+		    }
                     ret.r = REG_IRET;
                 }
                 ret.c.i = 0;
@@ -4259,18 +4269,40 @@ ST_FUNC void unary(void)
                 vtop -= (nb_args + 1);
             }
             /* return value */
-            vsetc(&ret.type, ret.r, &ret.c);
-            vtop->r2 = ret.r2;
+	    if (nb_ret == 1) {
+		vsetc(&ret.type, ret.r, &ret.c);
+	    } else if (nb_ret == 2) {
+		vsetc(&ret1.type, ret.r, &ret1.c);
+		vsetc(&ret2.type, ret2.r, &ret2.c);
+
+                int addr;
+
+                size = type_size(&s->type, &align);
+                loc = (loc - size) & -align;
+                addr = loc;
+                vset(&ret2.type, VT_LOCAL | VT_LVAL, addr+8);
+                vswap();
+                vstore();
+		save_regs(0);
+                vtop--;
+                vset(&ret1.type, VT_LOCAL | VT_LVAL, addr);
+		vswap();
+		vstore();
+		save_regs(0);
+		vtop--;
+
+		vset(&s->type, VT_LOCAL | VT_LVAL, addr);
+	    }
             /* handle packed struct return */
             if (((s->type.t & VT_BTYPE) == VT_STRUCT) && !sret) {
                 int addr;
                 size = type_size(&s->type, &align);
                 loc = (loc - size) & -align;
                 addr = loc;
-                vset(&ret.type, VT_LOCAL | VT_LVAL, addr);
+                vset((nb_ret > 1) ? &s->type : &ret.type, VT_LOCAL | VT_LVAL, addr);
                 vswap();
                 vstore();
-                vtop--;
+		vtop--;
                 vset(&s->type, VT_LOCAL | VT_LVAL, addr);
             }
         } else {
@@ -4869,7 +4901,32 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
                         vset(&ret_type, VT_LOCAL | VT_LVAL, addr);
                     }
                     vtop->type = ret_type;
-                    if (is_float(ret_type.t))
+		    if ((ret_type.t & VT_BTYPE) == VT_QLONG ||
+			(ret_type.t & VT_BTYPE) == VT_QFLOAT) {
+			int rc1 = ((ret_type.t & VT_BTYPE) == VT_QLONG) ? RC_INT : RC_FLOAT;
+			int rc2 = ((ret_type.t & VT_BTYPE) == VT_QLONG) ? RC_INT : RC_FLOAT;
+			int r1 = ((ret_type.t & VT_BTYPE) == VT_QLONG) ? REG_LRET: REG_QRET;
+			int r2 = ((ret_type.t & VT_BTYPE) == VT_QLONG) ? REG_IRET: REG_FRET;
+
+			save_reg(r1);
+			save_reg(r2);
+			get_specific_reg(r1);
+			get_specific_reg(r2);
+			//start_special_use(REG_IRET);
+			//start_special_use(REG_LRET);
+
+			vdup();
+			qexpand();
+			vswap();
+			gv(rc1);
+			load(r1, vtop);
+			/* move to iret */
+			vtop--;
+			gv(rc2);
+			load(r2, vtop);
+			/* move to lret */
+			vtop--;
+		    } else if (is_float(ret_type.t))
                         gv(rc_fret(ret_type.t));
                     else
                         gv(RC_IRET);
