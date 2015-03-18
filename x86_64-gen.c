@@ -2572,14 +2572,12 @@ void gen_cvt_itof(int t)
             o(0x6a); /* push $0 */
             g(0x00);
 	    orex_new(0, vtop->r, 0, 0);
-	    /* er, we're using the top 32 bits? */
             o(0x50 + REG_VALUE(vtop->r)); /* push r */
             o(0x242cdf); /* fildll (%rsp) */
             o(0x10c48348); /* add $16, %rsp */
         } else {
             /* int to float/double/long double */
 	    orex_new(0, vtop->r, 0, 0);
-	    /* er, we're using the top 32 bits? */
             o(0x50 + REG_VALUE(vtop->r)); /* push r */
             o(0x2404db); /* fildl (%rsp) */
             o(0x08c48348); /* add $8, %rsp */
