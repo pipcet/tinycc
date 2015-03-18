@@ -2076,7 +2076,7 @@ static void force_charshort_cast(int t)
     }
 }
 
-void orex(int ll, int r, int r2, int b);
+void orex(int bs, int r, int r2, int b);
 
 /* cast 'vtop' to 'type'. Casting to bitfields is forbidden. */
 static void gen_cast(CType *type)
@@ -2228,7 +2228,7 @@ static void gen_cast(CType *type)
                     int r = gv(RC_INT);
                     if (sbt != (VT_INT | VT_UNSIGNED)) {
                         /* x86_64 specific: movslq */
-			orex(1, r, r, 0x63);
+			orex(64, r, r, 0x63);
                         o(0xc0 + (REG_VALUE(r) << 3) + REG_VALUE(r));
                     }
                 }
