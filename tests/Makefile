@@ -13,6 +13,7 @@ TESTS = \
  hello-run \
  libtest \
  test1 \
+ test15 \
  test2 \
  test3 \
  abitest \
@@ -97,18 +98,28 @@ test1: test.ref
 	@echo ------------ $@ ------------
 	$(TCC) $(SRCDIR)/tcctest.c -g -o tcctest1
 	$(TCC) -run $(SRCDIR)/tcctest.c > test.out1
+	$(TCC) -g ../tcc.c -ltcc -lm -ldl -o metatcc
 	diff -u test.ref test.out1
 
 
 # iterated test2 (compile tcc then compile tcctest.c !)
+test15: test.ref
+	@echo ------------ $@ ------------
+	$(TCC) $(RUN_TCC) $(SRCDIR)/tcctest.c -g -o tcctest15
+	$(TCC) $(RUN_TCC) -run $(SRCDIR)/tcctest.c > test.out15
+	diff -u test.ref test.out15
+
+# iterated test2 (compile tcc then compile tcctest.c !)
 test2: test.ref
 	@echo ------------ $@ ------------
+	$(TCC) $(RUN_TCC) $(RUN_TCC) $(SRCDIR)/tcctest.c -g -o tcctest2
 	$(TCC) $(RUN_TCC) $(RUN_TCC) -run $(SRCDIR)/tcctest.c > test.out2
 	diff -u test.ref test.out2
 
 # iterated test3 (compile tcc then compile tcc then compile tcctest.c !)
 test3: test.ref
 	@echo ------------ $@ ------------
+	$(TCC) $(RUN_TCC) $(RUN_TCC) $(RUN_TCC) $(SRCDIR)/tcctest.c -g -o tcctest3
 	$(TCC) $(RUN_TCC) $(RUN_TCC) $(RUN_TCC) -run $(SRCDIR)/tcctest.c > test.out3
 	diff -u test.ref test.out3
 
