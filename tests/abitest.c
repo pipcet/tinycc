@@ -131,6 +131,60 @@ static int ret_2double_test(void) {
 }
 
 /*
+ * ret_mixed_test:
+ *
+ * On x86-64, a struct with a double and an integer should be passed in one SSE register and one integer register.
+ */
+typedef struct ret_mixed_test_type_s {double x; long long y;} ret_mixed_test_type;
+typedef ret_mixed_test_type (*ret_mixed_test_function_type) (ret_mixed_test_type);
+
+static int ret_mixed_test_callback(void *ptr) {
+  ret_mixed_test_function_type f = (ret_mixed_test_function_type)ptr;
+  ret_mixed_test_type a = {10, 35};
+  ret_mixed_test_type r;
+  r = f(a);
+  return ((r.x == a.x*5) && (r.y == a.y*3)) ? 0 : -1;
+}
+
+static int ret_mixed_test(void) {
+  const char *src =
+  "typedef struct ret_mixed_test_type_s {double x, y;} ret_mixed_test_type;"
+  "ret_mixed_test_type f(ret_mixed_test_type a) {\n"
+  "  ret_mixed_test_type r = {a.x*5, a.y*3};\n"
+  "  return r;\n"
+  "}\n";
+
+  return run_callback(src, ret_mixed_test_callback);
+}
+
+/*
+ * ret_mixed2_test:
+ *
+ * On x86-64, a struct with a double and an integer should be passed in one SSE register and one integer register.
+ */
+typedef struct ret_mixed2_test_type_s {float x,x2; int y,y2;} ret_mixed2_test_type;
+typedef ret_mixed2_test_type (*ret_mixed2_test_function_type) (ret_mixed2_test_type);
+
+static int ret_mixed2_test_callback(void *ptr) {
+  ret_mixed2_test_function_type f = (ret_mixed2_test_function_type)ptr;
+  ret_mixed2_test_type a = {10, 5, 35, 7 };
+  ret_mixed2_test_type r;
+  r = f(a);
+  return ((r.x == a.x*5) && (r.y == a.y*3)) ? 0 : -1;
+}
+
+static int ret_mixed2_test(void) {
+  const char *src =
+  "typedef struct ret_mixed2_test_type_s {double x, y;} ret_mixed2_test_type;"
+  "ret_mixed2_test_type f(ret_mixed2_test_type a) {\n"
+  "  ret_mixed2_test_type r = {a.x*5, a.y*3};\n"
+  "  return r;\n"
+  "}\n";
+
+  return run_callback(src, ret_mixed2_test_callback);
+}
+
+/*
  * reg_pack_test: return a small struct which should be packed into
  * registers (Win32) during return.
  */
@@ -476,6 +530,8 @@ int main(int argc, char **argv) {
   RUN_TEST(ret_longdouble_test);
   RUN_TEST(ret_2float_test);
   RUN_TEST(ret_2double_test);
+  RUN_TEST(ret_mixed_test);
+  RUN_TEST(ret_mixed2_test);
   RUN_TEST(reg_pack_test);
   RUN_TEST(reg_pack_longlong_test);
   RUN_TEST(sret_test);
