@@ -205,10 +205,16 @@ abitest-cc$(EXESUF): abitest.c $(top_builddir)/$(LIBTCC)
 abitest-tcc$(EXESUF): abitest.c $(top_builddir)/$(LIBTCC)
 	$(TCC) -o $@ $^ $(CPPFLAGS) $(CFLAGS) $(NATIVE_DEFINES) $(LIBS) $(LINK_LIBTCC) $(LDFLAGS) -I$(top_srcdir)
 
-abitest: abitest-cc$(EXESUF) abitest-tcc$(EXESUF)
+run-abitest-cc: abitest-cc$(EXESUF)
 	@echo ------------ $@ ------------
 	./abitest-cc$(EXESUF) lib_path=.. include="$(top_srcdir)/include"
+
+run-abitest-tcc: abitest-tcc$(EXESUF)
+	@echo ------------ $@ ------------
 	./abitest-tcc$(EXESUF) lib_path=.. include="$(top_srcdir)/include"
+
+abitest: run-abitest-cc run-abitest-tcc
+	true
 
 vla_test$(EXESUF): vla_test.c
 	$(TCC) -o $@ $^ $(CPPFLAGS) $(CFLAGS)
