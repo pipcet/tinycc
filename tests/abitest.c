@@ -13,6 +13,13 @@
 #define LONG_DOUBLE_LITERAL(x) x ## L
 #endif
 
+#include <signal.h>
+
+void segv_handler(int i)
+{
+  for(;;);
+}
+
 static const char *tccdir = NULL;
 static const char *include_dir = NULL;
 
@@ -682,6 +689,8 @@ int main(int argc, char **argv) {
   const char *testname = NULL;
   int retval = EXIT_SUCCESS;
   
+  signal(SIGSEGV, segv_handler);
+
   /* if tcclib.h and libtcc1.a are not installed, where can we find them */
   for (i = 1; i < argc; ++i) {
     if (!memcmp(argv[i], "lib_path=",9))
