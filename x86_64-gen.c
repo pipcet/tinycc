@@ -2432,11 +2432,7 @@ void gfunc_prolog(CType *func_type)
     /* if the function returns a structure, then add an
        implicit pointer parameter */
     func_vt = sym->type;
-#ifndef NO_QLONG
-    mode = classify_x86_64_arg(&func_vt, NULL, &size, &align, &reg_count);
-#else
-    mode = classify_x86_64_arg(&func_vt, NULL, NULL, &size, &align, &reg_count);
-#endif
+    mode = classify_x86_64_arg_new(&func_vt, NULL, 0, &size, &align, &reg_count);
     if (mode == x86_64_mode_memory) {
         push_arg_reg(reg_param_index);
         func_vc = loc;
@@ -2457,7 +2453,11 @@ void gfunc_prolog(CType *func_type)
                 loc -= reg_count * 8;
                 param_addr = loc;
                 for (i = 0; i < reg_count; ++i) {
-                    o(0xd60f66); /* movq */
+		    /* strictly speaking, we don't need orex here for
+		       the default ABI, but in case someone modifies it
+		       to pass more than eight SSE arguments ... */
+		    o(0x66);
+		    orex(0, sse_param_index, 0, 0xd60f); /* movq */
                     gen_modrm(sse_param_index, VT_LOCAL, NULL, param_addr + i*8);
                     ++sse_param_index;
                 }
