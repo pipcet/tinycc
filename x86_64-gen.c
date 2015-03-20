@@ -1633,7 +1633,6 @@ static X86_64_Mode classify_x86_64_arg(CType *ty, CType *ret, int *psize, int *p
 		       arguments and one double-word argument? */
                     *reg_count = 2;
                     ret_t = VT_QLONG;
-		    *(int *)0 = 0;
                 } else {
                     *reg_count = 1;
                     ret_t = (size > 4) ? VT_LLONG : VT_INT;
