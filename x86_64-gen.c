@@ -1577,54 +1577,133 @@ static X86_64_Mode classify_x86_64_inner(CType *ty, SValue *ret, int nret, int *
     assert(0);
 }
 
-#ifndef NO_QLONG
-static X86_64_Mode classify_x86_64_arg(CType *ty, CType *ret, int *psize, int *palign, int *reg_count) {
-#else
-static X86_64_Mode classify_x86_64_arg(CType *ty, SValue *ret, int nret, int *psize, int *palign, int *offset) {
-#endif
+static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, int *offset) {
     X86_64_Mode mode;
-    int size, align, ret_t = 0;
-#ifndef NO_QLONG
+    Sym *f;
     
-#else
-
-    if (nret)
-	ret[0].type.ref = ty->ref;
-#endif
-    if (ty->t & (VT_BITFIELD|VT_ARRAY)) {
-#ifdef NO_QLONG
-	if (nret) {
-	    ret[0].type.t = ty->t;
+    switch (ty->t & VT_BTYPE) {
+    case VT_VOID:
+	if (nret > 0) {
+	    ret[0].type = *ty;
 	    ret[0].c.ull = 0;
+	    ret[0].r = VT_CONST;
+	}
+	return x86_64_mode_none;
+    
+    case VT_INT:
+    case VT_BYTE:
+    case VT_SHORT:
+    case VT_LLONG:
+    case VT_BOOL:
+    case VT_PTR:
+    case VT_FUNC:
+    case VT_ENUM:
+	if (nret > 0) {
+	    int align;
+	    ret[0].type = *ty;
+	    ret[0].c.ull = type_size(ty, &align);
 	    ret[0].r = TREG_RAX;
 	}
+	(*offset)++;
+	return x86_64_mode_integer;
+    
+    case VT_FLOAT:
+    case VT_DOUBLE:
+	if (nret > 0) {
+	    int align;
+	    ret[0].type = *ty;
+	    ret[0].c.ull = type_size(ty, &align);
+	    ret[0].c.ull = 0;
+	    ret[0].r = TREG_XMM0;
+	}
+	(*offset)++;
+	return x86_64_mode_sse;
+    
+    case VT_LDOUBLE:
+	if (nret > 0) {
+	    ret[0].type = *ty;
+	    ret[0].c.ull = 0;
+	    ret[0].r = TREG_ST0;
+	}
+	(*offset)++;
+	return x86_64_mode_x87;
+      
+    case VT_STRUCT: ;
+	int align;
+        int size = type_size(ty, &align);
+	if (size > 16)
+	    return x86_64_mode_memory;
+        f = ty->ref;
 
-#endif
+        // Detect union
+	/* doesn't detect single-member unions. Is that intentional? I
+	 * can't find the rule saying that unions have to have mode
+	 * MEMORY in the ABI, either ... */
+        if (f->next && (f->c == f->next->c))
+	    return x86_64_mode_memory;
+        
+        mode = x86_64_mode_none;
+	int origo = 0, o = 0, eightbyte_o = 0;
+
+        for (; f; f = f->next) {
+	    int i;
+
+	    if (f->v & SYM_STRUCT)
+		continue;
+	    if (!(f->v & SYM_FIELD))
+		continue;
+
+            mode = classify_x86_64_merge(mode, classify_x86_64_inner_new(&f->type, ret+o, nret-o, &o));
+
+	    for(i=origo; i<o; i++) {
+		int new_eightbyte = (f->c & 7) == 0;
+		if (new_eightbyte)
+		    eightbyte_o = i;
+		else {
+		    /* struct { float x; int y; } is packed into %rax. */
+		    int j;
+
+		    for(j=eightbyte_o; j<i; j++) {
+			if(ret[i].r == TREG_RAX && ret[j].r == TREG_XMM0)
+			    ret[j].r = TREG_RAX;
+
+			if(ret[i].r == TREG_XMM0 && ret[j].r == TREG_RAX)
+			    ret[i].r = TREG_RAX;
+		    }
+		}
+
+		if (i < nret && ret[i].type.t != VT_VOID) {
+		    ret[i].c.ull += f->c;
+		}
+		(*offset)++;
+	    }
+	    origo = o;
+	}
+	if (nret >= 2 && ret[0].r == ret[1].r)
+	    ret[1].r = (ret[0].r == TREG_RAX) ? TREG_RDX : TREG_XMM1;
+        
+        return mode;
+    }
+    
+    assert(0);
+}
+
+static X86_64_Mode classify_x86_64_arg(CType *ty, CType *ret, int *psize, int *palign, int *reg_count) {
+    X86_64_Mode mode;
+    int size, align, ret_t = 0;
+    if (ty->t & (VT_BITFIELD|VT_ARRAY)) {
         *psize = 8;
-#ifndef NO_QLONG
         *reg_count = 1;
         ret_t = ty->t;
-#endif
         mode = x86_64_mode_integer;
     } else {
         size = type_size(ty, &align);
         *psize = (size + 7) & ~7;
         *palign = (align + 7) & ~7;
-#ifndef NO_QLONG
-    
-#else
 
-#endif
         if (size > 16) {
-#ifdef NO_QLONG
-	    /* we do not support SSEUP-class arguments properly */
-#endif
             mode = x86_64_mode_memory;
-#ifdef NO_QLONG
-	    (*offset)++;
-#endif
         } else {
-#ifndef NO_QLONG
             mode = classify_x86_64_inner(ty);
             switch (mode) {
             case x86_64_mode_integer:
@@ -1655,20 +1734,47 @@ static X86_64_Mode classify_x86_64_arg(CType *ty, SValue *ret, int nret, int *ps
                 break;
             default: break; /* nothing to be done for x86_64_mode_memory and x86_64_mode_none*/
             }
-#else
-	    /* this breaks for struct { struct { long x } s; long y; }, I think */
-            mode = classify_x86_64_inner(ty, ret, nret, offset);
-#endif
         }
     }
     
-#ifndef NO_QLONG
     if (ret) {
         ret->ref = NULL;
         ret->t = ret_t;
     }
     
-#endif
+    return mode;
+}
+
+static X86_64_Mode classify_x86_64_arg_new(CType *ty, SValue *ret, int nret, int *psize, int *palign, int *offset) {
+    X86_64_Mode mode;
+    int size, align, ret_t = 0;
+
+    if (nret)
+	ret[0].type.ref = ty->ref;
+    if (ty->t & (VT_BITFIELD|VT_ARRAY)) {
+	if (nret) {
+	    ret[0].type.t = ty->t;
+	    ret[0].c.ull = 0;
+	    ret[0].r = TREG_RAX;
+	}
+
+        *psize = 8;
+        mode = x86_64_mode_integer;
+    } else {
+        size = type_size(ty, &align);
+        *psize = (size + 7) & ~7;
+        *palign = (align + 7) & ~7;
+
+        if (size > 16) {
+	    /* we do not support SSEUP-class arguments properly */
+            mode = x86_64_mode_memory;
+	    (*offset)++;
+        } else {
+	    /* this breaks for struct { struct { long x } s; long y; }, I think */
+            mode = classify_x86_64_inner_new(ty, ret, nret, offset);
+        }
+    }
+    
     return mode;
 }
 
@@ -1691,10 +1797,13 @@ ST_FUNC int classify_x86_64_va_arg(CType *ty) {
     }
 }
 
-#ifndef NO_QLONG
 /* Return 1 if this function returns via an sret pointer, 0 otherwise */
 int gfunc_sret(CType *vt, CType *ret, int *ret_align) {
-#else
+    int size, align, reg_count;
+    *ret_align = 1; // Never have to re-align return values for x86-64
+    return (classify_x86_64_arg(vt, ret, &size, &align, &reg_count) == x86_64_mode_memory);
+}
+
 /* Return 1 if this function returns via an sret pointer, 0 otherwise.
  *
  * Up to two arguments can be returned in registers, but all three
@@ -1703,15 +1812,10 @@ int gfunc_sret(CType *vt, CType *ret, int *ret_align) {
  * register, struct offset, and type of the corresponding
  * argument. Only ret1 is modified if there is a single argument.
  */
-int gfunc_sret(CType *vt, SValue *ret, int nret, int *ret_align) {
-#endif
+int gfunc_sret_new(CType *vt, SValue *ret, int nret, int *ret_align) {
     int size, align, reg_count;
     *ret_align = 1; // Never have to re-align return values for x86-64
-#ifndef NO_QLONG
-    return (classify_x86_64_arg(vt, ret, &size, &align, &reg_count) == x86_64_mode_memory);
-#else
-    return (classify_x86_64_arg(vt, ret, nret, &size, &align, &reg_count) == x86_64_mode_memory);
-#endif
+    return (classify_x86_64_arg_new(vt, ret, nret, &size, &align, &reg_count) == x86_64_mode_memory);
 }
 
 #define REGN 6
@@ -1730,16 +1834,10 @@ void gfunc_call(int nb_args)
 {
     X86_64_Mode mode;
     CType type;
-#ifndef NO_QLONG
-    int size, align, r, args_size, stack_adjust, run_start, run_end, i, reg_count;
-#else
     int size, align, r, args_size, stack_adjust, run_start, run_end, i, j, reg_count;
-#endif
     int nb_reg_args = 0;
     int nb_sse_args = 0;
-#ifdef NO_QLONG
     int nb_x87_args = 0;
-#endif
     int sse_reg, gen_reg;
 #ifdef NO_QLONG
     SValue ret[256]; /* XXX */
