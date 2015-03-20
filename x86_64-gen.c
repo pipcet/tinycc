@@ -2440,59 +2440,67 @@ void gfunc_prolog(CType *func_type)
     }
     /* define parameters */
     while ((sym = sym->next) != NULL) {
+	SValue ret[16];
+	int nret = 16;
+	int i;
+	for(i=0; i<nret; i++) {
+	    ret[i].type.t = VT_VOID;
+	    ret[i].r = VT_CONST;
+	}
+
         type = &sym->type;
-#ifndef NO_QLONG
-        mode = classify_x86_64_arg(type, NULL, &size, &align, &reg_count);
-#else
-        mode = classify_x86_64_arg(type, NULL, NULL, &size, &align, &reg_count);
-#endif
+	reg_count = 0;
+        mode = classify_x86_64_arg_new(type, ret, nret, &size, &align, &reg_count);
         switch (mode) {
+        case x86_64_mode_integer:
         case x86_64_mode_sse:
-            if (sse_param_index + reg_count <= 8) {
-                /* save arguments passed by register */
-                loc -= reg_count * 8;
-                param_addr = loc;
-                for (i = 0; i < reg_count; ++i) {
+	    for(i=0; i<reg_count; i++) {
+		if (ret[i].r == TREG_RAX ||
+		    ret[i].r == TREG_RDX /* XXX */) {
+		    if (reg_param_index >= REGN) {
+			goto revert_assignments;
+		    }
+		    ret[i].r = arg_regs[reg_param_index];
+		    ++reg_param_index;
+		} else if (ret[i].r == TREG_XMM0 ||
+			   ret[i].r == TREG_XMM1) {
+		    if (sse_param_index >= 8) {
+			goto revert_assignments;
+		    }
+		    ret[i].r = TREG_XMM0 + sse_param_index;
+		    ++sse_param_index;
+		} else {
+		    *(int *)0 = 0;
+		}
+	    }
+
+	    /* save arguments passed by register */
+	    loc -= reg_count * 8;
+	    param_addr = loc;
+	    for (i = 0; i < reg_count; ++i) {
+		int r = ret[i].r;
+
+		if (r < 16) {
+		    gen_modrm64(0x89, r, VT_LOCAL, NULL, param_addr + ret[i].c.ull);
+		} else if (r >= TREG_XMM0 && r <= TREG_XMM7) {
 		    /* strictly speaking, we don't need orex here for
 		       the default ABI, but in case someone modifies it
 		       to pass more than eight SSE arguments ... */
 		    o(0x66);
-		    orex(0, sse_param_index, 0, 0xd60f); /* movq */
-                    gen_modrm(sse_param_index, VT_LOCAL, NULL, param_addr + i*8);
-                    ++sse_param_index;
-                }
-            } else {
-                addr = (addr + align - 1) & -align;
-                param_addr = addr;
-                addr += size;
-                sse_param_index += reg_count;
-            }
+		    orex(0, r, 0, 0xd60f); /* movq */
+                    gen_modrm(r, VT_LOCAL, NULL, param_addr + ret[i].c.ull);
+		}
+	    }
             break;
-            
+
+	revert_assignments:
+	    /* fall through to mode_memory case */;
         case x86_64_mode_memory:
         case x86_64_mode_x87:
             addr = (addr + align - 1) & -align;
             param_addr = addr;
             addr += size;
             break;
-            
-        case x86_64_mode_integer: {
-            if (reg_param_index + reg_count <= REGN) {
-                /* save arguments passed by register */
-                loc -= reg_count * 8;
-                param_addr = loc;
-                for (i = 0; i < reg_count; ++i) {
-                    gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, param_addr + i*8);
-                    ++reg_param_index;
-                }
-            } else {
-                addr = (addr + align - 1) & -align;
-                param_addr = addr;
-                addr += size;
-                reg_param_index += reg_count;
-            }
-            break;
-        }
 	default: break; /* nothing to be done for x86_64_mode_none */
         }
         sym_push(sym->v & ~SYM_FIELD, type,
