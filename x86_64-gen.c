@@ -1656,32 +1656,49 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 	    }
 
 	    for(i=origo; i<o; i++) {
-		int new_eightbyte = (f->c & 7) == 0;
-		if (new_eightbyte)
-		    eightbyte_o = i;
-		else {
-		    /* struct { float x; int y; } is packed into %rax. */
-		    int j;
-
-		    for(j=eightbyte_o; j<i; j++) {
-			if(ret[i].r == TREG_RAX && ret[j].r == TREG_XMM0)
-			    ret[j].r = TREG_RAX;
-
-			if(ret[i].r == TREG_XMM0 && ret[j].r == TREG_RAX)
-			    ret[i].r = TREG_RAX;
-		    }
-		}
-
-		if (i < nret && ret[i].type.t != VT_VOID) {
+		if(i < nret) {
 		    ret[i].c.ull += f->c;
-		    ret[i].c.ull &= ~7ULL;
-		    if ((ret[i].c.ull ^ last_offset) < 8) {
-			fprintf(stderr, "union detected\n");
-			ret[i].type.t = VT_VOID;
-			ret[i-1].type.t = (ret[i-1].type.t == VT_FLOAT) ? VT_DOUBLE : VT_LLONG;
-		    } else {
-			last_offset = ret[i].c.ull;
-			last_r = ret[i].r;
+		    /* start a new "eightbyte" at an eight-byte boundary... */
+		    int new_eightbyte = (ret[i].c.ull & 7ULL) == 0ULL;
+		    /* ...but not if it's the same eightbyte we're already in. */
+		    if (eightbyte_o < i && (ret[i].c.ull == ret[eightbyte_o].c.ull))
+			new_eightbyte = 0;
+		    if (new_eightbyte)
+			eightbyte_o = i;
+		    else {
+			/* struct { float x; int y; } is packed into %rax. */
+			int j;
+
+			for(j=eightbyte_o; j<i; j++) {
+			    if(ret[i].r == TREG_RAX && ret[j].r == TREG_XMM0)
+				ret[j].r = TREG_RAX;
+
+			    if(ret[i].r == TREG_XMM0 && ret[j].r == TREG_RAX)
+				ret[i].r = TREG_RAX;
+			}
+		    }
+
+		    if (ret[i].type.t != VT_VOID) {
+			/* if we're dealing with a structure which
+			 * packs two or more data items into the same
+			 * eightbyte, copy the entire
+			 * eightbyte. That's not absolutely the most
+			 * correct thing to do, because the structure
+			 * might be as small as two bytes... however,
+			 * we're only copying that data to the stack,
+			 * and then memcpy()ing it from there to the
+			 * original struct, so we should be safe. For
+			 * now. */
+
+			if (!new_eightbyte) {
+			    fprintf(stderr, "union detected\n");
+			    ret[i].type.t = VT_VOID;
+			    ret[i].r = VT_CONST;
+			    ret[eightbyte_o].type.t = (ret[eightbyte_o].r == TREG_XMM0) ? VT_DOUBLE : VT_LLONG;
+			} else {
+			    last_offset = ret[i].c.ull;
+			    last_r = ret[i].r;
+			}
 		    }
 		}
 		(*offset)++;
