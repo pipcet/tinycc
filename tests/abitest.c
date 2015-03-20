@@ -109,6 +109,31 @@ static int ret_2float_test(void) {
 }
 
 /*
+ * ret_intchar_test:
+ */
+typedef struct ret_intchar_test_type_s {int x; char y;} ret_intchar_test_type;
+typedef ret_intchar_test_type (*ret_intchar_test_function_type) (ret_intchar_test_type);
+
+static int ret_intchar_test_callback(void *ptr) {
+  ret_intchar_test_function_type f = (ret_intchar_test_function_type)ptr;
+  ret_intchar_test_type a = {10, 35};
+  ret_intchar_test_type r;
+  r = f(a);
+  return ((r.x == a.x*5) && (r.y == a.y*3)) ? 0 : -1;
+}
+
+static int ret_intchar_test(void) {
+  const char *src =
+  "typedef struct ret_intchar_test_type_s {float x, y;} ret_intchar_test_type;"
+  "ret_intchar_test_type f(ret_intchar_test_type a) {\n"
+  "  ret_intchar_test_type r = {a.x*5, a.y*3};\n"
+  "  return r;\n"
+  "}\n";
+
+  return run_callback(src, ret_intchar_test_callback);
+}
+
+/*
  * ret_2double_test:
  * 
  * On x86-64, a struct with 2 doubles should be passed in two SSE
@@ -594,6 +619,7 @@ int main(int argc, char **argv) {
 #endif
 #endif
   RUN_TEST(ret_2float_test);
+  RUN_TEST(ret_intchar_test);
   RUN_TEST(ret_2double_test);
   if(0) {
     /* we currently fail these tests. */
