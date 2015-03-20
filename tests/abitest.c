@@ -134,7 +134,7 @@ static int ret_16char_test(void) {
   "  return r;\n"
   "}\n";
 
-  return run_callback(src, ret_2float_test_callback);
+  return run_callback(src, ret_16char_test_callback);
 }
 
 /*
