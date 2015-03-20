@@ -1601,7 +1601,7 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 	if (nret > 0) {
 	    int align;
 	    ret[0].type = *ty;
-	    ret[0].c.ull = type_size(ty, &align);
+	    ret[0].c.ull = 0;
 	    ret[0].r = TREG_RAX;
 	}
 	(*offset)++;
@@ -1612,7 +1612,6 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 	if (nret > 0) {
 	    int align;
 	    ret[0].type = *ty;
-	    ret[0].c.ull = type_size(ty, &align);
 	    ret[0].c.ull = 0;
 	    ret[0].r = TREG_XMM0;
 	}
@@ -1635,15 +1634,10 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 	    return x86_64_mode_memory;
         f = ty->ref;
 
-        // Detect union
-	/* doesn't detect single-member unions. Is that intentional? I
-	 * can't find the rule saying that unions have to have mode
-	 * MEMORY in the ABI, either ... */
-        if (f->next && (f->c == f->next->c))
-	    return x86_64_mode_memory;
-        
         mode = x86_64_mode_none;
 	int origo = 0, o = 0, eightbyte_o = 0;
+	unsigned long long last_offset = -1;
+	int last_r;
 
         for (; f; f = f->next) {
 	    int i;
@@ -1654,6 +1648,12 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 		continue;
 
             mode = classify_x86_64_merge(mode, classify_x86_64_inner_new(&f->type, ret+o, nret-o, &o));
+
+	    if (mode == x86_64_mode_memory) {
+		for(i=origo; i<o; i++) {
+		    ret[i].r = VT_CONST;
+		}
+	    }
 
 	    for(i=origo; i<o; i++) {
 		int new_eightbyte = (f->c & 7) == 0;
@@ -1674,6 +1674,15 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 
 		if (i < nret && ret[i].type.t != VT_VOID) {
 		    ret[i].c.ull += f->c;
+		    ret[i].c.ull &= ~7ULL;
+		    if ((ret[i].c.ull ^ last_offset) < 8) {
+			fprintf(stderr, "union detected\n");
+			ret[i].type.t = VT_VOID;
+			ret[i-1].type.t = (ret[i-1].type.t == VT_FLOAT) ? VT_DOUBLE : VT_LLONG;
+		    } else {
+			last_offset = ret[i].c.ull;
+			last_r = ret[i].r;
+		    }
 		}
 		(*offset)++;
 	    }
