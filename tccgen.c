@@ -4272,7 +4272,7 @@ ST_FUNC void unary(void)
 		}
 
 		int i;
-		for(i=0; i<2; i++) {
+		for(i=0; i<16; i++) {
 		    if (ret[i].type.t != VT_VOID) {
 			vset(&ret[i].type, VT_LOCAL | VT_LVAL, addr + ret[i].c.ull);
 			vset(&ret[i].type, ret[i].r, 0);
@@ -4894,7 +4894,7 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
 		    vswap();
 		    vstore();
 
-		    for(i=0; i<2; i++) {
+		    for(i=0; i<16; i++) {
 			if (ret[i].type.t != VT_VOID &&
 			    ret[i].r != VT_CONST) {
 			    vset(&ret[i].type, ret[i].r, 0);

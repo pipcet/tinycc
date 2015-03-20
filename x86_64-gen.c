@@ -1528,6 +1528,7 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 
         for (; f; f = f->next) {
 	    int i;
+	    int j = origo;
 
 	    if (f->v & SYM_STRUCT)
 		continue;
@@ -1548,10 +1549,10 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 		    /* start a new "eightbyte" at an eight-byte boundary... */
 		    int new_eightbyte = (ret[i].c.ull & 7ULL) == 0ULL;
 		    /* ...but not if it's the same eightbyte we're already in. */
-		    if (eightbyte_o < i && (ret[i].c.ull == ret[eightbyte_o].c.ull))
+		    if (eightbyte_o < j && (ret[i].c.ull == ret[eightbyte_o].c.ull))
 			new_eightbyte = 0;
 		    if (new_eightbyte)
-			eightbyte_o = i;
+			eightbyte_o = j;
 		    else {
 			/* struct { float x; int y; } is packed into %rax. */
 			int j;
@@ -1583,10 +1584,22 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 			    ret[eightbyte_o].type.t = (ret[eightbyte_o].r == TREG_XMM0) ? VT_DOUBLE : VT_LLONG;
 			}
 		    }
+
+		    if(i != j) {
+			ret[j] = ret[i];
+		    }
+
+		    if(ret[i].type.t != VT_VOID) {
+			(*offset)++;
+			j++;
+		    }
+		} else {
+		    (*offset)++;
+		    j++;
 		}
-		(*offset)++;
 	    }
-	    origo = o;
+	    origo = j;
+	    o = j;
 	}
 	if (nret >= 2 && ret[0].r == ret[1].r)
 	    ret[1].r = (ret[0].r == TREG_RAX) ? TREG_RDX : TREG_XMM1;
@@ -1731,6 +1744,12 @@ int gfunc_sret_new(CType *vt, SValue *ret, int nret, int *ret_align) {
 
     if (reg_count >= 2 && ret[0].r == ret[1].r)
 	ret[1].r = (ret[0].r == TREG_RAX) ? TREG_RDX : TREG_XMM1;
+
+    int i;
+    for (i=reg_count; i<nret; i++) {
+	ret[i].type.t = VT_VOID;
+	ret[i].r = VT_CONST;
+    }
 
     return (mode == x86_64_mode_memory);
 }
