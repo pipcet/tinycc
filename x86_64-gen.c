@@ -1820,8 +1820,10 @@ ST_FUNC int classify_x86_64_va_arg(CType *ty) {
 /* Return 1 if this function returns via an sret pointer, 0 otherwise */
 int gfunc_sret(CType *vt, CType *ret, int *ret_align) {
     int size, align, reg_count;
+    X86_64_Mode mode;
     *ret_align = 1; // Never have to re-align return values for x86-64
-    return (classify_x86_64_arg(vt, ret, &size, &align, &reg_count) == x86_64_mode_memory);
+    mode = classify_x86_64_arg(vt, ret, &size, &align, &reg_count);
+    return (mode == x86_64_mode_memory);
 }
 
 /* Return 1 if this function returns via an sret pointer, 0 otherwise.
@@ -1833,8 +1835,14 @@ int gfunc_sret(CType *vt, CType *ret, int *ret_align) {
  * argument. Only ret1 is modified if there is a single argument.
  */
 int gfunc_sret_new(CType *vt, SValue *ret, int nret, int *ret_align) {
-    int size, align, reg_count;
+    int size, align, reg_count = 0;
+    X86_64_Mode mode;
     *ret_align = 1; // Never have to re-align return values for x86-64
+    mode = classify_x86_64_arg(vt, ret, &size, &align, &reg_count);
+
+    if (reg_count >= 2 && ret[0].r == ret[1].r)
+	ret[1].r = (ret[0].r == TREG_RAX) ? TREG_RDX : TREG_XMM1;
+
     return (classify_x86_64_arg_new(vt, ret, nret, &size, &align, &reg_count) == x86_64_mode_memory);
 }
 
