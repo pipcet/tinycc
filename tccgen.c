@@ -837,11 +837,7 @@ static void move_reg(int r, int s, int t)
 }
 
 /* get address of vtop (vtop MUST BE an lvalue) */
-#ifndef NO_QLONG
-static void gaddrof(void)
-#else
 ST_FUNC void gaddrof(void)
-#endif
 {
     if (vtop->r & VT_REF)
         gv(RC_INT);
@@ -4236,7 +4232,7 @@ ST_FUNC void unary(void)
 		ret[0].type = s->type;
 		ret[0].r = VT_LOCAL | VT_LVAL;
 		/* pass it as 'int' to avoid structure arg passing
-		   problems */
+		   problems. XXX 64-bit. */
 		vseti(VT_LOCAL, loc);
 		ret[0].c = vtop->c;
 		nb_args++;
@@ -4864,19 +4860,11 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
             gexpr();
             gen_assign_cast(&func_vt);
             if ((func_vt.t & VT_BTYPE) == VT_STRUCT) {
-#ifndef NO_QLONG
-                CType type, ret_type;
-#else
 		SValue ret[2];
-#endif
                 int ret_align;
-#ifndef NO_QLONG
-                if (gfunc_sret(&func_vt, &ret_type, &ret_align)) {
-#else
 		CType type;
-                if (gfunc_sret(&func_vt, ret, 2, &ret_align)) {
+                if (gfunc_sret_new(&func_vt, ret, 2, &ret_align)) {
 		    CType ret_type = ret[0].type;
-#endif
                     /* if returning structure, must copy it to implicit
                        first pointer arg location */
                     type = func_vt;
@@ -4887,52 +4875,27 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
                     /* copy structure value to pointer */
                     vstore();
                 } else {
-#ifdef NO_QLONG
-		    CType ret_type = ret[0].type;
-#endif
+		    int i;
                     /* returning structure packed into registers */
                     int size, addr, align;
                     size = type_size(&func_vt,&align);
-                    if ((vtop->r != (VT_LOCAL | VT_LVAL) || (vtop->c.i & (ret_align-1)))
-                        && (align & (ret_align-1))) {
-                        loc = (loc - size) & -align;
-                        addr = loc;
-                        type = func_vt;
-                        vset(&type, VT_LOCAL | VT_LVAL, addr);
-                        vswap();
-                        vstore();
-                        vset(&ret_type, VT_LOCAL | VT_LVAL, addr);
-                    }
-                    vtop->type = ret_type;
-		    if ((ret_type.t & VT_BTYPE) == VT_QLONG ||
-			(ret_type.t & VT_BTYPE) == VT_QFLOAT) {
-			int rc1 = ((ret_type.t & VT_BTYPE) == VT_QLONG) ? RC_INT : RC_FLOAT;
-			int rc2 = ((ret_type.t & VT_BTYPE) == VT_QLONG) ? RC_INT : RC_FLOAT;
-			int r1 = ((ret_type.t & VT_BTYPE) == VT_QLONG) ? REG_LRET: REG_QRET;
-			int r2 = ((ret_type.t & VT_BTYPE) == VT_QLONG) ? REG_IRET: REG_FRET;
+		    /* XXX we're saving the structure twice for two members. Correct but slow. */
+		    loc = (loc - size) & -align;
+		    addr = loc;
+		    type = func_vt;
+		    vset(&type, VT_LOCAL | VT_LVAL, addr);
+		    vswap();
+		    vstore();
 
-			save_reg(r1);
-			save_reg(r2);
-			get_specific_reg(r1);
-			get_specific_reg(r2);
-			//start_special_use(REG_IRET);
-			//start_special_use(REG_LRET);
-
-			vdup();
-			qexpand();
-			vswap();
-			gv(rc1);
-			load(r1, vtop);
-			/* move to iret */
-			vtop--;
-			gv(rc2);
-			load(r2, vtop);
-			/* move to lret */
-			vtop--;
-		    } else if (is_float(ret_type.t))
-                        gv(rc_fret(ret_type.t));
-                    else
-                        gv(RC_IRET);
+		    for(i=0; i<2; i++) {
+			if (ret[i].type.t != VT_VOID &&
+			    ret[i].r != VT_CONST) {
+			    vset(&ret[i].type, ret[i].r, 0);
+			    vset(&ret[i].type, VT_LOCAL | VT_LVAL, addr + ret[i].c.ull);
+			    vstore();
+			    vtop--;
+			}
+		    }
                 }
             } else if (is_float(func_vt.t)) {
                 gv(rc_fret(func_vt.t));

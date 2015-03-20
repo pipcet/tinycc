@@ -1314,6 +1314,7 @@ void gfunc_prolog(CType *func_type)
     size = gfunc_arg_size(&func_vt);
     if (size > 8) {
         gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
+	/* does this not break for nested functions ? */
         func_vc = addr;
         reg_param_index++;
         addr += 8;
@@ -1726,12 +1727,12 @@ int gfunc_sret_new(CType *vt, SValue *ret, int nret, int *ret_align) {
     int size, align, reg_count = 0;
     X86_64_Mode mode;
     *ret_align = 1; // Never have to re-align return values for x86-64
-    mode = classify_x86_64_arg(vt, ret, &size, &align, &reg_count);
+    mode = classify_x86_64_arg_new(vt, ret, nret, &size, &align, &reg_count);
 
     if (reg_count >= 2 && ret[0].r == ret[1].r)
 	ret[1].r = (ret[0].r == TREG_RAX) ? TREG_RDX : TREG_XMM1;
 
-    return (classify_x86_64_arg_new(vt, ret, nret, &size, &align, &reg_count) == x86_64_mode_memory);
+    return (mode == x86_64_mode_memory);
 }
 
 #define REGN 6
