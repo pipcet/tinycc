@@ -4178,21 +4178,18 @@ ST_FUNC void unary(void)
             indir();
             skip(']');
         } else if (tok == '(') {
-            SValue ret[2];
+            SValue ret[16];
             Sym *sa;
             int nb_args, nb_ret, sret, sret_addr;
+	    int i;
 
-	    ret[0].type.t = VT_VOID;
-	    ret[0].type.ref = NULL;
-	    ret[0].r = 0;
-	    ret[0].c.ull = 0;
-	    ret[0].sym = NULL;
-
-	    ret[1].type.t = VT_VOID;
-	    ret[1].type.ref = NULL;
-	    ret[1].r = 0;
-	    ret[1].c.ull = 0;
-	    ret[1].sym = NULL;
+	    for(i=0; i<16; i++) {
+		ret[i].type.t = VT_VOID;
+		ret[i].type.ref = NULL;
+		ret[i].r = 0;
+		ret[i].c.ull = 0;
+		ret[i].sym = NULL;
+	    }
 
             /* function call  */
             if ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
@@ -4221,7 +4218,7 @@ ST_FUNC void unary(void)
 	    CType dummy;
 
 	    sret_old = gfunc_sret(&s->type, &dummy, &dummy_align);
-	    sret = gfunc_sret_new(&s->type, ret, 2, &ret_align);
+	    sret = gfunc_sret_new(&s->type, ret, 16, &ret_align);
 	    //assert(sret == sret_old);
 	    assert(dummy_align == ret_align);
 	    if (sret) {
@@ -4860,10 +4857,20 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
             gexpr();
             gen_assign_cast(&func_vt);
             if ((func_vt.t & VT_BTYPE) == VT_STRUCT) {
-		SValue ret[2];
+		SValue ret[16];
                 int ret_align;
 		CType type;
-                if (gfunc_sret_new(&func_vt, ret, 2, &ret_align)) {
+		int i;
+
+		for(i=0; i<16; i++) {
+		    ret[i].type.t = VT_VOID;
+		    ret[i].type.ref = NULL;
+		    ret[i].r = 0;
+		    ret[i].c.ull = 0;
+		    ret[i].sym = NULL;
+		}
+
+                if (gfunc_sret_new(&func_vt, ret, 16, &ret_align)) {
 		    CType ret_type = ret[0].type;
                     /* if returning structure, must copy it to implicit
                        first pointer arg location */
