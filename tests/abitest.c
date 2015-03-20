@@ -619,7 +619,9 @@ int main(int argc, char **argv) {
 #endif
 #endif
   RUN_TEST(ret_2float_test);
+#if 0
   RUN_TEST(ret_intchar_test);
+#endif
   RUN_TEST(ret_2double_test);
   if(0) {
     /* we currently fail these tests. */
