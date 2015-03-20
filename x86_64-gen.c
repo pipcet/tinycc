@@ -1062,10 +1062,6 @@ void store(int r, SValue *v)
     if (fr == VT_CONST || fr == VT_LOCAL || (v->r & VT_LVAL)) {
 	gen_modrm(r, v->r, v->sym, fc);
     } else if (fr != r) {
-#ifndef NO_QLONG
-	/* XXX: don't we really come here? */
-	abort();
-#endif
 	o(0xc0 + REG_VALUE(fr) + REG_VALUE(r) * 8); /* mov r, fr */
     }
 }
@@ -1431,26 +1427,12 @@ static X86_64_Mode classify_x86_64_merge(X86_64_Mode a, X86_64_Mode b) {
         return x86_64_mode_sse;
 }
 
-#ifndef NO_QLONG
 static X86_64_Mode classify_x86_64_inner(CType *ty) {
-#else
-static X86_64_Mode classify_x86_64_inner(CType *ty, SValue *ret, int nret, int *offset) {
-#endif
     X86_64_Mode mode;
     Sym *f;
     
     switch (ty->t & VT_BTYPE) {
-#ifndef NO_QLONG
     case VT_VOID: return x86_64_mode_none;
-#else
-    case VT_VOID:
-	if (nret > 0) {
-	    ret[0].type = *ty;
-	    ret[0].c.ull = 0;
-	    ret[0].r = VT_CONST;
-	}
-	return x86_64_mode_none;
-#endif
     
     case VT_INT:
     case VT_BYTE:
@@ -1459,117 +1441,23 @@ static X86_64_Mode classify_x86_64_inner(CType *ty, SValue *ret, int nret, int *
     case VT_BOOL:
     case VT_PTR:
     case VT_FUNC:
-#ifndef NO_QLONG
     case VT_ENUM: return x86_64_mode_integer;
-#else
-    case VT_ENUM:
-	if (nret > 0) {
-	    int align;
-	    ret[0].type = *ty;
-	    ret[0].c.ull = type_size(ty, &align);
-	    ret[0].r = TREG_RAX;
-	}
-	(*offset)++;
-	return x86_64_mode_integer;
-#endif
     
     case VT_FLOAT:
-#ifndef NO_QLONG
     case VT_DOUBLE: return x86_64_mode_sse;
-#else
-    case VT_DOUBLE:
-	if (nret > 0) {
-	    int align;
-	    ret[0].type = *ty;
-	    ret[0].c.ull = type_size(ty, &align);
-	    ret[0].c.ull = 0;
-	    ret[0].r = TREG_XMM0;
-	}
-	(*offset)++;
-	return x86_64_mode_sse;
-#endif
     
-#ifndef NO_QLONG
     case VT_LDOUBLE: return x86_64_mode_x87;
-#else
-    case VT_LDOUBLE:
-	if (nret > 0) {
-	    ret[0].type = *ty;
-	    ret[0].c.ull = 0;
-	    ret[0].r = TREG_ST0;
-	}
-	(*offset)++;
-	return x86_64_mode_x87;
-#endif
       
-#ifndef NO_QLONG
     case VT_STRUCT:
-#else
-    case VT_STRUCT: ;
-	int align;
-        int size = type_size(ty, &align);
-	if (size > 16)
-	    return x86_64_mode_memory;
-#endif
         f = ty->ref;
 
         // Detect union
-#ifdef NO_QLONG
-	/* doesn't detect single-member unions. Is that intentional? I
-	 * can't find the rule saying that unions have to have mode
-	 * MEMORY in the ABI, either ... */
-#endif
         if (f->next && (f->c == f->next->c))
-#ifndef NO_QLONG
-          return x86_64_mode_memory;
-#else
 	    return x86_64_mode_memory;
-#endif
         
         mode = x86_64_mode_none;
-#ifndef NO_QLONG
         for (; f; f = f->next)
             mode = classify_x86_64_merge(mode, classify_x86_64_inner(&f->type));
-#else
-	int origo = 0, o = 0, eightbyte_o = 0;
-
-        for (; f; f = f->next) {
-	    int i;
-
-	    if (f->v & SYM_STRUCT)
-		continue;
-	    if (!(f->v & SYM_FIELD))
-		continue;
-
-            mode = classify_x86_64_merge(mode, classify_x86_64_inner(&f->type, ret+o, nret-o, &o));
-
-	    for(i=origo; i<o; i++) {
-		int new_eightbyte = (f->c & 7) == 0;
-		if (new_eightbyte)
-		    eightbyte_o = i;
-		else {
-		    /* struct { float x; int y; } is packed into %rax. */
-		    int j;
-
-		    for(j=eightbyte_o; j<i; j++) {
-			if(ret[i].r == TREG_RAX && ret[j].r == TREG_XMM0)
-			    ret[j].r = TREG_RAX;
-
-			if(ret[i].r == TREG_XMM0 && ret[j].r == TREG_RAX)
-			    ret[i].r = TREG_RAX;
-		    }
-		}
-
-		if (i < nret && ret[i].type.t != VT_VOID) {
-		    ret[i].c.ull += f->c;
-		}
-		(*offset)++;
-	    }
-	    origo = o;
-	}
-	if (nret >= 2 && ret[0].r == ret[1].r)
-	    ret[1].r = (ret[0].r == TREG_RAX) ? TREG_RDX : TREG_XMM1;
-#endif
         
         return mode;
     }
@@ -1819,7 +1707,7 @@ ST_FUNC int classify_x86_64_va_arg(CType *ty) {
 
 /* Return 1 if this function returns via an sret pointer, 0 otherwise */
 int gfunc_sret(CType *vt, CType *ret, int *ret_align) {
-    int size, align, reg_count;
+    int size, align, reg_count = 0;
     X86_64_Mode mode;
     *ret_align = 1; // Never have to re-align return values for x86-64
     mode = classify_x86_64_arg(vt, ret, &size, &align, &reg_count);
@@ -2114,15 +2002,11 @@ void gfunc_call(int nb_args)
                 assert(mode == x86_64_mode_sse);
                 if (sse_reg > 8) {
                     --sse_reg;
-#ifdef NO_QLONG
 		    assert(sse_reg >= 0);
-#endif
                     r = gv(RC_FLOAT);
                     o(0x50); /* push $rax */
                     /* movq %xmmN, (%rsp) */
-#ifdef NO_QLONG
 		    /* XXX orex! */
-#endif
                     o(0xd60f66);
                     o(0x04 + REG_VALUE(r)*8);
                     o(0x24);
@@ -2138,15 +2022,9 @@ void gfunc_call(int nb_args)
                 /* XXX: implicit cast ? */
                 if (gen_reg > REGN) {
                     --gen_reg;
-#ifdef NO_QLONG
 		    assert(gen_reg >= 0);
-#endif
                     r = gv(RC_INT);
-#ifndef NO_QLONG
-                    orex(32,r,0,0x50 + REG_VALUE(r)); /* push r */
-#else
                     orex(32,r,0,0x50 + REG_VALUE(r)); /* push r XXX orex right? */
-#endif
                     args_size += size;
                 } else {
                     arg_stored = 0;
@@ -2212,9 +2090,7 @@ void gfunc_call(int nb_args)
             
             vpop();
             --nb_args;
-#ifdef NO_QLONG
 	    assert(nb_args >= 0);
-#endif
         }
     }
     
@@ -2421,7 +2297,6 @@ void gfunc_call(int nb_args)
     end_special_use(TREG_R9);
     end_special_use(TREG_R10);
     end_special_use(TREG_R11);
-#ifdef NO_QLONG
 
     end_special_use(TREG_XMM0);
     end_special_use(TREG_XMM1);
@@ -2435,7 +2310,6 @@ void gfunc_call(int nb_args)
     end_special_use(TREG_ST0);
     /* end_special_use(TREG_ST1); for when we support complex args */
 
-#endif
     if (args_size)
         gadd_sp(args_size);
     vtop--;
