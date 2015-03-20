@@ -109,6 +109,91 @@ static int ret_2float_test(void) {
 }
 
 /*
+ * ret_16char_test:
+ * 
+ * On x86-64, a struct with 2 floats should be packed into a single
+ * SSE register (VT_DOUBLE is used for this purpose).
+ */
+typedef struct ret_16char_test_type_s {char x, y, z, w, a, b, c, d; char x2, y2, z2, w2, a2, b2, c2, d2; } ret_16char_test_type;
+typedef ret_16char_test_type (*ret_16char_test_function_type) (ret_16char_test_type);
+
+static int ret_16char_test_callback(void *ptr) {
+  ret_16char_test_function_type f = (ret_16char_test_function_type)ptr;
+  ret_16char_test_type a = {10, 35, 0, 0, 0, 0, 0, 0, 11, 36, 0, 0, 0, 0, 0, 0 };
+  ret_16char_test_type r;
+  r = f(a);
+  return ((r.x == a.x*5) && (r.y == a.y*3) &&
+	  (r.x2 == a.x2*5) && (r.y2 == a.y2*3)) ? 0 : -1;
+}
+
+static int ret_16char_test(void) {
+  const char *src =
+  "typedef struct ret_16char_test_type_s {char x, y, z, w, a, b, c, d; char x2, y2, z2, w2, a2, b2, c2, d2; } ret_16char_test_type; ret_16char_test_type;"
+  "ret_16char_test_type f(ret_16char_test_type a) {\n"
+  "  ret_16char_test_type r = {a.x*5, a.y*3, 0, 0, 0, 0, 0, 0, a.x2*5, a.y2*3, 0,0,0,0,0,0};\n"
+  "  return r;\n"
+  "}\n";
+
+  return run_callback(src, ret_2float_test_callback);
+}
+
+/*
+ * ret_8char_test:
+ * 
+ * On x86-64, a struct with 2 floats should be packed into a single
+ * SSE register (VT_DOUBLE is used for this purpose).
+ */
+typedef struct ret_8char_test_type_s {char x, y, z, w, a, b, c, d;} ret_8char_test_type;
+typedef ret_8char_test_type (*ret_8char_test_function_type) (ret_8char_test_type);
+
+static int ret_8char_test_callback(void *ptr) {
+  ret_8char_test_function_type f = (ret_8char_test_function_type)ptr;
+  ret_8char_test_type a = {10, 35};
+  ret_8char_test_type r;
+  r = f(a);
+  return ((r.x == a.x*5) && (r.y == a.y*3)) ? 0 : -1;
+}
+
+static int ret_8char_test(void) {
+  const char *src =
+  "typedef struct ret_8char_test_type_s {float x, y;} ret_8char_test_type;"
+  "ret_8char_test_type f(ret_8char_test_type a) {\n"
+  "  ret_8char_test_type r = {a.x*5, a.y*3};\n"
+  "  return r;\n"
+  "}\n";
+
+  return run_callback(src, ret_2float_test_callback);
+}
+
+/*
+ * ret_4char_float_test:
+ * 
+ * On x86-64, a struct with 2 floats should be packed into a single
+ * SSE register (VT_DOUBLE is used for this purpose).
+ */
+typedef struct ret_4char_float_test_type_s {float x; char y, a, b, c, d;} ret_4char_float_test_type;
+typedef ret_4char_float_test_type (*ret_4char_float_test_function_type) (ret_4char_float_test_type);
+
+static int ret_4char_float_test_callback(void *ptr) {
+  ret_4char_float_test_function_type f = (ret_4char_float_test_function_type)ptr;
+  ret_4char_float_test_type a = {10, 35};
+  ret_4char_float_test_type r;
+  r = f(a);
+  return ((r.x == a.x*5) && (r.y == a.y*3)) ? 0 : -1;
+}
+
+static int ret_4char_float_test(void) {
+  const char *src =
+  "typedef struct ret_4char_float_test_type_s {float x, y;} ret_4char_float_test_type;"
+  "ret_4char_float_test_type f(ret_4char_float_test_type a) {\n"
+  "  ret_4char_float_test_type r = {a.x*5, a.y*3};\n"
+  "  return r;\n"
+  "}\n";
+
+  return run_callback(src, ret_2float_test_callback);
+}
+
+/*
  * ret_intchar_test:
  */
 typedef struct ret_intchar_test_type_s {int x; char y;} ret_intchar_test_type;
@@ -619,6 +704,9 @@ int main(int argc, char **argv) {
 #endif
 #endif
   RUN_TEST(ret_2float_test);
+  RUN_TEST(ret_16char_test);
+  RUN_TEST(ret_8char_test);
+  RUN_TEST(ret_4char_float_test);
 #if 0
   RUN_TEST(ret_intchar_test);
 #endif
