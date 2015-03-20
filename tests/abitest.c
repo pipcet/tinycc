@@ -128,7 +128,7 @@ static int ret_16char_test_callback(void *ptr) {
 
 static int ret_16char_test(void) {
   const char *src =
-  "typedef struct ret_16char_test_type_s {char x, y, z, w, a, b, c, d; char x2, y2, z2, w2, a2, b2, c2, d2; } ret_16char_test_type; ret_16char_test_type;"
+  "typedef struct ret_16char_test_type_s {char x, y, z, w, a, b, c, d; char x2, y2, z2, w2, a2, b2, c2, d2; } ret_16char_test_type;"
   "ret_16char_test_type f(ret_16char_test_type a) {\n"
   "  ret_16char_test_type r = {a.x*5, a.y*3, 0, 0, 0, 0, 0, 0, a.x2*5, a.y2*3, 0,0,0,0,0,0};\n"
   "  return r;\n"
