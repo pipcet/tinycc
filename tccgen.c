@@ -19,6 +19,9 @@
  */
 
 #include "tcc.h"
+#ifdef NO_QLONG
+#include <assert.h>
+#endif
 
 /********************************************************/
 /* global variables */
@@ -836,7 +839,11 @@ static void move_reg(int r, int s, int t)
 }
 
 /* get address of vtop (vtop MUST BE an lvalue) */
+#ifndef NO_QLONG
 static void gaddrof(void)
+#else
+ST_FUNC void gaddrof(void)
+#endif
 {
     if (vtop->r & VT_REF)
         gv(RC_INT);
@@ -4177,10 +4184,28 @@ ST_FUNC void unary(void)
             indir();
             skip(']');
         } else if (tok == '(') {
+#ifndef NO_QLONG
             SValue ret, ret1, ret2;
+#else
+            SValue ret[2];
+#endif
             Sym *sa;
             int nb_args, nb_ret, sret;
 
+#ifdef NO_QLONG
+	    ret[0].type.t = VT_VOID;
+	    ret[0].type.ref = NULL;
+	    ret[0].r = 0;
+	    ret[0].c.ull = 0;
+	    ret[0].sym = NULL;
+
+	    ret[1].type.t = VT_VOID;
+	    ret[1].type.ref = NULL;
+	    ret[1].r = 0;
+	    ret[1].c.ull = 0;
+	    ret[1].sym = NULL;
+
+#endif
             /* function call  */
             if ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
                 /* pointer test (no array accepted) */
@@ -4202,6 +4227,7 @@ ST_FUNC void unary(void)
             nb_args = 0;
 	    nb_ret = 1;
             /* compute first implicit argument if a structure is returned */
+#ifndef NO_QLONG
             if ((s->type.t & VT_BTYPE) == VT_STRUCT) {
                 int ret_align;
                 sret = gfunc_sret(&s->type, &ret.type, &ret_align);
@@ -4220,8 +4246,29 @@ ST_FUNC void unary(void)
             } else {
                 sret = 0;
                 ret.type = s->type;
+#else
+	    int ret_align;
+	    sret = gfunc_sret(&s->type, ret, 2, &ret_align);
+	    if (sret) {
+		/* get some space for the returned structure */
+		size = type_size(&s->type, &align);
+		loc = (loc - size) & -align;
+		ret[0].type = s->type;
+		ret[0].r = VT_LOCAL | VT_LVAL;
+		/* pass it as 'int' to avoid structure arg passing
+		   problems */
+		vseti(VT_LOCAL, loc);
+		ret[0].c = vtop->c;
+		nb_args++;
+		nb_ret = 0;
+		save_regs(0); /* XXX */
+	    } else {
+		nb_ret = (ret[0].type.t != VT_VOID) + (ret[1].type.t != VT_VOID);
+		save_regs(0); /* XXX */
+#endif
             }
 
+#ifndef NO_QLONG
             if (!sret) {
                 /* return in register */
                 if (is_float(ret.type.t)) {
@@ -4248,6 +4295,7 @@ ST_FUNC void unary(void)
                 }
                 ret.c.i = 0;
             }
+#endif
             if (tok != ')') {
                 for(;;) {
                     expr_eq();
@@ -4268,6 +4316,7 @@ ST_FUNC void unary(void)
             } else {
                 vtop -= (nb_args + 1);
             }
+#ifndef NO_QLONG
             /* return value */
 	    if (nb_ret == 1) {
 		vsetc(&ret.type, ret.r, &ret.c);
@@ -4275,11 +4324,18 @@ ST_FUNC void unary(void)
 		vsetc(&ret1.type, ret.r, &ret1.c);
 		vsetc(&ret2.type, ret2.r, &ret2.c);
 
+#else
+            /* return value(s) */
+	    if ((s->type.t & VT_BTYPE) == VT_STRUCT) {
+#endif
                 int addr;
+#ifndef NO_QLONG
 
+#endif
                 size = type_size(&s->type, &align);
                 loc = (loc - size) & -align;
                 addr = loc;
+#ifndef NO_QLONG
                 vset(&ret2.type, VT_LOCAL | VT_LVAL, addr+8);
                 vswap();
                 vstore();
@@ -4290,9 +4346,29 @@ ST_FUNC void unary(void)
 		vstore();
 		save_regs(0);
 		vtop--;
+#else
+
+		int i;
+		for(i=0; i<2; i++) {
+		    if (ret[i].type.t != VT_VOID) {
+			vset(&ret[i].type, VT_LOCAL | VT_LVAL, addr + ret[i].c.ull);
+			vset(&ret[i].type, ret[i].r, 0);
+			vstore();
+			vtop--;
+		    }
+		}
+#endif
 
 		vset(&s->type, VT_LOCAL | VT_LVAL, addr);
+#ifdef NO_QLONG
+		save_regs(0); /* XXX */
+	    } else {
+		//assert(ret[0].c.ull == 0);
+		vset(&ret[0].type, ret[0].r, 0);
+		save_regs(0); /* XXX */
+#endif
 	    }
+#ifndef NO_QLONG
             /* handle packed struct return */
             if (((s->type.t & VT_BTYPE) == VT_STRUCT) && !sret) {
                 int addr;
@@ -4305,6 +4381,7 @@ ST_FUNC void unary(void)
 		vtop--;
                 vset(&s->type, VT_LOCAL | VT_LVAL, addr);
             }
+#endif
         } else {
             break;
         }
@@ -4874,9 +4951,19 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
             gexpr();
             gen_assign_cast(&func_vt);
             if ((func_vt.t & VT_BTYPE) == VT_STRUCT) {
+#ifndef NO_QLONG
                 CType type, ret_type;
+#else
+		SValue ret[2];
+#endif
                 int ret_align;
+#ifndef NO_QLONG
                 if (gfunc_sret(&func_vt, &ret_type, &ret_align)) {
+#else
+		CType type;
+                if (gfunc_sret(&func_vt, ret, 2, &ret_align)) {
+		    CType ret_type = ret[0].type;
+#endif
                     /* if returning structure, must copy it to implicit
                        first pointer arg location */
                     type = func_vt;
@@ -4887,6 +4974,9 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
                     /* copy structure value to pointer */
                     vstore();
                 } else {
+#ifdef NO_QLONG
+		    CType ret_type = ret[0].type;
+#endif
                     /* returning structure packed into registers */
                     int size, addr, align;
                     size = type_size(&func_vt,&align);

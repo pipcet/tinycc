@@ -52,6 +52,9 @@ static int run_callback(const char *src, callback_type callback) {
   return result;
 }
 
+#ifdef NO_QLONG
+#if 0
+#endif
 #define STR2(x) #x
 #define STR(x) STR2(x)
 
@@ -73,6 +76,9 @@ RET_PRIMITIVE_TEST(longlong, long long, 4333369356528LL)
 RET_PRIMITIVE_TEST(float, float, 63.0)
 RET_PRIMITIVE_TEST(double, double, 14789798.0)
 RET_PRIMITIVE_TEST(longdouble, LONG_DOUBLE, LONG_DOUBLE_LITERAL(378943892.0))
+#ifdef NO_QLONG
+#endif
+#endif
 
 /*
  * ret_2float_test:
@@ -115,15 +121,32 @@ static int ret_2double_test_callback(void *ptr) {
   ret_2double_test_function_type f = (ret_2double_test_function_type)ptr;
   ret_2double_test_type a = {10, 35};
   ret_2double_test_type r;
+#ifdef NO_QLONG
+  fprintf(stderr, "a.x = %f a.y = %f\n", a.x, a.y);
+#endif
   r = f(a);
+#ifdef NO_QLONG
+  fprintf(stderr, "r.x = %f r.y = %f\n", r.x, r.y);
+#endif
   return ((r.x == a.x*5) && (r.y == a.y*3)) ? 0 : -1;
 }
 
 static int ret_2double_test(void) {
   const char *src =
+#ifndef NO_QLONG
   "typedef struct ret_2double_test_type_s {double x, y;} ret_2double_test_type;"
+#else
+  "#include <stdio.h>\n"
+  "typedef struct ret_2double_test_type_s {double x, y;} ret_2double_test_type;\n"
+#endif
   "ret_2double_test_type f(ret_2double_test_type a) {\n"
+#ifdef NO_QLONG
+  "  fprintf(stderr, \"[cb] a.x = %f a.y = %f\n\", a.x, a.y);\n"
+#endif
   "  ret_2double_test_type r = {a.x*5, a.y*3};\n"
+#ifdef NO_QLONG
+  "  fprintf(stderr, \"[cb] r.x = %f r.y = %f\n\", r.x, r.y);\n"
+#endif
   "  return r;\n"
   "}\n";
 
@@ -220,16 +243,34 @@ typedef reg_pack_longlong_test_type (*reg_pack_longlong_test_function_type) (reg
 static int reg_pack_longlong_test_callback(void *ptr) {
   reg_pack_longlong_test_function_type f = (reg_pack_longlong_test_function_type)ptr;
   reg_pack_longlong_test_type a = {10, 35};
+#ifdef NO_QLONG
+  reg_pack_longlong_test_type b;
+#endif
   reg_pack_longlong_test_type r;
+#ifdef NO_QLONG
+  fprintf(stderr, "a.x = %Ld a.y = %Ld\n", a.x, a.y);
+#endif
   r = f(a);
+#ifdef NO_QLONG
+  fprintf(stderr, "r.x = %Ld r.y = %Ld\n", r.x, r.y);
+#endif
   return ((r.x == a.x*5) && (r.y == a.y*3)) ? 0 : -1;
 }
 
 static int reg_pack_longlong_test(void) {
   const char *src =
+#ifdef NO_QLONG
+  "#include <stdio.h>\n"
+#endif
   "typedef struct reg_pack_longlong_test_type_s {long long x, y;} reg_pack_longlong_test_type;"
   "reg_pack_longlong_test_type f(reg_pack_longlong_test_type a) {\n"
+#ifdef NO_QLONG
+  "  fprintf(stderr, \"[cb] a.x = %Ld a.y = %Ld\n\", a.x, a.y);\n"
+#endif
   "  reg_pack_longlong_test_type r = {a.x*5, a.y*3};\n"
+#ifdef NO_QLONG
+  "  fprintf(stderr, \"[cb] r.x = %Ld r.y = %Ld\n\", r.x, r.y);\n"
+#endif
   "  return r;\n"
   "}\n";
   
@@ -404,6 +445,9 @@ static int many_struct_test_3(void) {
   return run_callback(src, many_struct_test_3_callback);
 }
 
+#ifdef NO_QLONG
+#if 0
+#endif
 /*
  * stdarg_test: Test variable argument list ABI
  */
@@ -448,6 +492,9 @@ static int stdarg_test(void) {
   "}\n";
   return run_callback(src, stdarg_test_callback);
 }
+#ifdef NO_QLONG
+#endif
+#endif
 
 /*
  * Test Win32 stdarg handling, since the calling convention will pass a pointer
@@ -466,6 +513,9 @@ static int stdarg_struct_test_callback(void *ptr) {
 
 static int stdarg_struct_test(void) {
   const char *src =
+#ifdef NO_QLONG
+  "#include <stdio.h>\n"
+#endif
   "#include <stdarg.h>\n"
   "typedef struct {long long a, b, c;} stdarg_struct_test_struct_type;\n"
   "int f(stdarg_struct_test_struct_type a, ...) {\n"
@@ -473,11 +523,17 @@ static int stdarg_struct_test(void) {
   "  va_start(ap, a);\n"
   "  int z = va_arg(ap, int);\n"
   "  va_end(ap);\n"
+#ifdef NO_QLONG
+  "  fprintf(stderr, \"[cb] a.a = %Ld a.b = %Ld a.c = %Ld z = %d\n\", a.a, a.b, a.c, z);\n"
+#endif
   "  return z + a.a + a.b + a.c;\n"
   "}\n";
   return run_callback(src, stdarg_struct_test_callback);
 }
 
+#ifdef NO_QLONG
+#if 0
+#endif
 /* Test that x86-64 arranges the stack correctly for arguments with alignment >8 bytes */
 
 typedef LONG_DOUBLE (*arg_align_test_callback_type) (LONG_DOUBLE,int,LONG_DOUBLE,int,LONG_DOUBLE);
@@ -495,6 +551,9 @@ static int arg_align_test(void) {
   "}\n";
   return run_callback(src, arg_align_test_callback);
 }
+#ifdef NO_QLONG
+#endif
+#endif
 
 #define RUN_TEST(t) \
   if (!testname || (strcmp(#t, testname) == 0)) { \
@@ -523,11 +582,17 @@ int main(int argc, char **argv) {
       include_dir = argv[i] + 8;
   }   
 
+#ifdef NO_QLONG
+#if 0
+#endif
   RUN_TEST(ret_int_test);
   RUN_TEST(ret_longlong_test);
   RUN_TEST(ret_float_test);
   RUN_TEST(ret_double_test);
   RUN_TEST(ret_longdouble_test);
+#ifdef NO_QLONG
+#endif
+#endif
   RUN_TEST(ret_2float_test);
   RUN_TEST(ret_2double_test);
   if(0) {
@@ -543,8 +608,20 @@ int main(int argc, char **argv) {
   RUN_TEST(many_struct_test);
   RUN_TEST(many_struct_test_2);
   RUN_TEST(many_struct_test_3);
+#ifdef NO_QLONG
+#if 0
+#endif
   RUN_TEST(stdarg_test);
+#ifdef NO_QLONG
+#endif
+#endif
   RUN_TEST(stdarg_struct_test);
+#ifdef NO_QLONG
+#if 0
+#endif
   RUN_TEST(arg_align_test);
+#ifdef NO_QLONG
+#endif
+#endif
   return retval;
 }

@@ -1306,7 +1306,11 @@ ST_FUNC int gsym_addr(int t, int a);
 ST_FUNC int gsym(int t);
 ST_FUNC void load(int r, SValue *sv);
 ST_FUNC void store(int r, SValue *v);
+#ifndef NO_QLONG
 ST_FUNC int gfunc_sret(CType *vt, CType *ret, int *align);
+#else
+ST_FUNC int gfunc_sret(CType *vt, SValue *ret, int nret, int *align);
+#endif
 ST_FUNC void gfunc_call(int nb_args);
 ST_FUNC void gfunc_prolog(CType *func_type);
 ST_FUNC void gfunc_epilog(void);
