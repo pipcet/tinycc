@@ -3018,6 +3018,12 @@ void gen_opf(int op)
             } else {
                 o(0xf3);
             }
+            if (vtop->r & VT_LVAL) {
+		orex(0, r, vtop[-1].r, 0);
+            } else {
+		orex(0, vtop[-1].r, vtop[0].r, 0);
+            }
+
             o(0x0f);
             o(0x58 + a);
             
