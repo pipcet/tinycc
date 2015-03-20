@@ -1636,8 +1636,6 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 
         mode = x86_64_mode_none;
 	int origo = 0, o = 0, eightbyte_o = 0;
-	unsigned long long last_offset = -1;
-	int last_r;
 
         for (; f; f = f->next) {
 	    int i;
@@ -1691,13 +1689,9 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 			 * now. */
 
 			if (!new_eightbyte) {
-			    fprintf(stderr, "union detected\n");
 			    ret[i].type.t = VT_VOID;
 			    ret[i].r = VT_CONST;
 			    ret[eightbyte_o].type.t = (ret[eightbyte_o].r == TREG_XMM0) ? VT_DOUBLE : VT_LLONG;
-			} else {
-			    last_offset = ret[i].c.ull;
-			    last_r = ret[i].r;
 			}
 		    }
 		}
