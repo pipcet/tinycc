@@ -469,7 +469,6 @@ int check_baddies(int clobber_reg, int flags_okay)
 
     if(check_nth_last_instruction_mask(0, 0xe9, 0xff, 5) &&
        check_nth_last_instruction_mask(1, 0x05840f, 0xffffff, 6)) {
-	*(int *)0 = 0;
     }
 
 
@@ -1634,6 +1633,7 @@ static X86_64_Mode classify_x86_64_arg(CType *ty, CType *ret, int *psize, int *p
 		       arguments and one double-word argument? */
                     *reg_count = 2;
                     ret_t = VT_QLONG;
+		    *(int *)0 = 0;
                 } else {
                     *reg_count = 1;
                     ret_t = (size > 4) ? VT_LLONG : VT_INT;

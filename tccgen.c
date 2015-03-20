@@ -4213,14 +4213,9 @@ ST_FUNC void unary(void)
 	    nb_ret = 1;
             /* compute first implicit argument if a structure is returned */
 	    int ret_align;
-	    int sret_old;
-	    int dummy_align;
 	    CType dummy;
 
-	    sret_old = gfunc_sret(&s->type, &dummy, &dummy_align);
 	    sret = gfunc_sret_new(&s->type, ret, 16, &ret_align);
-	    //assert(sret == sret_old);
-	    assert(dummy_align == ret_align);
 	    if (sret) {
 		/* get some space for the returned structure */
 		size = type_size(&s->type, &align);
