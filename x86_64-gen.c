@@ -1685,7 +1685,7 @@ void gfunc_call(int nb_args)
 
     assert((vtop[-nb_args].type.t & VT_BTYPE) == VT_FUNC);
     /* calculate the number of integer/float register arguments */
-    for(i = 0; i < nb_args; i++) {
+    for(i = nb_args-1; i >= 0; i--) {
 	int start = off;
 	int prel_nb_reg_args = nb_reg_args;
 	int prel_nb_sse_args = nb_sse_args;
@@ -1702,52 +1702,51 @@ void gfunc_call(int nb_args)
 		ret[j].r == TREG_RDX) {
 		int idx = prel_nb_reg_args;
 
-		if (ret[j].c.ull & 7) {
-		    idx--;
+		if ((ret[j].c.ull & 7) == 0) {
+		    prel_nb_reg_args++;
 		}
 
-		prel_nb_reg_args++;
 		if (idx < REGN) {
-		    //ret[j].r = arg_prepare_reg(idx);
+		    ret[j].r = arg_prepare_reg(idx);
 		} else {
-		    //goto failure;
+		    goto failure;
 		}
 	    } else if (ret[j].r == TREG_XMM0 ||
 		       ret[j].r == TREG_XMM1) {
 		int idx = prel_nb_sse_args;
 
-		if (ret[j].c.ull & 7) {
-		    idx--;
+		if ((ret[j].c.ull & 7) == 0) {
+		    prel_nb_sse_args++;
 		}
 
-		prel_nb_sse_args++;
 		if (idx < 8) {
-		    //ret[j].r = TREG_XMM0 + idx;
+		    ret[j].r = TREG_XMM0 + idx;
 		} else {
-		    //goto failure;
+		    goto failure;
 		}
 	    } else if (ret[j].r == TREG_ST0) {
 		int idx = prel_nb_x87_args;
 
 		prel_nb_x87_args++;
 		if (idx < 0) {
-		    //ret[j].r = TREG_ST0;
+		    ret[j].r = TREG_ST0;
 		} else {
-		    //goto failure;
+		    goto failure;
 		}
 	    }
 	}
 
+    success:
 	/* success */
 	nb_reg_args = prel_nb_reg_args;
 	nb_sse_args = prel_nb_sse_args;
 	nb_x87_args = prel_nb_x87_args;
 	continue;
-
     failure:
 	for(j = start; j<off && j<nret; j++) {
 	    ret[j].r = VT_CONST;
 	}
+	goto success; /* for now, we're counting integer arguments, not register arguments, in nb_reg_args */
     }
 
     /* arguments are collected in runs. Each run is a collection of 8-byte aligned arguments
