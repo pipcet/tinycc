@@ -96,7 +96,7 @@ ST_INLN int is_float(int t)
 {
     int bt;
     bt = t & VT_BTYPE;
-    return bt == VT_LDOUBLE || bt == VT_DOUBLE || bt == VT_FLOAT || bt == VT_QFLOAT;
+    return bt == VT_LDOUBLE || bt == VT_DOUBLE || bt == VT_FLOAT;
 }
 
 /* we use our own 'finite' function to avoid potential problems with
@@ -885,10 +885,6 @@ ST_FUNC int gv(int rc)
     int r, bit_pos, bit_size, size, align, i;
     int rc2;
 
-    if ((vtop->type.t & VT_VALMASK) == VT_QLONG ||
-	(vtop->type.t & VT_VALMASK) == VT_QFLOAT)
-	tcc_error("cannot gv() a QLONG");
-
     /* NOTE: get_reg can modify vstack[] */
     if (vtop->type.t & VT_BITFIELD) {
         CType type;
@@ -977,11 +973,6 @@ ST_FUNC int gv(int rc)
         if (r >= VT_CONST
          || (vtop->r & VT_LVAL)
          || !(reg_classes[r] & rc)
-#ifdef TCC_TARGET_X86_64
-         || ((vtop->type.t & VT_BTYPE) == VT_QLONG)
-         || ((vtop->type.t & VT_BTYPE) == VT_QFLOAT)
-#else
-#endif
             )
         {
 	    int r1 = find_cached_value(vtop);
@@ -1005,19 +996,16 @@ ST_FUNC int gv(int rc)
 		}
 	    }
 
-#ifdef TCC_TARGET_X86_64
-            if (((vtop->type.t & VT_BTYPE) == VT_QLONG) || ((vtop->type.t & VT_BTYPE) == VT_QFLOAT)) {
+#ifndef TCC_TARGET_X86_64
                 int addr_type = VT_LLONG, load_size = 8, load_type = ((vtop->type.t & VT_BTYPE) == VT_QLONG) ? VT_LLONG : VT_DOUBLE;
-#else
             if ((vtop->type.t & VT_BTYPE) == VT_LLONG) {
                 int addr_type = VT_INT, load_size = 4, load_type = VT_INT;
                 unsigned long long ll;
-#endif
+
                 int r2, original_type;
                 original_type = vtop->type.t;
                 /* two register type load : expand to two words
                    temporarily */
-#ifndef TCC_TARGET_X86_64
                 if ((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST) {
                     /* load constant */
                     ll = vtop->c.ull;
@@ -1026,7 +1014,6 @@ ST_FUNC int gv(int rc)
                     vtop->r = r; /* save register value */
                     vpushi(ll >> 32); /* second word */
                 } else
-#endif
                 if (r >= VT_CONST || /* XXX: test to VT_CONST incorrect ? */
                            (vtop->r & VT_LVAL)) {
                     /* We do not want to modifier the long long
@@ -1052,7 +1039,9 @@ ST_FUNC int gv(int rc)
                     vdup();
                 }
 		vpop();
-            } else if ((vtop->r & VT_LVAL) && !is_float(vtop->type.t)) {
+            } else
+#endif
+	    if ((vtop->r & VT_LVAL) && !is_float(vtop->type.t)) {
                 int t1, t;
                 /* lvalue of scalar type : need to use lvalue type
                    because of possible cast */
@@ -1142,18 +1131,6 @@ static int reg_fret(int t)
     }
 #endif
     return REG_FRET;
-}
-
-/* expand quad long on stack in two long long/long registers */
-ST_FUNC void qexpand(void)
-{
-    //assert((vtop->type.t & VT_VALMASK) == VT_LOCAL);
-    int addr_type = VT_LLONG, load_size = 8, load_type = ((vtop->type.t & VT_BTYPE) == VT_QLONG) ? VT_LLONG : VT_DOUBLE;
-
-    vdup();
-    vtop[-1].c.ul += 8;
-    vtop[-1].type.t = load_type;
-    vtop[0].type.t = load_type;
 }
 
 /* expand long long on stack in two int registers */
@@ -2318,9 +2295,6 @@ ST_FUNC int type_size(CType *type, int *a)
     } else if (bt == VT_SHORT) {
         *a = 2;
         return 2;
-    } else if (bt == VT_QLONG || bt == VT_QFLOAT) {
-        *a = 8;
-        return 16;
     } else {
         /* char, void, function, _Bool */
         *a = 1;
@@ -2740,13 +2714,9 @@ ST_FUNC void vstore(void)
         }
 #endif
         if (!nocode_wanted) {
-#ifdef TCC_TARGET_X86_64
-            if (((ft & VT_BTYPE) == VT_QLONG) || ((ft & VT_BTYPE) == VT_QFLOAT)) {
-                int addr_type = VT_LLONG, load_size = 8, load_type = ((vtop->type.t & VT_BTYPE) == VT_QLONG) ? VT_LLONG : VT_DOUBLE;
-#else
+#ifndef TCC_TARGET_X86_64
             if ((ft & VT_BTYPE) == VT_LLONG) {
                 int addr_type = VT_INT, load_size = 4, load_type = VT_INT;
-#endif
 		/* QD QS */
 		vdup();
 		vrotb(3);
@@ -2780,15 +2750,15 @@ ST_FUNC void vstore(void)
 		vstore();
 		/* QS LS1 */
 		vswap();
-            } else {
+            } else
+#endif
+	    {
 		rc = RC_INT;
 		if (is_float(ft)) {
 		    rc = RC_FLOAT;
 #ifdef TCC_TARGET_X86_64
 		    if ((ft & VT_BTYPE) == VT_LDOUBLE) {
 			rc = RC_ST0;
-		    } else if ((ft & VT_BTYPE) == VT_QFLOAT) {
-			rc = RC_FRET;
 		    }
 #endif
 		}
