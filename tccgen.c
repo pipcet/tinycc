@@ -5350,13 +5350,16 @@ static void init_putv(CType *type, Section *sec, unsigned long c,
 }
 
 /* put zeros for variable based init */
-static void init_putz(CType *t, Section *sec, unsigned long c, int size)
+static void init_putz(CType *t, Section *sec, unsigned long long c, int size)
 {
     if (sec) {
         /* nothing to do because globals are already set to zero */
     } else {
+	CType ty;
+	ty.t = VT_LLONG;
+	ty.ref = NULL;
         vpush_global_sym(&func_old_type, TOK_memset);
-        vseti(VT_LOCAL, c);
+        vset(&ty, VT_LOCAL, c);
         vpushi(0);
         vpushs(size);
         gfunc_call(3);
