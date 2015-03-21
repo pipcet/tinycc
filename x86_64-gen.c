@@ -1857,76 +1857,53 @@ void gfunc_call(int nb_args)
     args_size = 0;
     while (run_start != nb_args) {
         int run_gen_reg = gen_reg, run_sse_reg = sse_reg;
-#ifdef NO_QLONG
 	int new_eightbyte = 1;
-#endif
         
         run_end = nb_args;
         stack_adjust = 0;
         for(i = run_start; (i < nb_args) && (run_end == nb_args); i++) {
-#ifndef NO_QLONG
-            mode = classify_x86_64_arg(&vtop[-i].type, NULL, &size, &align, &reg_count);
-            switch (mode) {
-            case x86_64_mode_memory:
-            case x86_64_mode_x87:
-            stack_arg:
-                if (align == 16)
-                    run_end = i;
-                else
-                    stack_adjust += size;
-                break;
-#else
-	    SValue ret[8];
 	    int off = 0, j;
-            mode = classify_x86_64_arg(&vtop[-i].type, ret, 8, &size, &align, &off);
+	    int arg_gen_reg = gen_reg;
+	    int arg_sse_reg = sse_reg;
+            mode = classify_x86_64_arg_new(&vtop[-i].type, ret, nret, &size, &align, &off);
 	    for(j=off-1; j>=0; j--) {
-		if (new_eightbyte) {
-		    reg_count = 1;
-		    switch (mode) {
-		    case x86_64_mode_memory:
-		    case x86_64_mode_x87:
-		    stack_arg:
-			if (align == 16)
-			    run_end = i;
-			else
-			    stack_adjust += size;
-			break;
-#endif
+		if(ret[j].c.ull & 7)
+		    new_eightbyte = 0;
+		else
+		    new_eightbyte = 1;
+
+		switch (mode) {
+		case x86_64_mode_memory:
+		case x86_64_mode_x87:
+		stack_arg:
+		    arg_gen_reg = gen_reg;
+		    arg_sse_reg = sse_reg;
+		    if (align == 16)
+			run_end = i;
+		    else
+			stack_adjust += size;
+		    break;
                 
-#ifndef NO_QLONG
-            case x86_64_mode_sse:
-                sse_reg -= reg_count;
-                if (sse_reg + reg_count > 8) goto stack_arg;
-                break;
-#else
-		    case x86_64_mode_sse:
-			sse_reg -= reg_count;
-			if (sse_reg + reg_count > 8) goto stack_arg;
-			break;
-#endif
-            
-#ifndef NO_QLONG
-            case x86_64_mode_integer:
-                gen_reg -= reg_count;
-                if (gen_reg + reg_count > REGN) goto stack_arg;
-                break;
-	    default: break; /* nothing to be done for x86_64_mode_none */
-#else
-		    case x86_64_mode_integer:
-			gen_reg -= reg_count;
-			if (gen_reg + reg_count > REGN) goto stack_arg;
+		case x86_64_mode_sse:
+		    if (new_eightbyte) {
+			arg_sse_reg--;
+			if (sse_reg + 1 > 8) goto stack_arg;
+		    }
+
+		    break;
+
+		case x86_64_mode_integer:
+		    if (new_eightbyte) {
+			arg_gen_reg--;
+			if (gen_reg + 1 > REGN) goto stack_arg;
 			break;
 		    default:
 			break; /* nothing to be done for x86_64_mode_none */
 		    }
 		}
-
-		if(ret[j].c.ull & 7)
-		    new_eightbyte = 0;
-		else
-		    new_eightbyte = 1;
-#endif
             }
+	    gen_reg = arg_gen_reg;
+	    sse_reg = arg_sse_reg;
         }
         
         gen_reg = run_gen_reg;
@@ -1934,11 +1911,7 @@ void gfunc_call(int nb_args)
         
         /* adjust stack to align SSE boundary */
         if (stack_adjust &= 15) {
-#ifndef NO_QLONG
-            /* fetch cpu flag before the following sub will change the value */
-#else
             /* fetch cpu flag before the following sub will change the value. What about VT_JMP[I]? */
-#endif
             if (vtop >= vstack && (vtop->r & VT_VALMASK) == VT_CMP)
                 gv(RC_INT);
 
@@ -1948,9 +1921,8 @@ void gfunc_call(int nb_args)
             args_size += stack_adjust;
         }
         
-#ifdef NO_QLONG
 	reg_count = 0;
-#endif
+
         for(i = run_start; i < run_end;) {
             /* Swap argument to top, it will possibly be changed here,
               and might use more temps. At the end of the loop we keep
@@ -1959,106 +1931,67 @@ void gfunc_call(int nb_args)
             SValue tmp = vtop[0];
             vtop[0] = vtop[-i];
             vtop[-i] = tmp;
-#ifdef NO_QLONG
-
-	    SValue ret[2];
 	    int align;
-#endif
             
-#ifndef NO_QLONG
-            mode = classify_x86_64_arg(&vtop->type, NULL, &size, &align, &reg_count);
-            
-#else
-            mode = classify_x86_64_arg(&vtop->type, ret, 2, &size, &align, &reg_count);
-
-	    reg_count = type_size(&ret[0].type, &align) > 8 ? 2 : 1;
-#endif
+	    int off = 0, j;
+	    int arg_gen_reg = gen_reg;
+	    int arg_sse_reg = sse_reg;
             int arg_stored = 1;
-            switch (vtop->type.t & VT_BTYPE) {
-            case VT_STRUCT:
-                if (mode == x86_64_mode_sse) {
-#ifndef NO_QLONG
-                    if (sse_reg > 8)
-#else
-                    if (sse_reg > 8) {
-#endif
-                        sse_reg -= reg_count;
-#ifndef NO_QLONG
-                    else
-#else
-			assert(sse_reg >= 0);
-                    } else
-#endif
-                        arg_stored = 0;
-                } else if (mode == x86_64_mode_integer) {
-#ifndef NO_QLONG
-                    if (gen_reg > REGN)
-#else
-                    if (gen_reg > REGN) {
-#endif
-                        gen_reg -= reg_count;
-#ifndef NO_QLONG
-                    else
-#else
-			assert(gen_reg >= 0);
-                    } else
-#endif
-                        arg_stored = 0;
-                }
+            mode = classify_x86_64_arg_new(&vtop->type, ret, nret, &size, &align, &off);
+	    for(j=off-1; j>=0; j--) {
+		if(ret[j].c.ull & 7)
+		    new_eightbyte = 0;
+		else
+		    new_eightbyte = 1;
+
+		switch (mode) {
+		case x86_64_mode_memory:
+		case x86_64_mode_x87:
+		push_stack_arg:
+		    arg_stored = 1;
+		    arg_gen_reg = gen_reg;
+		    arg_sse_reg = sse_reg;
+		    break;
                 
-                if (arg_stored) {
-                    /* allocate the necessary size on stack */
-                    o(0x48);
-                    oad(0xec81, size); /* sub $xxx, %rsp */
-                    /* generate structure store */
-                    r = get_reg(RC_INT);
-                    orex(64, r, 0, 0x89); /* mov %rsp, r */
-                    o(0xe0 + REG_VALUE(r));
-                    vset(&vtop->type, r | VT_LVAL, 0);
-                    vswap();
-                    vstore();
-                    args_size += size;
-                }
-                break;
-                
-            case VT_LDOUBLE:
-                assert(0);
-                break;
-                
-            case VT_FLOAT:
-            case VT_DOUBLE:
-                assert(mode == x86_64_mode_sse);
-                if (sse_reg > 8) {
-                    --sse_reg;
-		    assert(sse_reg >= 0);
-                    r = gv(RC_FLOAT);
-                    o(0x50); /* push $rax */
-                    /* movq %xmmN, (%rsp) */
-		    /* XXX orex! */
-                    o(0xd60f66);
-                    o(0x04 + REG_VALUE(r)*8);
-                    o(0x24);
-                    args_size += size;
-                } else {
-                    arg_stored = 0;
-                }
-                break;
-                
-            default:
-                assert(mode == x86_64_mode_integer);
-                /* simple type */
-                /* XXX: implicit cast ? */
-                if (gen_reg > REGN) {
-                    --gen_reg;
-		    assert(gen_reg >= 0);
-                    r = gv(RC_INT);
-                    orex(32,r,0,0x50 + REG_VALUE(r)); /* push r XXX orex right? */
-                    args_size += size;
-                } else {
-                    arg_stored = 0;
-                }
-                break;
+		case x86_64_mode_sse:
+		    if (new_eightbyte) {
+			arg_sse_reg--;
+			arg_stored = 0;
+
+			if (sse_reg + 1 > 8) goto push_stack_arg;
+		    }
+
+		    break;
+
+		case x86_64_mode_integer:
+		    if (new_eightbyte) {
+			arg_gen_reg--;
+			arg_stored = 0;
+
+			if (gen_reg + 1 > REGN) goto push_stack_arg;
+			break;
+		    default:
+			break; /* nothing to be done for x86_64_mode_none */
+		    }
+		}
             }
+
+	    gen_reg = arg_gen_reg;
+	    sse_reg = arg_sse_reg;
+
+	    if (arg_stored) {
+		/* allocate the necessary size on stack */
+		o(0x48);
+		oad(0xec81, size); /* sub $xxx, %rsp */
+		/* generate structure store */
+		r = get_reg(RC_INT);
+		orex(64, r, 0, 0x89); /* mov %rsp, r */
+		o(0xe0 + REG_VALUE(r));
+		vset(&vtop->type, r | VT_LVAL, 0);
+		vswap();
+		vstore();
+		args_size += size;
+	    }
             
             /* And swap the argument back to its original position.  */
             tmp = vtop[0];
@@ -2066,28 +1999,22 @@ void gfunc_call(int nb_args)
             vtop[-i] = tmp;
 
             if (arg_stored) {
-              vrotb(i+1);
-              assert((vtop->type.t == tmp.type.t) && (vtop->r == tmp.r));
-              vpop();
-              --nb_args;
-              --run_end;
+		vrotb(i+1);
+		assert((vtop->type.t == tmp.type.t) && (vtop->r == tmp.r));
+		vpop();
+		--nb_args;
+		--run_end;
             } else {
-              ++i;
+		++i;
             }
         }
 
-#ifdef NO_QLONG
 	reg_count = 0;
-#endif
         /* handle 16 byte aligned arguments at end of run */
         run_start = i = run_end;
         while (i < nb_args) {
             /* Rotate argument to top since it will always be popped */
-#ifndef NO_QLONG
-            mode = classify_x86_64_arg(&vtop[-i].type, NULL, &size, &align, &reg_count);
-#else
-            mode = classify_x86_64_arg(&vtop[-i].type, NULL, NULL, &size, &align, &reg_count);
-#endif
+            mode = classify_x86_64_arg_new(&vtop[-i].type, ret, nret, &size, &align, &reg_count);
             if (align != 16)
               break;
 
@@ -2122,171 +2049,114 @@ void gfunc_call(int nb_args)
         }
     }
     
+    gen_reg = nb_reg_args;
+    sse_reg = nb_sse_args;
+
     /* XXX This should be superfluous.  */
     save_regs(0); /* save used temporary registers */
 
-#ifndef NO_QLONG
-    /* then, we prepare register passing arguments.
-       Note that we cannot set RDX and RCX in this loop because gv()
-       may break these temporary registers. Let's use R10 and R11
-       instead of them */
+    /* then, we prepare register passing arguments. */
     assert(gen_reg <= REGN);
     assert(sse_reg <= 8);
     for(i = 0; i < nb_args; i++) {
-        mode = classify_x86_64_arg(&vtop->type, &type, &size, &align, &reg_count);
-        /* Alter stack entry type so that gv() knows how to treat it */
-        vtop->type = type;
-        if (mode == x86_64_mode_sse) {
-            if (reg_count == 2) {
-                sse_reg -= 2;
-#else
-    for(i=13; i>=0; i--) {
-	if ((ret[i].type.t & VT_BTYPE) == VT_STRUCT)
-	    continue;
+	int off = 0, j;
+	int arg_gen_reg = gen_reg;
+	int arg_sse_reg = sse_reg;
+	int arg_stored = 1;
+	int shared_eightbyte = 0;
+	int new_eightbyte;
 
-	while ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
-	    Sym *f;
-	    f = vtop->type.ref;
+	assert(gen_reg >= 0);
+	assert(sse_reg >= 0);
+	mode = classify_x86_64_arg_new(&vtop->type, ret, nret, &size, &align, &off);
+	for(j=off-1; j>=0; j--) {
+	    if(ret[j].c.ull & 7)
+		new_eightbyte = 0;
+	    else
+		new_eightbyte = 1;
 
-	    for (; f; f = f->next) {
-		if (f->v & SYM_STRUCT)
-		    continue;
-		if (!(f->v & SYM_FIELD))
-		    continue;
+	    switch (mode) {
+	    case x86_64_mode_memory:
+	    case x86_64_mode_x87:
+		assert(0);
+		break;
 
-#endif
-		vdup();
-#ifndef NO_QLONG
-		qexpand();
-#else
-		gaddrof();
-		vtop->type.t = VT_LLONG;
-		vpushi(f->c);
-		gen_op('+');
-		vtop->type.t = VT_PTR;
-		vtop->type.ref = f;
-		indir();
-#endif
-		vswap();
-#ifndef NO_QLONG
-                gv(RC_QRET);
-		vtop--;
-                gv(RC_FRET); /* Use pair load into xmm0 & xmm1 */
-		vtop--;
-                if (sse_reg) { /* avoid redundant movaps %xmm0, %xmm0 */
-                    /* movaps %xmm0, %xmmN */
-                    o(0x280f);
-                    o(0xc0 + (sse_reg << 3));
-                    /* movaps %xmm1, %xmmN */
-                    o(0x280f);
-                    o(0xc1 + ((sse_reg+1) << 3));
-                }
-            } else {
-                assert(reg_count == 1);
-                --sse_reg;
-                /* Load directly to register */
-                gv(RC_XMM0 << sse_reg);
-            }
-        } else if (mode == x86_64_mode_integer) {
-            /* simple type */
-            /* XXX: implicit cast ? */
-            gen_reg -= reg_count;
-	    /* 128-bit types complicate everything. This code might
-	       not be pretty or efficient, but it appears to work. */
-	    if((vtop[0].type.t & VT_BTYPE) == VT_QLONG) {
-		assert(reg_count == 2);
-		qexpand();
-		save_regs(1); /* we might need the register the high word occupies */
-	    } else {
-		assert(reg_count == 1);
-#endif
+	    case x86_64_mode_sse:
+		if (new_eightbyte) {
+		    arg_sse_reg--;
+		    assert(arg_sse_reg < 8);
+		    if (shared_eightbyte)
+			ret[j].type.t = VT_DOUBLE;
+		    ret[j].r = TREG_XMM0 + arg_sse_reg;
+		} else {
+		    ret[j].r = VT_CONST;
+		    shared_eightbyte = 1;
+		}
+
+		break;
+
+	    case x86_64_mode_integer:
+		if (new_eightbyte) {
+		    arg_gen_reg--;
+		    assert(arg_gen_reg < REGN);
+		    if (shared_eightbyte)
+			ret[j].type.t = VT_LLONG;
+		    ret[j].r = arg_prepare_reg(arg_gen_reg);
+		} else {
+		    ret[j].r = VT_CONST;
+		    shared_eightbyte = 1;
+		}
+
+		break;
+	    default:
+		break; /* nothing to be done for x86_64_mode_none */
 	    }
-#ifndef NO_QLONG
-	    int i;
-	    for(i=0; i<reg_count; i++) {
-		int d = arg_prepare_reg(gen_reg+i);
-		r = gv(RC_INT);
-		if (d!=r) {
-		    orex(64,d,r,0x89); /* mov */
-		    o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
+
+	    if (new_eightbyte)
+		shared_eightbyte = 0;
+	}
+
+	    
+	gen_reg = arg_gen_reg;
+	sse_reg = arg_sse_reg;
+
+	for(j=0; j<off; j++) {
+	    while ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
+		Sym *f;
+		f = vtop->type.ref;
+		
+		for (; f; f = f->next) {
+		    if (f->v & SYM_STRUCT)
+			continue;
+		    if (!(f->v & SYM_FIELD))
+			continue;
+
+		    vdup();
+		    gaddrof();
+		    vtop->type.t = VT_LLONG;
+		    vpushi(f->c);
+		    gen_op('+');
+		    vtop->type.t = VT_PTR;
+		    vtop->type.ref = f;
+		    indir();
+		    vswap();
 		}
 		vtop--;
-#else
-
-	    vtop--;
-	}
-
-	if ((ret[i].type.t & VT_BTYPE) == VT_VOID) {
-	    continue;
-	}
-
-	if (ret[i].c.ull & 7) {
-	    gv(ret[i].r < TREG_XMM0 ? RC_INT : RC_FLOAT);
-	    save_regs(0);
-	}
-
-	vtop->type.t = VT_LLONG;
-
-	if (ret[i].r >= TREG_XMM0 && ret[i].r <= TREG_XMM7) {
-	    gv(RC_XMM0 << (ret[i].r-TREG_XMM0));
-	    vtop--;
-	    if ((ret[i].c.ull & 7) == 0)
-		start_special_use(ret[i].r);
-	    save_regs(0);
-	} else if (ret[i].r == TREG_ST0) {
-	    vtop--;
- 	    start_special_use(ret[i].r);
-	} else if (ret[i].r < VT_CONST) {
-	    int d = ret[i].r;
-	    r = gv(RC_INT);
-	    if (d!=r) {
-		orex(64,d,r,0x89); /* mov */
-		o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
 	    }
-	    vtop--;
-	    if ((ret[i].c.ull & 7) == 0)
-#endif
-		start_special_use(d);
-#ifdef NO_QLONG
-	    save_regs(0);
-	} else {
-	    vtop--;
-	}
-    }
 
-    if (0) {
-	while ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
-	    Sym *f;
-	    f = vtop->type.ref;
+	    if(ret[j].r == VT_CONST)
+		continue;
+
+	    save_reg(ret[j].r);
+	    get_specific_reg(ret[j].r);
+	    start_special_use(ret[j].r);
 	    
-	    for (; f; f = f->next) {
-		int i;
-		
-		if (f->v & SYM_STRUCT)
-		    continue;
-		if (!(f->v & SYM_FIELD))
-		    continue;
-		
-		vdup();
-		gaddrof();
-		vtop->type.t = VT_LLONG;
-		vpushi(f->c);
-		gen_op('+');
-		vtop->type.t = VT_PTR;
-		vtop->type.ref = f;
-		indir();
-		vswap();
-#endif
-	    }
-#ifndef NO_QLONG
-	    vtop++;
-        }
+	    vset(&ret[j].type, ret[j].r, 0);
+	    vswap();
+	    vstore();
+	}
+
         vtop--;
-#else
-	    
-	    vtop--;
-	}
-#endif
     }
 #ifndef NO_QLONG
     assert(gen_reg == 0);
