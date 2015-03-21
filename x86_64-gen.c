@@ -1035,9 +1035,12 @@ void store(int r, SValue *v)
 
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
-        o(0x66);
+	o(0x66);
 	orex(0, v->r, r, 0x0f);
-        o(0x7e); /* movd */
+	if (v->r >= TREG_XMM0)
+	    o(0xd6);
+	else
+	    o(0x7e); /* movd/movq */
     } else if (bt == VT_DOUBLE) {
         o(0x66);
 	orex(0, v->r, r, 0x0f);
@@ -1678,6 +1681,7 @@ static X86_64_Mode classify_x86_64_arg_new(CType *ty, SValue *ret, int nret, int
 	    ret[0].c.ull = 0;
 	    ret[0].r = TREG_RAX;
 	}
+	(*offset)++;
 
         *psize = 8;
         mode = x86_64_mode_integer;
@@ -1800,11 +1804,11 @@ void gfunc_call(int nb_args)
 		    idx--;
 		}
 
+		prel_nb_reg_args++;
 		if (idx < REGN) {
-		    ret[j].r = arg_prepare_reg(idx);
-		    prel_nb_reg_args++;
+		    //ret[j].r = arg_prepare_reg(idx);
 		} else {
-		    goto failure;
+		    //goto failure;
 		}
 	    } else if (ret[j].r == TREG_XMM0 ||
 		       ret[j].r == TREG_XMM1) {
@@ -1814,20 +1818,20 @@ void gfunc_call(int nb_args)
 		    idx--;
 		}
 
+		prel_nb_sse_args++;
 		if (idx < 8) {
-		    ret[j].r = TREG_XMM0 + idx;
-		    prel_nb_sse_args++;
+		    //ret[j].r = TREG_XMM0 + idx;
 		} else {
-		    goto failure;
+		    //goto failure;
 		}
 	    } else if (ret[j].r == TREG_ST0) {
 		int idx = prel_nb_x87_args;
 
+		prel_nb_x87_args++;
 		if (idx < 0) {
-		    ret[j].r = TREG_ST0;
-		    prel_nb_x87_args++;
+		    //ret[j].r = TREG_ST0;
 		} else {
-		    goto failure;
+		    //goto failure;
 		}
 	    }
 	}
@@ -1842,7 +1846,6 @@ void gfunc_call(int nb_args)
 	for(j = start; j<off && j<nret; j++) {
 	    ret[j].r = VT_CONST;
 	}
-	break;
     }
 
     /* arguments are collected in runs. Each run is a collection of 8-byte aligned arguments
@@ -1876,8 +1879,8 @@ void gfunc_call(int nb_args)
 		case x86_64_mode_memory:
 		case x86_64_mode_x87:
 		stack_arg:
-		    arg_gen_reg = gen_reg;
-		    arg_sse_reg = sse_reg;
+		    //arg_gen_reg = gen_reg;
+		    //arg_sse_reg = sse_reg;
 		    if (align == 16)
 			run_end = i;
 		    else
@@ -1887,7 +1890,7 @@ void gfunc_call(int nb_args)
 		case x86_64_mode_sse:
 		    if (new_eightbyte) {
 			arg_sse_reg--;
-			if (sse_reg + 1 > 8) goto stack_arg;
+			if (arg_sse_reg >= 8) goto stack_arg;
 		    }
 
 		    break;
@@ -1895,7 +1898,7 @@ void gfunc_call(int nb_args)
 		case x86_64_mode_integer:
 		    if (new_eightbyte) {
 			arg_gen_reg--;
-			if (gen_reg + 1 > REGN) goto stack_arg;
+			if (arg_gen_reg >= REGN) goto stack_arg;
 			break;
 		    default:
 			break; /* nothing to be done for x86_64_mode_none */
@@ -1949,8 +1952,8 @@ void gfunc_call(int nb_args)
 		case x86_64_mode_x87:
 		push_stack_arg:
 		    arg_stored = 1;
-		    arg_gen_reg = gen_reg;
-		    arg_sse_reg = sse_reg;
+		    //arg_gen_reg = gen_reg;
+		    //arg_sse_reg = sse_reg;
 		    break;
                 
 		case x86_64_mode_sse:
@@ -1958,7 +1961,7 @@ void gfunc_call(int nb_args)
 			arg_sse_reg--;
 			arg_stored = 0;
 
-			if (sse_reg + 1 > 8) goto push_stack_arg;
+			if (arg_sse_reg >= 8) goto push_stack_arg;
 		    }
 
 		    break;
@@ -1968,7 +1971,7 @@ void gfunc_call(int nb_args)
 			arg_gen_reg--;
 			arg_stored = 0;
 
-			if (gen_reg + 1 > REGN) goto push_stack_arg;
+			if (arg_gen_reg >= REGN) goto push_stack_arg;
 			break;
 		    default:
 			break; /* nothing to be done for x86_64_mode_none */
@@ -2052,10 +2055,17 @@ void gfunc_call(int nb_args)
     gen_reg = nb_reg_args;
     sse_reg = nb_sse_args;
 
+    if (gen_reg > REGN)
+	gen_reg = REGN;
+
+    if (sse_reg > 8)
+	sse_reg = 8;
+
     /* XXX This should be superfluous.  */
     save_regs(0); /* save used temporary registers */
 
     /* then, we prepare register passing arguments. */
+    assert(nb_args == gen_reg + sse_reg);
     assert(gen_reg <= REGN);
     assert(sse_reg <= 8);
     for(i = 0; i < nb_args; i++) {
@@ -2116,7 +2126,6 @@ void gfunc_call(int nb_args)
 		shared_eightbyte = 0;
 	}
 
-	    
 	gen_reg = arg_gen_reg;
 	sse_reg = arg_sse_reg;
 
@@ -2150,7 +2159,12 @@ void gfunc_call(int nb_args)
 	    save_reg(ret[j].r);
 	    get_specific_reg(ret[j].r);
 	    start_special_use(ret[j].r);
-	    
+
+	    gv((ret[j].r >= TREG_XMM0) ? RC_FLOAT : RC_INT);
+
+	    /* 8-bit writes do not clear the high 56 bits */
+	    if ((ret[j].type.t & VT_BTYPE) == VT_BYTE)
+		ret[j].type.t = VT_LLONG;
 	    vset(&ret[j].type, ret[j].r, 0);
 	    vswap();
 	    vstore();
@@ -2158,15 +2172,10 @@ void gfunc_call(int nb_args)
 
         vtop--;
     }
-#ifndef NO_QLONG
     assert(gen_reg == 0);
     assert(sse_reg == 0);
-#endif
 
-#ifdef NO_QLONG
     assert((vtop->type.t & VT_BTYPE) == VT_FUNC);
-	
-#endif
     /* We shouldn't have many operands on the stack anymore, but the
        call address itself is still there, and it might be in %eax
        (or edx/ecx) currently, which the below writes would clobber.
