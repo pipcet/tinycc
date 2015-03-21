@@ -2295,36 +2295,38 @@ void gfunc_prolog(CType *func_type)
         /* count the number of seen parameters */
         sym = func_type->ref;
         while ((sym = sym->next) != NULL) {
+	    SValue ret[256];
+	    int nret = 256;
+	    for (i=0; i<nret; i++) {
+		ret[i].type.t = VT_VOID;
+		ret[i].r = VT_CONST;
+	    }
+	  
             type = &sym->type;
-#ifndef NO_QLONG
-            mode = classify_x86_64_arg(type, NULL, &size, &align, &reg_count);
-#else
-            mode = classify_x86_64_arg(type, NULL, NULL, &size, &align, &reg_count);
-#endif
-            switch (mode) {
-            default:
-            stack_arg:
-                seen_stack_size = ((seen_stack_size + align - 1) & -align) + size;
-                break;
-                
-            case x86_64_mode_integer:
-                if (seen_reg_num + reg_count <= 8) {
-                    seen_reg_num += reg_count;
-                } else {
-                    seen_reg_num = 8;
-                    goto stack_arg;
-                }
-                break;
-                
-            case x86_64_mode_sse:
-                if (seen_sse_num + reg_count <= 8) {
-                    seen_sse_num += reg_count;
-                } else {
-                    seen_sse_num = 8;
-                    goto stack_arg;
-                }
-                break;
-            }
+	    reg_count = 0;
+            mode = classify_x86_64_arg_new(type, ret, nret, &size, &align, &reg_count);
+	    if (mode != x86_64_mode_memory) {
+		int arg_reg_num = seen_reg_num;
+		int arg_sse_num = seen_sse_num;
+
+		for(i=0; i<reg_count; i++) {
+		    if (ret[i].r == TREG_RAX) {
+			arg_reg_num++;
+		    } else if (ret[i].r == TREG_XMM0) {
+			arg_sse_num++;
+		    }
+		}
+		if (arg_reg_num > REGN ||
+		    arg_sse_num > 8) {
+		    goto stack_arg;
+		} else {
+		    seen_reg_num = arg_reg_num;
+		    seen_sse_num = arg_sse_num;
+		}
+	    } else {
+	    stack_arg:
+		seen_stack_size = ((seen_stack_size + align - 1) & -align) + size;
+	    }
         }
 
         loc -= 16;
