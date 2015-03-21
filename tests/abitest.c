@@ -307,6 +307,33 @@ static int ret_mixed2_test(void) {
 }
 
 /*
+ * ret_mixed3_test:
+ *
+ * On x86-64, this struct is passed in two integer registers.
+ */
+typedef struct ret_mixed3_test_type_s {float x; int y; float x2; int y2;} ret_mixed3_test_type;
+typedef ret_mixed3_test_type (*ret_mixed3_test_function_type) (ret_mixed3_test_type);
+
+static int ret_mixed3_test_callback(void *ptr) {
+  ret_mixed3_test_function_type f = (ret_mixed3_test_function_type)ptr;
+  ret_mixed3_test_type a = {10, 5, 35, 7 };
+  ret_mixed3_test_type r;
+  r = f(a);
+  return ((r.x == a.x*5) && (r.y2 == a.y*3)) ? 0 : -1;
+}
+
+static int ret_mixed3_test(void) {
+  const char *src =
+  "typedef struct ret_mixed3_test_type_s {float x; int y; float x2; int y2;} ret_mixed3_test_type;"
+  "ret_mixed3_test_type f(ret_mixed3_test_type a) {\n"
+  "  ret_mixed3_test_type r = {a.x*5, 0, 0, a.y*3};\n"
+  "  return r;\n"
+  "}\n";
+
+  return run_callback(src, ret_mixed3_test_callback);
+}
+
+/*
  * reg_pack_test: return a small struct which should be packed into
  * registers (Win32) during return.
  */
@@ -668,6 +695,7 @@ int main(int argc, char **argv) {
   RUN_TEST(ret_2double_test);
   RUN_TEST(ret_mixed_test);
   RUN_TEST(ret_mixed2_test);
+  RUN_TEST(ret_mixed3_test);
   RUN_TEST(reg_pack_test);
   RUN_TEST(reg_pack_longlong_test);
   RUN_TEST(sret_test);
