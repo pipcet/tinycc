@@ -1704,13 +1704,8 @@ ST_FUNC int classify_x86_64_va_arg(CType *ty) {
     enum __va_arg_type {
         __va_gen_reg, __va_float_reg, __va_stack
     };
-#ifndef NO_QLONG
-    int size, align, reg_count;
-    X86_64_Mode mode = classify_x86_64_arg(ty, NULL, &size, &align, &reg_count);
-#else
     int size, align, reg_count = 0;
-    X86_64_Mode mode = classify_x86_64_arg(ty, NULL, NULL, &size, &align, &reg_count);
-#endif
+    X86_64_Mode mode = classify_x86_64_arg_new(ty, NULL, 0, &size, &align, &reg_count);
     switch (mode) {
     default: return __va_stack;
     case x86_64_mode_integer: return __va_gen_reg;
@@ -1774,66 +1769,80 @@ void gfunc_call(int nb_args)
     int nb_sse_args = 0;
     int nb_x87_args = 0;
     int sse_reg, gen_reg;
-#ifdef NO_QLONG
     SValue ret[256]; /* XXX */
+    int nret = 256;
     int off = 0;
-    for(i=0; i<14; i++) {
+    for(i=0; i<nret; i++) {
 	ret[i].type.t = VT_VOID;
 	ret[i].r = VT_CONST;
 	ret[i].sym = NULL;
     }
-#endif
 
     /* calculate the number of integer/float register arguments */
     for(i = 0; i < nb_args; i++) {
-#ifndef NO_QLONG
-        mode = classify_x86_64_arg(&vtop[-i].type, NULL, &size, &align, &reg_count);
-        if (mode == x86_64_mode_sse)
-            nb_sse_args += reg_count;
-        else if (mode == x86_64_mode_integer)
-            nb_reg_args += reg_count;
-#else
-        mode = classify_x86_64_arg(&vtop[-i].type, ret+off, 256-off, &size, &align, &off);
-    }
+	int start = off;
+	int prel_nb_reg_args = nb_reg_args;
+	int prel_nb_sse_args = nb_sse_args;
+	int prel_nb_x87_args = nb_x87_args;
+	int j;
 
-    for(i = 0; i<off && i<256; i++) {
-	if (ret[i].r == TREG_RAX) {
-	    int idx = nb_reg_args;
+        mode = classify_x86_64_arg_new(&vtop[-i].type, ret+off, nret-off, &size, &align, &off);
 
-	    if (ret[i].c.ull & 7) {
-		idx--;
-	    }
+	if (mode == x86_64_mode_memory)
+	    continue;
 
-	    if (idx < REGN) {
-		ret[i].r = arg_prepare_reg(idx);
-		nb_reg_args++;
-	    } else {
-		ret[i].r = VT_CONST;
-	    }
-	} else if (ret[i].r == TREG_XMM0) {
-	    int idx = nb_sse_args;
+	for(j = start; j<off && j<nret; j++) {
+	    if (ret[j].r == TREG_RAX ||
+		ret[j].r == TREG_RDX) {
+		int idx = prel_nb_reg_args;
 
-	    if (ret[i].c.ull & 7) {
-		idx--;
-	    }
+		if (ret[j].c.ull & 7) {
+		    idx--;
+		}
 
-	    if (idx < 8) {
-		ret[i].r = TREG_XMM0 + idx;
-		nb_sse_args++;
-	    } else {
-		ret[i].r = VT_CONST;
-	    }
-	} else if (ret[i].r == TREG_ST0) {
-	    int idx = nb_x87_args;
+		if (idx < REGN) {
+		    ret[j].r = arg_prepare_reg(idx);
+		    prel_nb_reg_args++;
+		} else {
+		    goto failure;
+		}
+	    } else if (ret[j].r == TREG_XMM0 ||
+		       ret[j].r == TREG_XMM1) {
+		int idx = prel_nb_sse_args;
 
-	    if (idx < 0) {
-		ret[i].r = TREG_ST0;
-		nb_x87_args++;
-	    } else {
-		ret[i].r = VT_CONST;
+		if (ret[j].c.ull & 7) {
+		    idx--;
+		}
+
+		if (idx < 8) {
+		    ret[j].r = TREG_XMM0 + idx;
+		    prel_nb_sse_args++;
+		} else {
+		    goto failure;
+		}
+	    } else if (ret[j].r == TREG_ST0) {
+		int idx = prel_nb_x87_args;
+
+		if (idx < 0) {
+		    ret[j].r = TREG_ST0;
+		    prel_nb_x87_args++;
+		} else {
+		    goto failure;
+		}
 	    }
 	}
-#endif
+
+	/* success */
+	nb_reg_args = prel_nb_reg_args;
+	nb_sse_args = prel_nb_sse_args;
+	nb_x87_args = prel_nb_x87_args;
+	continue;
+
+    failure:
+	for(j = start; j<off && j<nret; j++) {
+	    ret[j].r = VT_CONST;
+	}
+	break;
     }
 
     /* arguments are collected in runs. Each run is a collection of 8-byte aligned arguments
