@@ -795,7 +795,7 @@ ST_FUNC int get_reg(int rc)
         r = p->r & VT_VALMASK;
         if (r < VT_CONST && (reg_classes[r] & rc)) {
 	    if(register_contents[r].special_use)
-		tcc_error("register already in special use");
+		continue;
             save_reg(r);
 	    last_r = r;
 	    uncache_value_by_register(r);
@@ -993,6 +993,7 @@ ST_FUNC int gv(int rc)
 		    r = get_specific_reg(r1);
 	    if (r == -1)
 		r = get_reg(rc);
+	    assert(r != -1);
 
 	    if(r1 != -1) {
 		//fprintf(stderr, "found cached value %d -> %d (%08x)\n", r1, r, vtop->type.t);
@@ -4226,6 +4227,7 @@ ST_FUNC void unary(void)
 		/* pass it as 'int' to avoid structure arg passing
 		   problems. XXX 64-bit. */
 		vseti(VT_LOCAL, loc);
+		vtop[0].type.t = VT_LLONG;
 		ret[0].c = vtop->c;
 		nb_args++;
 		nb_ret = 0;

@@ -980,9 +980,12 @@ void store_pic(int r,SValue *v)
 
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
-        o(0x66);
-        orex(0, pic_reg, r, 0x0f);
-        o(0x7e); /* movd */
+	o(0x66);
+	orex(0, v->r, r, 0x0f);
+	if (r < TREG_XMM0)
+	    o(0x7e); /* movd/movq */
+	else
+	    o(0xd6);
         r = REG_VALUE(r);
     } else if (bt == VT_DOUBLE) {
         o(0x66);
@@ -1037,10 +1040,10 @@ void store(int r, SValue *v)
     if (bt == VT_FLOAT) {
 	o(0x66);
 	orex(0, v->r, r, 0x0f);
-	if (v->r >= TREG_XMM0)
-	    o(0xd6);
-	else
+	if (v->r < TREG_XMM0 || v->r > TREG_XMM0 + 15)
 	    o(0x7e); /* movd/movq */
+	else
+	    o(0xd6);
     } else if (bt == VT_DOUBLE) {
         o(0x66);
 	orex(0, v->r, r, 0x0f);
@@ -1566,6 +1569,10 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 			    if(ret[i].r == TREG_XMM0 && ret[j].r == TREG_RAX)
 				ret[i].r = TREG_RAX;
 			}
+
+			if (mode == x86_64_mode_integer)
+			    for(j=eightbyte_o; j<=i; j++)
+				assert(ret[j].r != TREG_XMM0);
 		    }
 
 		    if (ret[i].type.t != VT_VOID) {
@@ -1603,8 +1610,6 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 	    origo = j;
 	    o = j;
 	}
-	if (nret >= 2 && ret[0].r == ret[1].r)
-	    ret[1].r = (ret[0].r == TREG_RAX) ? TREG_RDX : TREG_XMM1;
         
         return mode;
     }
@@ -1699,7 +1704,7 @@ static X86_64_Mode classify_x86_64_arg_new(CType *ty, SValue *ret, int nret, int
             mode = classify_x86_64_inner_new(ty, ret, nret, offset);
         }
     }
-    
+
     return mode;
 }
 
@@ -1782,6 +1787,7 @@ void gfunc_call(int nb_args)
 	ret[i].sym = NULL;
     }
 
+    assert((vtop[-nb_args].type.t & VT_BTYPE) == VT_FUNC);
     /* calculate the number of integer/float register arguments */
     for(i = 0; i < nb_args; i++) {
 	int start = off;
@@ -1983,19 +1989,47 @@ void gfunc_call(int nb_args)
 	    sse_reg = arg_sse_reg;
 
 	    if (arg_stored) {
-		/* allocate the necessary size on stack */
-		o(0x48);
-		oad(0xec81, size); /* sub $xxx, %rsp */
-		/* generate structure store */
-		r = get_reg(RC_INT);
-		orex(64, r, 0, 0x89); /* mov %rsp, r */
-		o(0xe0 + REG_VALUE(r));
-		vset(&vtop->type, r | VT_LVAL, 0);
-		vswap();
-		vstore();
-		args_size += size;
+		switch(vtop->type.t & VT_BTYPE) {
+		case VT_STRUCT:
+		    /* allocate the necessary size on stack */
+		    o(0x48);
+		    oad(0xec81, size); /* sub $xxx, %rsp */
+		    /* generate structure store */
+		    r = get_reg(RC_INT);
+		    orex(64, r, 0, 0x89); /* mov %rsp, r */
+		    o(0xe0 + REG_VALUE(r));
+		    vset(&vtop->type, r | VT_LVAL, 0);
+		    vswap();
+		    vstore();
+		    args_size += size;
+		    break;
+
+		case VT_LDOUBLE:
+		    assert(0);
+		    break;
+
+		case VT_FLOAT:
+		case VT_DOUBLE:
+                    r = gv(RC_FLOAT);
+                    o(0x50); /* push $rax */
+                    /* movq %xmmN, (%rsp) */
+                    o(0xd60f66);
+                    o(0x04 + REG_VALUE(r)*8);
+                    o(0x24);
+                    args_size += size;
+		    break;
+
+		default:
+		    assert(mode == x86_64_mode_integer);
+		    /* simple type */
+		    /* XXX: implicit cast ? */
+                    r = gv(RC_INT);
+                    orex(0,r,0,0x50 + REG_VALUE(r)); /* push r */
+                    args_size += size;
+		    break;
+		}
 	    }
-            
+
             /* And swap the argument back to its original position.  */
             tmp = vtop[0];
             vtop[0] = vtop[-i];
@@ -2065,7 +2099,7 @@ void gfunc_call(int nb_args)
     save_regs(0); /* save used temporary registers */
 
     /* then, we prepare register passing arguments. */
-    assert(nb_args == gen_reg + sse_reg);
+    //assert(nb_args == gen_reg + sse_reg);
     assert(gen_reg <= REGN);
     assert(sse_reg <= 8);
     for(i = 0; i < nb_args; i++) {
@@ -2085,13 +2119,8 @@ void gfunc_call(int nb_args)
 	    else
 		new_eightbyte = 1;
 
-	    switch (mode) {
-	    case x86_64_mode_memory:
-	    case x86_64_mode_x87:
-		assert(0);
-		break;
-
-	    case x86_64_mode_sse:
+	    switch (ret[j].r) {
+	    case TREG_XMM0:
 		if (new_eightbyte) {
 		    arg_sse_reg--;
 		    assert(arg_sse_reg < 8);
@@ -2103,9 +2132,11 @@ void gfunc_call(int nb_args)
 		    shared_eightbyte = 1;
 		}
 
+		assert (ret[j].r != TREG_RAX);
+
 		break;
 
-	    case x86_64_mode_integer:
+	    case TREG_RAX:
 		if (new_eightbyte) {
 		    arg_gen_reg--;
 		    assert(arg_gen_reg < REGN);
@@ -2119,6 +2150,7 @@ void gfunc_call(int nb_args)
 
 		break;
 	    default:
+		assert(0);
 		break; /* nothing to be done for x86_64_mode_none */
 	    }
 
@@ -2126,51 +2158,60 @@ void gfunc_call(int nb_args)
 		shared_eightbyte = 0;
 	}
 
+	assert(!shared_eightbyte);
+
 	gen_reg = arg_gen_reg;
 	sse_reg = arg_sse_reg;
 
-	for(j=0; j<off; j++) {
-	    while ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
-		Sym *f;
-		f = vtop->type.ref;
-		
-		for (; f; f = f->next) {
-		    if (f->v & SYM_STRUCT)
-			continue;
-		    if (!(f->v & SYM_FIELD))
-			continue;
+	int retj = 0;
+	unsigned long long struct_offset = 0;
+	int pop_structs = 0;
+	if(off > 1)
+	    assert((vtop->type.t & VT_BTYPE) == VT_STRUCT);
+	for(j=0; retj<off; j++) {
+	    if(ret[retj].r == VT_CONST) {
+		assert(0);
+	    }
 
-		    vdup();
-		    gaddrof();
-		    vtop->type.t = VT_LLONG;
-		    vpushi(f->c);
-		    gen_op('+');
-		    vtop->type.t = VT_PTR;
-		    vtop->type.ref = f;
-		    indir();
-		    vswap();
-		}
+	    if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
+		pop_structs = 1;
+		CType ty = ret[retj].type;
+		vdup();
+		gaddrof();
+		vtop->type.t = VT_LLONG;
+		vpushi(ret[retj].c.i);
+		gen_op('+');
+		mk_pointer(&ty);
+		vtop->type = ty;
+		indir();
+	    }
+
+
+	    int r = gv((ret[retj].r >= TREG_XMM0) ? (RC_XMM0 << (ret[retj].r-TREG_XMM0)) : RC_INT);
+
+	    if(r == ret[retj].r) {
+		vtop--;
+		/* either we're lucky, or this is the last register. */
+		start_special_use(ret[retj].r);
+
+	    } else {
+		save_reg(ret[retj].r);
+		get_specific_reg(ret[retj].r);
+		start_special_use(ret[retj].r);
+
+		int d = ret[retj].r;
+		orex(64,d,r,0x89); /* mov */
+		o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
 		vtop--;
 	    }
 
-	    if(ret[j].r == VT_CONST)
-		continue;
-
-	    save_reg(ret[j].r);
-	    get_specific_reg(ret[j].r);
-	    start_special_use(ret[j].r);
-
-	    gv((ret[j].r >= TREG_XMM0) ? RC_FLOAT : RC_INT);
-
-	    /* 8-bit writes do not clear the high 56 bits */
-	    if ((ret[j].type.t & VT_BTYPE) == VT_BYTE)
-		ret[j].type.t = VT_LLONG;
-	    vset(&ret[j].type, ret[j].r, 0);
-	    vswap();
-	    vstore();
+	    retj++;
 	}
 
-        vtop--;
+	if (pop_structs) {
+	    assert((vtop->type.t & VT_BTYPE) == VT_STRUCT);
+	    vtop--;
+	}
     }
     assert(gen_reg == 0);
     assert(sse_reg == 0);
