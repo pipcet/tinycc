@@ -299,7 +299,7 @@ static int ret_mixed2_test(void) {
   const char *src =
   "typedef struct ret_mixed2_test_type_s {float x, x2; int y,y2;} ret_mixed2_test_type;"
   "ret_mixed2_test_type f(ret_mixed2_test_type a) {\n"
-  "  ret_mixed2_test_type r = {a.x*5, a.y*3};\n"
+  "  ret_mixed2_test_type r = {a.x*5, 0, a.y*3, 0};\n"
   "  return r;\n"
   "}\n";
 
@@ -666,10 +666,8 @@ int main(int argc, char **argv) {
   RUN_TEST(ret_4char_float_test);
   RUN_TEST(ret_intchar_test);
   RUN_TEST(ret_2double_test);
-  if (0) {
-      RUN_TEST(ret_mixed_test);
-      RUN_TEST(ret_mixed2_test);
-  }
+  RUN_TEST(ret_mixed_test);
+  RUN_TEST(ret_mixed2_test);
   RUN_TEST(reg_pack_test);
   RUN_TEST(reg_pack_longlong_test);
   RUN_TEST(sret_test);

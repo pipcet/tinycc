@@ -2398,7 +2398,7 @@ void gfunc_prolog(CType *func_type)
 		    ret[i].r = TREG_XMM0 + sse_param_index;
 		    ++sse_param_index;
 		} else {
-		    *(int *)0 = 0;
+		    assert(0);
 		}
 	    }
 
