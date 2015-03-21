@@ -1433,44 +1433,6 @@ static X86_64_Mode classify_x86_64_merge(X86_64_Mode a, X86_64_Mode b) {
         return x86_64_mode_sse;
 }
 
-static X86_64_Mode classify_x86_64_inner(CType *ty) {
-    X86_64_Mode mode;
-    Sym *f;
-    
-    switch (ty->t & VT_BTYPE) {
-    case VT_VOID: return x86_64_mode_none;
-    
-    case VT_INT:
-    case VT_BYTE:
-    case VT_SHORT:
-    case VT_LLONG:
-    case VT_BOOL:
-    case VT_PTR:
-    case VT_FUNC:
-    case VT_ENUM: return x86_64_mode_integer;
-    
-    case VT_FLOAT:
-    case VT_DOUBLE: return x86_64_mode_sse;
-    
-    case VT_LDOUBLE: return x86_64_mode_x87;
-      
-    case VT_STRUCT:
-        f = ty->ref;
-
-        // Detect union
-        if (f->next && (f->c == f->next->c))
-	    return x86_64_mode_memory;
-        
-        mode = x86_64_mode_none;
-        for (; f; f = f->next)
-            mode = classify_x86_64_merge(mode, classify_x86_64_inner(&f->type));
-        
-        return mode;
-    }
-    
-    assert(0);
-}
-
 static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, int *offset) {
     X86_64_Mode mode;
     Sym *f;
@@ -1617,63 +1579,6 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
     assert(0);
 }
 
-static X86_64_Mode classify_x86_64_arg(CType *ty, CType *ret, int *psize, int *palign, int *reg_count) {
-    X86_64_Mode mode;
-    int size, align, ret_t = 0;
-    if (ty->t & (VT_BITFIELD|VT_ARRAY)) {
-        *psize = 8;
-        *reg_count = 1;
-        ret_t = ty->t;
-        mode = x86_64_mode_integer;
-    } else {
-        size = type_size(ty, &align);
-        *psize = (size + 7) & ~7;
-        *palign = (align + 7) & ~7;
-
-        if (size > 16) {
-            mode = x86_64_mode_memory;
-        } else {
-            mode = classify_x86_64_inner(ty);
-            switch (mode) {
-            case x86_64_mode_integer:
-                if (size > 8) {
-		    /* what happens if there are 5 single-word
-		       arguments and one double-word argument? */
-                    *reg_count = 2;
-                    ret_t = VT_QLONG;
-                } else {
-                    *reg_count = 1;
-                    ret_t = (size > 4) ? VT_LLONG : VT_INT;
-                }
-                break;
-                
-            case x86_64_mode_x87:
-                *reg_count = 1;
-                ret_t = VT_LDOUBLE;
-                break;
-
-            case x86_64_mode_sse:
-                if (size > 8) {
-                    *reg_count = 2;
-                    ret_t = VT_QFLOAT;
-                } else {
-                    *reg_count = 1;
-                    ret_t = (size > 4) ? VT_DOUBLE : VT_FLOAT;
-                }
-                break;
-            default: break; /* nothing to be done for x86_64_mode_memory and x86_64_mode_none*/
-            }
-        }
-    }
-    
-    if (ret) {
-        ret->ref = NULL;
-        ret->t = ret_t;
-    }
-    
-    return mode;
-}
-
 static X86_64_Mode classify_x86_64_arg_new(CType *ty, SValue *ret, int nret, int *psize, int *palign, int *offset) {
     X86_64_Mode mode;
     int size, align, ret_t = 0;
@@ -1720,15 +1625,6 @@ ST_FUNC int classify_x86_64_va_arg(CType *ty) {
     case x86_64_mode_integer: return __va_gen_reg;
     case x86_64_mode_sse: return __va_float_reg;
     }
-}
-
-/* Return 1 if this function returns via an sret pointer, 0 otherwise */
-int gfunc_sret(CType *vt, CType *ret, int *ret_align) {
-    int size, align, reg_count = 0;
-    X86_64_Mode mode;
-    *ret_align = 1; // Never have to re-align return values for x86-64
-    mode = classify_x86_64_arg(vt, ret, &size, &align, &reg_count);
-    return (mode == x86_64_mode_memory);
 }
 
 /* Return 1 if this function returns via an sret pointer, 0 otherwise.
