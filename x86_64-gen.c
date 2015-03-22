@@ -1684,12 +1684,18 @@ void gfunc_call(int nb_args)
     int offsets[256];
     int sse_reg, gen_reg;
     SValue ret[256]; /* XXX */
+    SValue ret2[256]; /* XXX */
     int nret = 256;
     int off = 0;
     for(i=0; i<nret; i++) {
 	ret[i].type.t = VT_VOID;
 	ret[i].r = VT_CONST;
 	ret[i].sym = NULL;
+    }
+    for(i=0; i<nret; i++) {
+	ret2[i].type.t = VT_VOID;
+	ret2[i].r = VT_CONST;
+	ret2[i].sym = NULL;
     }
 
     assert((vtop[-nb_args].type.t & VT_BTYPE) == VT_FUNC);
@@ -1780,9 +1786,9 @@ void gfunc_call(int nb_args)
 	    int off = 0, j;
 	    int arg_gen_reg = gen_reg;
 	    int arg_sse_reg = sse_reg;
-            mode = classify_x86_64_arg_new(&vtop[-i].type, ret, nret, &size, &align, &off);
+            mode = classify_x86_64_arg_new(&vtop[-i].type, ret2, nret, &size, &align, &off);
 	    for(j=off-1; j>=0; j--) {
-		if(ret[j].c.ull & 7)
+		if(ret2[j].c.ull & 7)
 		    new_eightbyte = 0;
 		else
 		    new_eightbyte = 1;
@@ -1853,9 +1859,9 @@ void gfunc_call(int nb_args)
 	    int arg_gen_reg = gen_reg;
 	    int arg_sse_reg = sse_reg;
             int arg_stored = 1;
-            mode = classify_x86_64_arg_new(&vtop->type, ret, nret, &size, &align, &off);
+            mode = classify_x86_64_arg_new(&vtop->type, ret2, nret, &size, &align, &off);
 	    for(j=off-1; j>=0; j--) {
-		if(ret[j].c.ull & 7)
+		if(ret2[j].c.ull & 7)
 		    new_eightbyte = 0;
 		else
 		    new_eightbyte = 1;
@@ -1944,6 +1950,7 @@ void gfunc_call(int nb_args)
 		vrotb(i+1);
 		assert((vtop->type.t == tmp.type.t) && (vtop->r == tmp.r));
 		vpop();
+		memmove(offsets+nb_args-1-i, offsets+nb_args-i, nb_args-i+1);
 		--nb_args;
 		--run_end;
             } else {
@@ -1956,7 +1963,7 @@ void gfunc_call(int nb_args)
         run_start = i = run_end;
         while (i < nb_args) {
             /* Rotate argument to top since it will always be popped */
-            mode = classify_x86_64_arg_new(&vtop[-i].type, ret, nret, &size, &align, &reg_count);
+            mode = classify_x86_64_arg_new(&vtop[-i].type, ret2, nret, &size, &align, &reg_count);
             if (align != 16)
               break;
 
@@ -1986,6 +1993,7 @@ void gfunc_call(int nb_args)
             }
             
             vpop();
+	    memmove(offsets+nb_args-1-i, offsets+nb_args-i, nb_args-i+1);
             --nb_args;
 	    assert(nb_args >= 0);
         }
@@ -2017,27 +2025,27 @@ void gfunc_call(int nb_args)
 
 	assert(gen_reg >= 0);
 	assert(sse_reg >= 0);
-	mode = classify_x86_64_arg_new(&vtop->type, ret, nret, &size, &align, &off);
+	mode = classify_x86_64_arg_new(&vtop->type, ret2, nret, &size, &align, &off);
 	for(j=off-1; j>=0; j--) {
-	    if(ret[j].c.ull & 7)
+	    if(ret2[j].c.ull & 7)
 		new_eightbyte = 0;
 	    else
 		new_eightbyte = 1;
 
-	    switch (ret[j].r) {
+	    switch (ret2[j].r) {
 	    case TREG_XMM0:
 		if (new_eightbyte) {
 		    arg_sse_reg--;
 		    assert(arg_sse_reg < 8);
 		    if (shared_eightbyte)
-			ret[j].type.t = VT_DOUBLE;
-		    ret[j].r = TREG_XMM0 + arg_sse_reg;
+			ret2[j].type.t = VT_DOUBLE;
+		    ret2[j].r = TREG_XMM0 + arg_sse_reg;
 		} else {
-		    ret[j].r = VT_CONST;
+		    ret2[j].r = VT_CONST;
 		    shared_eightbyte = 1;
 		}
 
-		assert (ret[j].r != TREG_RAX);
+		assert (ret2[j].r != TREG_RAX);
 
 		break;
 
@@ -2046,10 +2054,10 @@ void gfunc_call(int nb_args)
 		    arg_gen_reg--;
 		    assert(arg_gen_reg < REGN);
 		    if (shared_eightbyte)
-			ret[j].type.t = VT_LLONG;
-		    ret[j].r = arg_prepare_reg(arg_gen_reg);
+			ret2[j].type.t = VT_LLONG;
+		    ret2[j].r = arg_prepare_reg(arg_gen_reg);
 		} else {
-		    ret[j].r = VT_CONST;
+		    ret2[j].r = VT_CONST;
 		    shared_eightbyte = 1;
 		}
 
@@ -2074,17 +2082,17 @@ void gfunc_call(int nb_args)
 	if(off > 1)
 	    assert((vtop->type.t & VT_BTYPE) == VT_STRUCT);
 	for(j=0; retj<off; j++) {
-	    if(ret[retj].r == VT_CONST) {
+	    if(ret2[retj].r == VT_CONST) {
 		assert(0);
 	    }
 
 	    if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
 		pop_structs = 1;
-		CType ty = ret[retj].type;
+		CType ty = ret2[retj].type;
 		vdup();
 		gaddrof();
 		vtop->type.t = VT_LLONG;
-		vpushi(ret[retj].c.i);
+		vpushi(ret2[retj].c.i);
 		gen_op('+');
 		mk_pointer(&ty);
 		vtop->type = ty;
@@ -2092,19 +2100,19 @@ void gfunc_call(int nb_args)
 	    }
 
 
-	    int r = gv((ret[retj].r >= TREG_XMM0) ? (RC_XMM0 << (ret[retj].r-TREG_XMM0)) : RC_INT);
+	    int r = gv((ret2[retj].r >= TREG_XMM0) ? (RC_XMM0 << (ret2[retj].r-TREG_XMM0)) : RC_INT);
 
-	    if(r == ret[retj].r) {
+	    if(r == ret2[retj].r) {
 		vtop--;
 		/* either we're lucky, or this is the last register. */
-		start_special_use(ret[retj].r);
+		start_special_use(ret2[retj].r);
 
 	    } else {
-		save_reg(ret[retj].r);
-		get_specific_reg(ret[retj].r);
-		start_special_use(ret[retj].r);
+		save_reg(ret2[retj].r);
+		get_specific_reg(ret2[retj].r);
+		start_special_use(ret2[retj].r);
 
-		int d = ret[retj].r;
+		int d = ret2[retj].r;
 		orex(64,d,r,0x89); /* mov */
 		o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
 		vtop--;
