@@ -1959,7 +1959,11 @@ void gfunc_call(int nb_args)
         while (i < nb_args) {
 	    int i2 = nb_args-1-i;
             /* Rotate argument to top since it will always be popped */
-            mode = classify_x86_64_arg_new(&vtop[-i].type, ret2, nret, &size, &align, &reg_count);
+	    size = type_size(&vtop[-i].type, &align);
+	    size += 7;
+	    size &= -8;
+	    align += 7;
+	    align &= -8;
             if (align != 16)
               break;
 
@@ -1974,8 +1978,6 @@ void gfunc_call(int nb_args)
                 g(0x00);
                 args_size += size;
             } else {
-                assert(mode == x86_64_mode_memory);
-
                 /* allocate the necessary size on stack */
                 o(0x48);
                 oad(0xec81, size); /* sub $xxx, %rsp */
