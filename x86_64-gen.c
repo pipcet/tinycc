@@ -1865,10 +1865,9 @@ void gfunc_call(int nb_args)
 	    int align;
             
 	    int off = 0, j;
-            int arg_stored = 1;
+            int arg_stored = 0;
 	    for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
 		if(ret[offsets[i2]+j].type.t == VT_VOID) {
-		    arg_stored = 0;
 		    continue;
 		}
 
@@ -1881,19 +1880,18 @@ void gfunc_call(int nb_args)
 		push_stack_arg:
 		    arg_stored = 1;
 		} else if(ret[offsets[i2]+j].r >= TREG_XMM0) {
-		    if (new_eightbyte) {
-			arg_stored = 0;
-		    }
+		    arg_stored = 0;
 		} else if(ret[offsets[i2]+j].r < TREG_XMM0) {
-		    if (new_eightbyte) {
-			arg_stored = 0;
-		    }
+		    arg_stored = 0;
 		} else {
 		    assert(0);
 		}
             }
 
 	    if (arg_stored) {
+		for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
+		    ret[offsets[i2]+j].r = VT_CONST;
+		}
 		size = type_size(&vtop->type, &align);
 		size += 7;
 		size &= -8;
@@ -1942,24 +1940,20 @@ void gfunc_call(int nb_args)
             vtop[0] = vtop[idx];
             vtop[idx] = tmp;
 
-            if (arg_stored) {
-		vrotb(i+1);
-		assert((vtop->type.t == tmp.type.t) && (vtop->r == tmp.r));
-		vpop();
-		memmove(offsets+i2, offsets+i2+1, (nb_args+2-i2) * sizeof(offsets[0]));
-		memmove(offsets2+i2, offsets2+i2+1, (nb_args+2-i2) * sizeof(offsets[0]));
-		--nb_args;
-		--run_end;
-            } else {
-		++i;
-            }
+	    ++i;
         }
 
 	reg_count = 0;
         /* handle 16 byte aligned arguments at end of run */
-        run_start = i = run_end;
+        i = run_end;
         while (i < nb_args) {
 	    int i2 = nb_args-1-i;
+
+	    if(ret[offsets[i2]].type.t == VT_VOID) {
+		i++;
+		continue;
+	    }
+
             /* Rotate argument to top since it will always be popped */
 	    size = type_size(&vtop[-i].type, &align);
 	    size += 7;
@@ -1967,9 +1961,8 @@ void gfunc_call(int nb_args)
 	    align += 7;
 	    align &= -8;
             if (align != 16)
-              break;
+		break;
 
-	    int idx = -nb_args+1+i;
 	    vrotb(i+1);
             
             if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
@@ -1992,20 +1985,20 @@ void gfunc_call(int nb_args)
                 vstore();
                 args_size += size;
             }
-            
-            vpop();
-	    memmove(offsets+i2, offsets+i2+1, (nb_args+2-i2) * sizeof(offsets[0]));
-	    memmove(offsets2+i2, offsets2+i2+1, (nb_args+2-i2) * sizeof(offsets[0]));
-            --nb_args;
+
+	    vrott(i+1);
+	    ret[offsets[i2]].r = VT_CONST;
+	    i++;
 	    assert(nb_args >= 0);
         }
+	run_start = i;
     }
     
     /* XXX This should be superfluous.  */
     save_regs(0); /* save used temporary registers */
 
     /* then, we prepare register passing arguments. */
-    for(i = 0; i < nb_args; i++) {
+    for(i = 0; i < nb_args;) {
 	int i2 = nb_args-1-i;
 	int off = 0, j;
 
@@ -2014,47 +2007,65 @@ void gfunc_call(int nb_args)
 	int retj = 0;
 	unsigned long long struct_offset = 0;
 	int pop_structs = 0;
-	if(off > 1)
-	    assert((vtop->type.t & VT_BTYPE) == VT_STRUCT);
 	for(j=0; retj<off; j++) {
 	    if(ret[offsets[i2]+retj].r == VT_CONST) {
-		continue;
+		if (ret[offsets[i2]+retj].type.t == VT_VOID &&
+		    ret[offsets[i2]+retj].c.ull) {
+		    vtop--;
+		    retj++;
+		    nb_args--;
+		} else if (ret[offsets[i2]+retj].type.t == VT_VOID) {
+		    nb_args--;
+		    retj++;
+		    continue;
+		} else {
+		    vtop--;
+		    retj++;
+		    nb_args--;
+		    continue;
+		}
 	    }
 
-	    if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
-		pop_structs = 1;
+	    /* XXX fix for nested structs */
+	    while((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
 		CType ty = ret[offsets[i2]+retj].type;
 		vdup();
 		gaddrof();
 		vtop->type.t = VT_LLONG;
 		vpushi(ret[offsets[i2]+retj].c.i);
+		if(ret[offsets[i2]+retj].c.i == 0)
+		    pop_structs++;
 		gen_op('+');
 		mk_pointer(&ty);
 		vtop->type = ty;
 		indir();
 	    }
 
-	    int r = gv((ret[offsets[i2]+retj].r >= TREG_XMM0) ? (RC_XMM0 << (ret[offsets[i2]+retj].r-TREG_XMM0)) : RC_INT);
+	    int d = ret[offsets[i2]+retj].r;
+	    int r = gv((d >= TREG_XMM0) ? (RC_XMM0 << (d-TREG_XMM0)) : RC_INT);
 
-	    if(r == ret[offsets[i2]+retj].r) {
-		vtop--;
+	    if(r == d) {
 		/* either we're lucky, or this is the last register. */
-		start_special_use(ret[offsets[i2]+retj].r);
+		vtop--;
+		vpushi(0);
+		start_special_use(d);
 	    } else {
-		save_reg(ret[offsets[i2]+retj].r);
-		get_specific_reg(ret[offsets[i2]+retj].r);
-		start_special_use(ret[offsets[i2]+retj].r);
+		save_reg(d);
+		vtop--;
+		vpushi(0);
+		get_specific_reg(d);
+		start_special_use(d);
 
-		int d = ret[offsets[i2]+retj].r;
 		orex(64,d,r,0x89); /* mov */
 		o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
-		vtop--;
 	    }
 
+	    vtop--;
+	    nb_args--;
 	    retj++;
 	}
 
-	if (pop_structs) {
+	if (pop_structs--) {
 	    assert((vtop->type.t & VT_BTYPE) == VT_STRUCT);
 	    vtop--;
 	}
