@@ -1687,7 +1687,6 @@ void gfunc_call(int nb_args)
     // int offsets[nb_args+1]; VLAs broken in upstream
     int offsets[256];
     int offsets2[256];
-    int sse_reg, gen_reg;
     SValue ret[256]; /* XXX */
     SValue ret2[256]; /* XXX */
     int nret = 256;
@@ -1796,12 +1795,9 @@ void gfunc_call(int nb_args)
     /* for struct arguments, we need to call memcpy and the function
        call breaks register passing arguments we are preparing.
        So, we process arguments which will be passed by stack first. */
-    gen_reg = nb_reg_args;
-    sse_reg = nb_sse_args;
     run_start = 0;
     args_size = 0;
     while (run_start < nb_args) {
-        int run_gen_reg = gen_reg, run_sse_reg = sse_reg;
 	int new_eightbyte = 1;
         
         run_end = nb_args;
@@ -1809,8 +1805,6 @@ void gfunc_call(int nb_args)
         for(i = run_start; (i < nb_args) && (run_end == nb_args); i++) {
 	    int i2 = nb_args-1-i;
 	    int off = 0, j;
-	    int arg_gen_reg = gen_reg;
-	    int arg_sse_reg = sse_reg;
 	    for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
 		if(ret[offsets[i2]+j].c.ull & 7)
 		    new_eightbyte = 0;
@@ -1843,12 +1837,7 @@ void gfunc_call(int nb_args)
 		    assert(0);
 		}
             }
-	    gen_reg = arg_gen_reg;
-	    sse_reg = arg_sse_reg;
         }
-        
-        gen_reg = run_gen_reg;
-        sse_reg = run_sse_reg;
         
         /* adjust stack to align SSE boundary */
         if (stack_adjust &= 15) {
@@ -1877,8 +1866,6 @@ void gfunc_call(int nb_args)
 	    int align;
             
 	    int off = 0, j;
-	    int arg_gen_reg = gen_reg;
-	    int arg_sse_reg = sse_reg;
             int arg_stored = 1;
 	    for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
 		if(ret[offsets[i2]+j].c.ull & 7)
@@ -1901,9 +1888,6 @@ void gfunc_call(int nb_args)
 		    assert(0);
 		}
             }
-
-	    gen_reg = arg_gen_reg;
-	    sse_reg = arg_sse_reg;
 
 	    if (arg_stored) {
 		size = type_size(&vtop->type, &align);
@@ -2013,37 +1997,15 @@ void gfunc_call(int nb_args)
         }
     }
     
-    gen_reg = nb_reg_args;
-    sse_reg = nb_sse_args;
-
-    if (gen_reg > REGN)
-	gen_reg = REGN;
-
-    if (sse_reg > 8)
-	sse_reg = 8;
-
     /* XXX This should be superfluous.  */
     save_regs(0); /* save used temporary registers */
 
     /* then, we prepare register passing arguments. */
-    //assert(nb_args == gen_reg + sse_reg);
-    assert(gen_reg <= REGN);
-    assert(sse_reg <= 8);
     for(i = 0; i < nb_args; i++) {
 	int i2 = nb_args-1-i;
 	int off = 0, j;
-	int arg_gen_reg = gen_reg;
-	int arg_sse_reg = sse_reg;
-	int arg_stored = 1;
-	int shared_eightbyte = 0;
-	int new_eightbyte;
 
 	off = offsets2[i2] - offsets[i2];
-
-	assert(!shared_eightbyte);
-
-	gen_reg = arg_gen_reg;
-	sse_reg = arg_sse_reg;
 
 	int retj = 0;
 	unsigned long long struct_offset = 0;
@@ -2067,7 +2029,6 @@ void gfunc_call(int nb_args)
 		vtop->type = ty;
 		indir();
 	    }
-
 
 	    int r = gv((ret[offsets[i2]+retj].r >= TREG_XMM0) ? (RC_XMM0 << (ret[offsets[i2]+retj].r-TREG_XMM0)) : RC_INT);
 
