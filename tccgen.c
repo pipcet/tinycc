@@ -4192,13 +4192,10 @@ ST_FUNC void unary(void)
 		size = type_size(&s->type, &align);
 		loc = (loc - size) & -align;
 		sret_addr = loc;
-		ret[0].type = s->type;
-		ret[0].r = VT_LOCAL | VT_LVAL;
 		/* pass it as 'int' to avoid structure arg passing
 		   problems. XXX 64-bit. */
 		vseti(VT_LOCAL, loc);
 		vtop[0].type.t = VT_LLONG;
-		ret[0].c = vtop->c;
 		nb_args++;
 		nb_ret = 0;
 		save_regs(0); /* XXX */
@@ -4231,24 +4228,28 @@ ST_FUNC void unary(void)
 	    if ((s->type.t & VT_BTYPE) == VT_STRUCT) {
                 int addr;
 		if (sret) {
-		  addr = sret_addr;
+		    addr = sret_addr;
 		} else {
-		  size = type_size(&s->type, &align);
-		  loc = (loc - size) & -align;
-		  addr = loc;
+		    size = type_size(&s->type, &align);
+		    loc = (loc - size) & -align;
+		    addr = loc;
 		}
 
-		int i;
-		for(i=0; i<16; i++) {
-		    if (ret[i].type.t != VT_VOID) {
-			vset(&ret[i].type, VT_LOCAL | VT_LVAL, addr + ret[i].c.ull);
-			vset(&ret[i].type, ret[i].r, 0);
-			vstore();
-			vtop--;
+		if (!sret) {
+		    int i;
+		    for(i=0; i<16; i++) {
+			if (ret[i].type.t != VT_VOID) {
+			    vset(&ret[i].type, VT_LOCAL | VT_LVAL, addr + ret[i].c.ull);
+			    vset(&ret[i].type, ret[i].r, 0);
+			    vstore();
+			    vtop--;
+			}
 		    }
+		    vset(&s->type, VT_LOCAL|VT_LVAL, addr);
+		} else {
+		    vset(&s->type, VT_LOCAL|VT_LVAL, addr);
 		}
 
-		vset(&s->type, VT_LOCAL | VT_LVAL, addr);
 		save_regs(0); /* XXX */
 	    } else {
 		//assert(ret[0].c.ull == 0);

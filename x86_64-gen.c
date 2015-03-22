@@ -1486,8 +1486,15 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
     case VT_STRUCT: ;
 	int align;
         int size = type_size(ty, &align);
-	if (size > 16)
+	if (size > 16) {
+	    if (nret > 0) {
+		ret[0].type = *ty;
+		ret[0].c.ull = 0;
+		ret[0].r = VT_CONST;
+	    }
+	    (*offset)++;
 	    return x86_64_mode_memory;
+	}
         f = ty->ref;
 
         mode = x86_64_mode_none;
