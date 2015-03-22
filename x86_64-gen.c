@@ -1682,6 +1682,7 @@ void gfunc_call(int nb_args)
     int nb_x87_args = 0;
     // int offsets[nb_args+1]; VLAs broken in upstream
     int offsets[256];
+    int offsets2[256];
     int sse_reg, gen_reg;
     SValue ret[256]; /* XXX */
     SValue ret2[256]; /* XXX */
@@ -1708,6 +1709,7 @@ void gfunc_call(int nb_args)
 	int j;
 
 	offsets[i] = off;
+	offsets2[i] = off;
         mode = classify_x86_64_arg_new(&vtop[-nb_args+1+i].type, ret+off, nret-off, &size, &align, &off);
 
 	if (mode == x86_64_mode_memory)
@@ -1765,6 +1767,7 @@ void gfunc_call(int nb_args)
 	goto success; /* for now, we're counting integer arguments, not register arguments, in nb_reg_args */
     }
     offsets[nb_args] = off;
+    offsets2[nb_args] = off;
 
     /* arguments are collected in runs. Each run is a collection of 8-byte aligned arguments
        and ended by a 16-byte aligned argument. This is because, from the point of view of
@@ -1950,7 +1953,7 @@ void gfunc_call(int nb_args)
 		vrotb(i+1);
 		assert((vtop->type.t == tmp.type.t) && (vtop->r == tmp.r));
 		vpop();
-		memmove(offsets+nb_args-1-i, offsets+nb_args-i, nb_args-i+1);
+		memmove(offsets2+nb_args-1-i, offsets2+nb_args-i, nb_args-i+1 * sizeof(offsets[0]));
 		--nb_args;
 		--run_end;
             } else {
@@ -1993,7 +1996,7 @@ void gfunc_call(int nb_args)
             }
             
             vpop();
-	    memmove(offsets+nb_args-1-i, offsets+nb_args-i, nb_args-i+1);
+	    memmove(offsets2+nb_args-1-i, offsets2+nb_args-i, nb_args-i+1 * sizeof(offsets[0]));
             --nb_args;
 	    assert(nb_args >= 0);
         }
