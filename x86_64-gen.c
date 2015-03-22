@@ -1866,40 +1866,25 @@ void gfunc_call(int nb_args)
 	    int arg_gen_reg = gen_reg;
 	    int arg_sse_reg = sse_reg;
             int arg_stored = 1;
-            mode = classify_x86_64_arg_new(&vtop->type, ret2, nret, &size, &align, &off);
-	    for(j=off-1; j>=0; j--) {
-		if(ret2[j].c.ull & 7)
+	    for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
+		if(ret[offsets[i2]+j].c.ull & 7)
 		    new_eightbyte = 0;
 		else
 		    new_eightbyte = 1;
 
-		switch (mode) {
-		case x86_64_mode_memory:
-		case x86_64_mode_x87:
+		if(ret[offsets[i2]+j].r == VT_CONST) {
 		push_stack_arg:
 		    arg_stored = 1;
-		    break;
-                
-		case x86_64_mode_sse:
+		} else if(ret[offsets[i2]+j].r >= TREG_XMM0) {
 		    if (new_eightbyte) {
-			arg_sse_reg--;
 			arg_stored = 0;
-
-			if (arg_sse_reg >= 8) goto push_stack_arg;
 		    }
-
-		    break;
-
-		case x86_64_mode_integer:
+		} else if(ret[offsets[i2]+j].r < TREG_XMM0) {
 		    if (new_eightbyte) {
-			arg_gen_reg--;
 			arg_stored = 0;
-
-			if (arg_gen_reg >= REGN) goto push_stack_arg;
-			break;
-		    default:
-			break; /* nothing to be done for x86_64_mode_none */
 		    }
+		} else {
+		    assert(0);
 		}
             }
 
@@ -1907,6 +1892,9 @@ void gfunc_call(int nb_args)
 	    sse_reg = arg_sse_reg;
 
 	    if (arg_stored) {
+		size = type_size(&vtop->type, &align);
+		size += 7;
+		size &= -8;
 		switch(vtop->type.t & VT_BTYPE) {
 		case VT_STRUCT:
 		    /* allocate the necessary size on stack */
@@ -1938,7 +1926,6 @@ void gfunc_call(int nb_args)
 		    break;
 
 		default:
-		    assert(mode == x86_64_mode_integer);
 		    /* simple type */
 		    /* XXX: implicit cast ? */
                     r = gv(RC_INT);
