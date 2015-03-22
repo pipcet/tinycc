@@ -1713,6 +1713,7 @@ void gfunc_call(int nb_args)
 	int prel_nb_x87_args = nb_x87_args;
 	int j;
 	int i2 = nb_args-1-i;
+	int last_eightbyte = -1;
 
 	offsets[i] = off;
         mode = classify_x86_64_arg_new(&vtop[-i2].type, ret+off, nret-off, &size, &align, &off);
@@ -1727,9 +1728,14 @@ void gfunc_call(int nb_args)
 		assert(mode == x86_64_mode_integer);
 		int idx = prel_nb_reg_args;
 
-		if ((ret[j].c.ull & 7) == 0) {
-		    prel_nb_reg_args++;
+		if ((ret[j].c.ull & 7) != 0) {
+		    assert(last_eightbyte >= 0);
+		    ret[last_eightbyte].type.t = (ret[last_eightbyte].r >= TREG_XMM0) ? VT_DOUBLE:VT_LLONG;
+		    ret[j].r = VT_CONST;
+		    continue;
 		}
+		prel_nb_reg_args++;
+		last_eightbyte = j;
 
 		if (idx < REGN) {
 		    ret[j].r = arg_prepare_reg(idx);
@@ -1741,9 +1747,14 @@ void gfunc_call(int nb_args)
 		assert(mode == x86_64_mode_sse || off > start + 1 && mode == x86_64_mode_integer);
 		int idx = prel_nb_sse_args;
 
-		if ((ret[j].c.ull & 7) == 0) {
-		    prel_nb_sse_args++;
+		if ((ret[j].c.ull & 7) != 0) {
+		    assert(last_eightbyte >= 0);
+		    ret[last_eightbyte].type.t = (ret[last_eightbyte].r >= TREG_XMM0) ? VT_DOUBLE:VT_LLONG;
+		    ret[j].r = VT_CONST;
+		    continue;
 		}
+		prel_nb_sse_args++;
+		last_eightbyte = j;
 
 		if (idx < 8) {
 		    ret[j].r = TREG_XMM0 + idx;
@@ -1773,6 +1784,9 @@ void gfunc_call(int nb_args)
 	for(j = start; j<off && j<nret; j++) {
 	    ret[j].r = VT_CONST;
 	}
+	prel_nb_reg_args = nb_reg_args;
+	prel_nb_sse_args = nb_sse_args;
+	prel_nb_x87_args = nb_x87_args;
 	goto success; /* for now, we're counting integer arguments, not register arguments, in nb_reg_args */
     }
 
@@ -2024,54 +2038,8 @@ void gfunc_call(int nb_args)
 	int shared_eightbyte = 0;
 	int new_eightbyte;
 
-	assert(gen_reg >= 0);
-	assert(sse_reg >= 0);
 	mode = classify_x86_64_arg_new(&vtop->type, ret2, nret, &size, &align, &off);
 	assert(off == offsets2[i2] - offsets[i2]);
-	for(j=off-1; j>=0; j--) {
-	    if(ret[offsets[i2]+j].c.ull & 7)
-		new_eightbyte = 0;
-	    else
-		new_eightbyte = 1;
-
-	    switch (ret2[j].r) {
-	    case TREG_XMM0:
-		if (new_eightbyte) {
-		    arg_sse_reg--;
-		    assert(arg_sse_reg < 8);
-		    if (shared_eightbyte)
-			ret2[j].type.t = VT_DOUBLE;
-		    ret2[j].r = TREG_XMM0 + arg_sse_reg;
-		} else {
-		    ret2[j].r = VT_CONST;
-		    shared_eightbyte = 1;
-		}
-
-		assert (ret2[j].r != TREG_RAX);
-
-		break;
-
-	    case TREG_RAX:
-		if (new_eightbyte) {
-		    arg_gen_reg--;
-		    assert(arg_gen_reg < REGN);
-		    if (shared_eightbyte)
-			ret2[j].type.t = VT_LLONG;
-		    ret2[j].r = arg_prepare_reg(arg_gen_reg);
-		} else {
-		    ret2[j].r = VT_CONST;
-		    shared_eightbyte = 1;
-		}
-
-		break;
-	    default:
-		assert(0);
-		break; /* nothing to be done for x86_64_mode_none */
-	    }
-
-	    if (new_eightbyte)
-		shared_eightbyte = 0;
-	}
 
 	assert(!shared_eightbyte);
 
@@ -2084,17 +2052,17 @@ void gfunc_call(int nb_args)
 	if(off > 1)
 	    assert((vtop->type.t & VT_BTYPE) == VT_STRUCT);
 	for(j=0; retj<off; j++) {
-		assert(0);
-	    if(ret2[offsets[i2]+retj].r == VT_CONST) {
+	    if(ret[offsets[i2]+retj].r == VT_CONST) {
+		continue;
 	    }
 
 	    if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
 		pop_structs = 1;
-		CType ty = ret2[offsets[i2]+retj].type;
+		CType ty = ret[offsets[i2]+retj].type;
 		vdup();
 		gaddrof();
 		vtop->type.t = VT_LLONG;
-		vpushi(ret2[offsets[i2]+retj].c.i);
+		vpushi(ret[offsets[i2]+retj].c.i);
 		gen_op('+');
 		mk_pointer(&ty);
 		vtop->type = ty;
@@ -2102,19 +2070,19 @@ void gfunc_call(int nb_args)
 	    }
 
 
-	    int r = gv((ret2[offsets[i2]+retj].r >= TREG_XMM0) ? (RC_XMM0 << (ret2[offsets[i2]+retj].r-TREG_XMM0)) : RC_INT);
+	    int r = gv((ret[offsets[i2]+retj].r >= TREG_XMM0) ? (RC_XMM0 << (ret[offsets[i2]+retj].r-TREG_XMM0)) : RC_INT);
 
-	    if(r == ret2[offsets[i2]+retj].r) {
+	    if(r == ret[offsets[i2]+retj].r) {
 		vtop--;
 		/* either we're lucky, or this is the last register. */
-		start_special_use(ret2[offsets[i2]+retj].r);
+		start_special_use(ret[offsets[i2]+retj].r);
 
 	    } else {
-		save_reg(ret2[offsets[i2]+retj].r);
-		get_specific_reg(ret2[offsets[i2]+retj].r);
-		start_special_use(ret2[offsets[i2]+retj].r);
+		save_reg(ret[offsets[i2]+retj].r);
+		get_specific_reg(ret[offsets[i2]+retj].r);
+		start_special_use(ret[offsets[i2]+retj].r);
 
-		int d = ret2[offsets[i2]+retj].r;
+		int d = ret[offsets[i2]+retj].r;
 		orex(64,d,r,0x89); /* mov */
 		o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
 		vtop--;
@@ -2128,9 +2096,6 @@ void gfunc_call(int nb_args)
 	    vtop--;
 	}
     }
-    assert(gen_reg == 0);
-    assert(sse_reg == 0);
-
     assert((vtop->type.t & VT_BTYPE) == VT_FUNC);
     /* We shouldn't have many operands on the stack anymore, but the
        call address itself is still there, and it might be in %eax
