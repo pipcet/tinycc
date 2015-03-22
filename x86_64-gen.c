@@ -1797,20 +1797,14 @@ void gfunc_call(int nb_args)
 	    int off = 0, j;
 	    int arg_gen_reg = gen_reg;
 	    int arg_sse_reg = sse_reg;
-            mode = classify_x86_64_arg_new(&vtop[-i].type, ret2, nret, &size, &align, &off);
-	    assert(off == offsets2[i2] - offsets[i2]);
 	    for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
 		if(ret[offsets[i2]+j].c.ull & 7)
 		    new_eightbyte = 0;
 		else
 		    new_eightbyte = 1;
 
-		if(mode == x86_64_mode_memory ||
-		   mode == x86_64_mode_x87) {
+		if(ret[offsets[i2]+j].r == VT_CONST) {
 		stack_arg:
-		    //assert(ret[offsets2[nb_args-1-i]+j].r == VT_CONST);
-		    //arg_gen_reg = gen_reg;
-		    //arg_sse_reg = sse_reg;
 		    size = type_size(&ret[offsets[i2]+j].type, &align);
 		    size += 7;
 		    size &= -8;
@@ -1822,20 +1816,13 @@ void gfunc_call(int nb_args)
 			run_end = i;
 		    else
 			stack_adjust += size;
-		} else if(mode == x86_64_mode_sse) {
+		} else if(ret[offsets[i2]+j].r >= TREG_XMM0) {
 		sse_arg:
 		    if (new_eightbyte) {
-			arg_sse_reg--;
-			if (arg_sse_reg >= 8) goto stack_arg;
 			assert(ret[offsets[i2]+j].r >= TREG_XMM0);
-			//assert(ret[offsets2[nb_args-1-i]+j].r < VT_CONST);
 		    }
-		} else if(mode == x86_64_mode_integer) {
+		} else if(ret[offsets[i2]+j].r <= 15) {
 		    if (new_eightbyte) {
-			if(ret[offsets[i2]+j].r >= TREG_XMM0)
-			    goto sse_arg;
-			arg_gen_reg--;
-			if (arg_gen_reg >= REGN) goto stack_arg;
 			assert(ret[offsets[i2]+j].r < TREG_XMM0);
 		    }
 		} else {
