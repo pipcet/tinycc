@@ -1678,7 +1678,6 @@ static int arg_prepare_reg(int idx) {
    parameters and the function address. */
 void gfunc_call(int nb_args)
 {
-    X86_64_Mode mode;
     CType type;
     int size, align, r, args_size, stack_adjust, run_start, run_end, i, j, reg_count;
     int nb_reg_args = 0;
@@ -1688,7 +1687,6 @@ void gfunc_call(int nb_args)
     int offsets[256];
     int offsets2[256];
     SValue ret[256]; /* XXX */
-    SValue ret2[256]; /* XXX */
     int nret = 256;
     int off = 0;
     for(i=0; i<nret; i++) {
@@ -1696,16 +1694,12 @@ void gfunc_call(int nb_args)
 	ret[i].r = VT_CONST;
 	ret[i].sym = NULL;
     }
-    for(i=0; i<nret; i++) {
-	ret2[i].type.t = VT_VOID;
-	ret2[i].r = VT_CONST;
-	ret2[i].sym = NULL;
-    }
 
     assert((vtop[-nb_args].type.t & VT_BTYPE) == VT_FUNC);
     /* calculate the number of integer/float register arguments */
     //for(i = nb_args-1; i >= 0; i--) {
     for(i = 0; i <= nb_args-1; i++) {
+	X86_64_Mode mode;
 	int start = off;
 	int prel_nb_reg_args = nb_reg_args;
 	int prel_nb_sse_args = nb_sse_args;
@@ -1731,6 +1725,7 @@ void gfunc_call(int nb_args)
 		    assert(last_eightbyte >= 0);
 		    ret[last_eightbyte].type.t = (ret[last_eightbyte].r >= TREG_XMM0) ? VT_DOUBLE:VT_LLONG;
 		    ret[j].r = VT_CONST;
+		    ret[j].type.t = VT_VOID;
 		    continue;
 		}
 		prel_nb_reg_args++;
@@ -1750,6 +1745,7 @@ void gfunc_call(int nb_args)
 		    assert(last_eightbyte >= 0);
 		    ret[last_eightbyte].type.t = (ret[last_eightbyte].r >= TREG_XMM0) ? VT_DOUBLE:VT_LLONG;
 		    ret[j].r = VT_CONST;
+		    ret[j].type.t = VT_VOID;
 		    continue;
 		}
 		prel_nb_sse_args++;
@@ -1806,6 +1802,9 @@ void gfunc_call(int nb_args)
 	    int i2 = nb_args-1-i;
 	    int off = 0, j;
 	    for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
+		if(ret[offsets[i2]+j].type.t == VT_VOID)
+		    continue;
+
 		if(ret[offsets[i2]+j].c.ull & 7)
 		    new_eightbyte = 0;
 		else
@@ -1868,6 +1867,11 @@ void gfunc_call(int nb_args)
 	    int off = 0, j;
             int arg_stored = 1;
 	    for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
+		if(ret[offsets[i2]+j].type.t == VT_VOID) {
+		    arg_stored = 0;
+		    continue;
+		}
+
 		if(ret[offsets[i2]+j].c.ull & 7)
 		    new_eightbyte = 0;
 		else
