@@ -1486,15 +1486,8 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
     case VT_STRUCT: ;
 	int align;
         int size = type_size(ty, &align);
-	if (size > 16) {
-	    if (nret > 0) {
-		ret[0].type = *ty;
-		ret[0].c.ull = 0;
-		ret[0].r = VT_CONST;
-	    }
-	    (*offset)++;
+	if (size > 16)
 	    return x86_64_mode_memory;
-	}
         f = ty->ref;
 
         mode = x86_64_mode_none;
@@ -1608,13 +1601,9 @@ static X86_64_Mode classify_x86_64_arg_new(CType *ty, SValue *ret, int nret, int
         *palign = (align + 7) & ~7;
 
         if (size > 16) {
-	    if (nret > 0) {
-		ret[0].type = *ty;
-		ret[0].c.ull = 0;
-		ret[0].r = VT_CONST;
-	    }
+	    /* we do not support SSEUP-class arguments properly */
+            mode = x86_64_mode_memory;
 	    (*offset)++;
-	    return x86_64_mode_memory;
         } else {
 	    /* this breaks for struct { struct { long x } s; long y; }, I think */
             mode = classify_x86_64_inner_new(ty, ret, nret, offset);
@@ -1685,7 +1674,6 @@ void gfunc_call(int nb_args)
     int nb_sse_args = 0;
     int nb_x87_args = 0;
     int sse_reg, gen_reg;
-    int offsets[nb_args+1];
     SValue ret[256]; /* XXX */
     int nret = 256;
     int off = 0;
@@ -1697,15 +1685,14 @@ void gfunc_call(int nb_args)
 
     assert((vtop[-nb_args].type.t & VT_BTYPE) == VT_FUNC);
     /* calculate the number of integer/float register arguments */
-    for(i = 0; i < nb_args; i++) {
+    for(i = nb_args-1; i >= 0; i--) {
 	int start = off;
 	int prel_nb_reg_args = nb_reg_args;
 	int prel_nb_sse_args = nb_sse_args;
 	int prel_nb_x87_args = nb_x87_args;
 	int j;
 
-	offsets[i] = off;
-        mode = classify_x86_64_arg_new(&vtop[-nb_args+1+i].type, ret+off, nret-off, &size, &align, &off);
+        mode = classify_x86_64_arg_new(&vtop[-i].type, ret+off, nret-off, &size, &align, &off);
 
 	if (mode == x86_64_mode_memory)
 	    continue;
@@ -1756,15 +1743,11 @@ void gfunc_call(int nb_args)
 	nb_x87_args = prel_nb_x87_args;
 	continue;
     failure:
-	/* success */
-	prel_nb_reg_args = nb_reg_args;
-	prel_nb_sse_args = nb_sse_args;
-	prel_nb_x87_args = nb_x87_args;
 	for(j = start; j<off && j<nret; j++) {
 	    ret[j].r = VT_CONST;
 	}
+	goto success; /* for now, we're counting integer arguments, not register arguments, in nb_reg_args */
     }
-    offsets[nb_args] = off;
 
     /* arguments are collected in runs. Each run is a collection of 8-byte aligned arguments
        and ended by a 16-byte aligned argument. This is because, from the point of view of
@@ -1783,37 +1766,43 @@ void gfunc_call(int nb_args)
         run_end = nb_args;
         stack_adjust = 0;
         for(i = run_start; (i < nb_args) && (run_end == nb_args); i++) {
-	    int j;
+	    int off = 0, j;
 	    int arg_gen_reg = gen_reg;
 	    int arg_sse_reg = sse_reg;
-	    for(j=offsets[i]; j<offsets[i+1]; j++) {
+            mode = classify_x86_64_arg_new(&vtop[-i].type, ret, nret, &size, &align, &off);
+	    for(j=off-1; j>=0; j--) {
 		if(ret[j].c.ull & 7)
 		    new_eightbyte = 0;
 		else
 		    new_eightbyte = 1;
 
-		if (ret[j].r == VT_CONST ||
-		    ret[j].r == TREG_ST0) {
-		stack_arg: ;
+		switch (mode) {
+		case x86_64_mode_memory:
+		case x86_64_mode_x87:
+		stack_arg:
 		    //arg_gen_reg = gen_reg;
 		    //arg_sse_reg = sse_reg;
-		    int align, size;
-		    size = type_size(&ret[j].type, &align);
-		    size = (size + 7) & ~7ULL;
-		    if (align == 16 || (ret[j].type.t&VT_BTYPE) == VT_LDOUBLE) {
+		    if (align == 16)
 			run_end = i;
-			break;
-		    } else
+		    else
 			stack_adjust += size;
-		} else {
-		    if (ret[j].r >= TREG_XMM0) {
-			if (new_eightbyte) {
-			    arg_sse_reg--;
-			}
-		    } else {
-			if (new_eightbyte) {
-			    arg_gen_reg--;
-			}
+		    break;
+                
+		case x86_64_mode_sse:
+		    if (new_eightbyte) {
+			arg_sse_reg--;
+			if (arg_sse_reg >= 8) goto stack_arg;
+		    }
+
+		    break;
+
+		case x86_64_mode_integer:
+		    if (new_eightbyte) {
+			arg_gen_reg--;
+			if (arg_gen_reg >= REGN) goto stack_arg;
+			break;
+		    default:
+			break; /* nothing to be done for x86_64_mode_none */
 		    }
 		}
             }
@@ -1838,46 +1827,55 @@ void gfunc_call(int nb_args)
         
 	reg_count = 0;
 
-        for(i = run_end-1; i >= run_start; i--) {
-	    int idx = -nb_args+1+i;
+        for(i = run_start; i < run_end;) {
             /* Swap argument to top, it will possibly be changed here,
               and might use more temps. At the end of the loop we keep
               in on the stack and swap it back to its original position
               if it is a register. */
             SValue tmp = vtop[0];
-            vtop[0] = vtop[idx];
-            vtop[idx] = tmp;
+            vtop[0] = vtop[-i];
+            vtop[-i] = tmp;
 	    int align;
             
-	    int j;
+	    int off = 0, j;
 	    int arg_gen_reg = gen_reg;
 	    int arg_sse_reg = sse_reg;
-            int arg_stored = 0;
-	    for(j=offsets[i]; j<offsets[i+1]; j++) {
-		if(ret[j].type.t == VT_VOID)
-		    continue;
-
+            int arg_stored = 1;
+            mode = classify_x86_64_arg_new(&vtop->type, ret, nret, &size, &align, &off);
+	    for(j=off-1; j>=0; j--) {
 		if(ret[j].c.ull & 7)
 		    new_eightbyte = 0;
 		else
 		    new_eightbyte = 1;
 
-		if (ret[j].r == VT_CONST) {
+		switch (mode) {
+		case x86_64_mode_memory:
+		case x86_64_mode_x87:
 		push_stack_arg:
 		    arg_stored = 1;
-		    arg_gen_reg = gen_reg;
-		    arg_sse_reg = sse_reg;
-		} else {
-		    if (ret[j].r >= TREG_XMM0) {
-			if (new_eightbyte) {
-			    arg_sse_reg--;
-			    arg_stored = 0;
-			}
-		    } else {
-			if (new_eightbyte) {
-			    arg_gen_reg--;
-			    arg_stored = 0;
-			}
+		    //arg_gen_reg = gen_reg;
+		    //arg_sse_reg = sse_reg;
+		    break;
+                
+		case x86_64_mode_sse:
+		    if (new_eightbyte) {
+			arg_sse_reg--;
+			arg_stored = 0;
+
+			if (arg_sse_reg >= 8) goto push_stack_arg;
+		    }
+
+		    break;
+
+		case x86_64_mode_integer:
+		    if (new_eightbyte) {
+			arg_gen_reg--;
+			arg_stored = 0;
+
+			if (arg_gen_reg >= REGN) goto push_stack_arg;
+			break;
+		    default:
+			break; /* nothing to be done for x86_64_mode_none */
 		    }
 		}
             }
@@ -1887,9 +1885,7 @@ void gfunc_call(int nb_args)
 
 	    if (arg_stored) {
 		switch(vtop->type.t & VT_BTYPE) {
-		case VT_STRUCT:;
-		    int align, size;
-		    size = type_size(&vtop->type, &align);
+		case VT_STRUCT:
 		    /* allocate the necessary size on stack */
 		    o(0x48);
 		    oad(0xec81, size); /* sub $xxx, %rsp */
@@ -1919,6 +1915,7 @@ void gfunc_call(int nb_args)
 		    break;
 
 		default:
+		    assert(mode == x86_64_mode_integer);
 		    /* simple type */
 		    /* XXX: implicit cast ? */
                     r = gv(RC_INT);
@@ -1926,67 +1923,61 @@ void gfunc_call(int nb_args)
                     args_size += size;
 		    break;
 		}
-
-		ret[j-1].type.t = VT_VOID;
 	    }
 
             /* And swap the argument back to its original position.  */
             tmp = vtop[0];
-            vtop[0] = vtop[idx];
-            vtop[idx] = tmp;
-        }
+            vtop[0] = vtop[-i];
+            vtop[-i] = tmp;
 
-	g(0x40);
-	g(0x90);
+            if (arg_stored) {
+		vrotb(i+1);
+		assert((vtop->type.t == tmp.type.t) && (vtop->r == tmp.r));
+		vpop();
+		--nb_args;
+		--run_end;
+            } else {
+		++i;
+            }
+        }
 
 	reg_count = 0;
         /* handle 16 byte aligned arguments at end of run */
         run_start = i = run_end;
         while (i < nb_args) {
-	    int j;
-	    int arg_gen_reg = gen_reg;
-	    int arg_sse_reg = sse_reg;
-            int arg_stored = 1;
+            /* Rotate argument to top since it will always be popped */
+            mode = classify_x86_64_arg_new(&vtop[-i].type, ret, nret, &size, &align, &reg_count);
+            if (align != 16)
+              break;
 
-	    for(j=offsets[i]; j<offsets[i+1]; j++) {
-		if(ret[j].r != VT_CONST || ret[j].type.t == VT_VOID)
-		    continue;
-
-		int size, align;
-		size = type_size(&ret[j].type, &align);
-		if (align == 16)
-		    goto aligned_arg;
-	    }
-
-	    break;
-	aligned_arg: ;
-	    int idx = -nb_args+1+i;
-            SValue tmp = vtop[0];
-            vtop[0] = vtop[idx];
-            vtop[idx] = tmp;
+            vrotb(i+1);
             
-	    for(j=offsets[i]; j<offsets[i+1]; j++) {
-		if(ret[j].r != VT_CONST || ret[j].type.t == VT_VOID)
-		    continue;
+            if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
+                gv(RC_ST0);
+                oad(0xec8148, size); /* sub $xxx, %rsp */
+                o(0x7cdb); /* fstpt 0(%rsp) */
+                g(0x24);
+                g(0x00);
+                args_size += size;
+            } else {
+                assert(mode == x86_64_mode_memory);
 
-		if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
-		    gv(RC_ST0);
-		    oad(0xec8148, size); /* sub $xxx, %rsp */
-		    o(0x7cdb); /* fstpt 0(%rsp) */
-		    g(0x24);
-		    g(0x00);
-		    args_size += size;
-		    ret[j].r = VT_CONST;
-		    ret[j].type.t = VT_VOID;
-		} else {
-		    assert(0);
-		}
+                /* allocate the necessary size on stack */
+                o(0x48);
+                oad(0xec81, size); /* sub $xxx, %rsp */
+                /* generate structure store */
+                r = get_reg(RC_INT);
+                orex(64, r, 0, 0x89); /* mov %rsp, r */
+                o(0xe0 + REG_VALUE(r));
+                vset(&vtop->type, r | VT_LVAL, 0);
+                vswap();
+                vstore();
+                args_size += size;
             }
-
-            tmp = vtop[0];
-            vtop[0] = vtop[idx];
-            vtop[idx] = tmp;
-	    i++;
+            
+            vpop();
+            --nb_args;
+	    assert(nb_args >= 0);
         }
     }
     
@@ -2006,57 +1997,110 @@ void gfunc_call(int nb_args)
     //assert(nb_args == gen_reg + sse_reg);
     assert(gen_reg <= REGN);
     assert(sse_reg <= 8);
-    for(i = nb_args-1; i >= 0; i--) {
-	int j;
+    for(i = 0; i < nb_args; i++) {
+	int off = 0, j;
+	int arg_gen_reg = gen_reg;
+	int arg_sse_reg = sse_reg;
 	int arg_stored = 1;
 	int shared_eightbyte = 0;
 	int new_eightbyte;
 
 	assert(gen_reg >= 0);
 	assert(sse_reg >= 0);
+	mode = classify_x86_64_arg_new(&vtop->type, ret, nret, &size, &align, &off);
+	for(j=off-1; j>=0; j--) {
+	    if(ret[j].c.ull & 7)
+		new_eightbyte = 0;
+	    else
+		new_eightbyte = 1;
+
+	    switch (ret[j].r) {
+	    case TREG_XMM0:
+		if (new_eightbyte) {
+		    arg_sse_reg--;
+		    assert(arg_sse_reg < 8);
+		    if (shared_eightbyte)
+			ret[j].type.t = VT_DOUBLE;
+		    ret[j].r = TREG_XMM0 + arg_sse_reg;
+		} else {
+		    ret[j].r = VT_CONST;
+		    shared_eightbyte = 1;
+		}
+
+		assert (ret[j].r != TREG_RAX);
+
+		break;
+
+	    case TREG_RAX:
+		if (new_eightbyte) {
+		    arg_gen_reg--;
+		    assert(arg_gen_reg < REGN);
+		    if (shared_eightbyte)
+			ret[j].type.t = VT_LLONG;
+		    ret[j].r = arg_prepare_reg(arg_gen_reg);
+		} else {
+		    ret[j].r = VT_CONST;
+		    shared_eightbyte = 1;
+		}
+
+		break;
+	    default:
+		assert(0);
+		break; /* nothing to be done for x86_64_mode_none */
+	    }
+
+	    if (new_eightbyte)
+		shared_eightbyte = 0;
+	}
+
+	assert(!shared_eightbyte);
+
+	gen_reg = arg_gen_reg;
+	sse_reg = arg_sse_reg;
 
 	int retj = 0;
+	unsigned long long struct_offset = 0;
 	int pop_structs = 0;
-	int diff = offsets[i+1] - offsets[i];
-	if(diff > 1)
+	if(off > 1)
 	    assert((vtop->type.t & VT_BTYPE) == VT_STRUCT);
-
-	for(j=offsets[i]; j<offsets[i+1]; j++) {
-	    if(ret[j].r == VT_CONST) {
-		vtop--;
-		continue;
+	for(j=0; retj<off; j++) {
+	    if(ret[retj].r == VT_CONST) {
+		assert(0);
 	    }
 
 	    if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
 		pop_structs = 1;
-		CType ty = ret[j].type;
+		CType ty = ret[retj].type;
 		vdup();
 		gaddrof();
 		vtop->type.t = VT_LLONG;
-		vpushi(ret[j].c.i);
+		vpushi(ret[retj].c.i);
 		gen_op('+');
 		mk_pointer(&ty);
 		vtop->type = ty;
 		indir();
 	    }
 
-	    int r = gv((ret[j].r >= TREG_XMM0) ? (RC_XMM0 << (ret[j].r-TREG_XMM0)) : RC_INT);
 
-	    if(r == ret[j].r) {
+	    int r = gv((ret[retj].r >= TREG_XMM0) ? (RC_XMM0 << (ret[retj].r-TREG_XMM0)) : RC_INT);
+
+	    if(r == ret[retj].r) {
 		vtop--;
 		/* either we're lucky, or this is the last register. */
-		start_special_use(ret[j].r);
+		start_special_use(ret[retj].r);
 
 	    } else {
-		save_reg(ret[j].r);
-		get_specific_reg(ret[j].r);
-		start_special_use(ret[j].r);
+		save_reg(ret[retj].r);
+		get_specific_reg(ret[retj].r);
+		start_special_use(ret[retj].r);
 
-		int d = ret[j].r;
+		int d = ret[retj].r;
 		orex(64,d,r,0x89); /* mov */
 		o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
 		vtop--;
 	    }
+
+	    retj++;
 	}
 
 	if (pop_structs) {
@@ -2064,6 +2108,8 @@ void gfunc_call(int nb_args)
 	    vtop--;
 	}
     }
+    assert(gen_reg == 0);
+    assert(sse_reg == 0);
 
     assert((vtop->type.t & VT_BTYPE) == VT_FUNC);
     /* We shouldn't have many operands on the stack anymore, but the
