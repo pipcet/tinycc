@@ -2038,8 +2038,7 @@ void gfunc_call(int nb_args)
 	int shared_eightbyte = 0;
 	int new_eightbyte;
 
-	mode = classify_x86_64_arg_new(&vtop->type, ret2, nret, &size, &align, &off);
-	assert(off == offsets2[i2] - offsets[i2]);
+	off = offsets2[i2] - offsets[i2];
 
 	assert(!shared_eightbyte);
 
@@ -2076,7 +2075,6 @@ void gfunc_call(int nb_args)
 		vtop--;
 		/* either we're lucky, or this is the last register. */
 		start_special_use(ret[offsets[i2]+retj].r);
-
 	    } else {
 		save_reg(ret[offsets[i2]+retj].r);
 		get_specific_reg(ret[offsets[i2]+retj].r);
