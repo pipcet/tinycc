@@ -2016,6 +2016,7 @@ void gfunc_call(int nb_args)
     assert(gen_reg <= REGN);
     assert(sse_reg <= 8);
     for(i = 0; i < nb_args; i++) {
+	int i2 = nb_args-1-i;
 	int off = 0, j;
 	int arg_gen_reg = gen_reg;
 	int arg_sse_reg = sse_reg;
@@ -2026,8 +2027,9 @@ void gfunc_call(int nb_args)
 	assert(gen_reg >= 0);
 	assert(sse_reg >= 0);
 	mode = classify_x86_64_arg_new(&vtop->type, ret2, nret, &size, &align, &off);
+	assert(off == offsets2[i2] - offsets[i2]);
 	for(j=off-1; j>=0; j--) {
-	    if(ret2[j].c.ull & 7)
+	    if(ret[offsets[i2]+j].c.ull & 7)
 		new_eightbyte = 0;
 	    else
 		new_eightbyte = 1;
@@ -2082,17 +2084,17 @@ void gfunc_call(int nb_args)
 	if(off > 1)
 	    assert((vtop->type.t & VT_BTYPE) == VT_STRUCT);
 	for(j=0; retj<off; j++) {
-	    if(ret2[retj].r == VT_CONST) {
 		assert(0);
+	    if(ret2[offsets[i2]+retj].r == VT_CONST) {
 	    }
 
 	    if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
 		pop_structs = 1;
-		CType ty = ret2[retj].type;
+		CType ty = ret2[offsets[i2]+retj].type;
 		vdup();
 		gaddrof();
 		vtop->type.t = VT_LLONG;
-		vpushi(ret2[retj].c.i);
+		vpushi(ret2[offsets[i2]+retj].c.i);
 		gen_op('+');
 		mk_pointer(&ty);
 		vtop->type = ty;
@@ -2100,19 +2102,19 @@ void gfunc_call(int nb_args)
 	    }
 
 
-	    int r = gv((ret2[retj].r >= TREG_XMM0) ? (RC_XMM0 << (ret2[retj].r-TREG_XMM0)) : RC_INT);
+	    int r = gv((ret2[offsets[i2]+retj].r >= TREG_XMM0) ? (RC_XMM0 << (ret2[offsets[i2]+retj].r-TREG_XMM0)) : RC_INT);
 
-	    if(r == ret2[retj].r) {
+	    if(r == ret2[offsets[i2]+retj].r) {
 		vtop--;
 		/* either we're lucky, or this is the last register. */
-		start_special_use(ret2[retj].r);
+		start_special_use(ret2[offsets[i2]+retj].r);
 
 	    } else {
-		save_reg(ret2[retj].r);
-		get_specific_reg(ret2[retj].r);
-		start_special_use(ret2[retj].r);
+		save_reg(ret2[offsets[i2]+retj].r);
+		get_specific_reg(ret2[offsets[i2]+retj].r);
+		start_special_use(ret2[offsets[i2]+retj].r);
 
-		int d = ret2[retj].r;
+		int d = ret2[offsets[i2]+retj].r;
 		orex(64,d,r,0x89); /* mov */
 		o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
 		vtop--;
