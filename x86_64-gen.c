@@ -1608,9 +1608,13 @@ static X86_64_Mode classify_x86_64_arg_new(CType *ty, SValue *ret, int nret, int
         *palign = (align + 7) & ~7;
 
         if (size > 16) {
-	    /* we do not support SSEUP-class arguments properly */
-            mode = x86_64_mode_memory;
+	    if (nret > 0) {
+		ret[0].type = *ty;
+		ret[0].c.ull = 0;
+		ret[0].r = VT_CONST;
+	    }
 	    (*offset)++;
+	    return x86_64_mode_memory;
         } else {
 	    /* this breaks for struct { struct { long x } s; long y; }, I think */
             mode = classify_x86_64_inner_new(ty, ret, nret, offset);
@@ -1701,16 +1705,18 @@ void gfunc_call(int nb_args)
 
     assert((vtop[-nb_args].type.t & VT_BTYPE) == VT_FUNC);
     /* calculate the number of integer/float register arguments */
-    for(i = nb_args-1; i >= 0; i--) {
+    //for(i = nb_args-1; i >= 0; i--) {
+    for(i = 0; i <= nb_args-1; i++) {
 	int start = off;
 	int prel_nb_reg_args = nb_reg_args;
 	int prel_nb_sse_args = nb_sse_args;
 	int prel_nb_x87_args = nb_x87_args;
 	int j;
+	int i2 = nb_args-1-i;
 
 	offsets[i] = off;
+        mode = classify_x86_64_arg_new(&vtop[-i2].type, ret+off, nret-off, &size, &align, &off);
 	offsets2[i] = off;
-        mode = classify_x86_64_arg_new(&vtop[-nb_args+1+i].type, ret+off, nret-off, &size, &align, &off);
 
 	if (mode == x86_64_mode_memory)
 	    continue;
@@ -1718,6 +1724,7 @@ void gfunc_call(int nb_args)
 	for(j = start; j<off && j<nret; j++) {
 	    if (ret[j].r == TREG_RAX ||
 		ret[j].r == TREG_RDX) {
+		assert(mode == x86_64_mode_integer);
 		int idx = prel_nb_reg_args;
 
 		if ((ret[j].c.ull & 7) == 0) {
@@ -1731,6 +1738,7 @@ void gfunc_call(int nb_args)
 		}
 	    } else if (ret[j].r == TREG_XMM0 ||
 		       ret[j].r == TREG_XMM1) {
+		assert(mode == x86_64_mode_sse || off > start + 1 && mode == x86_64_mode_integer);
 		int idx = prel_nb_sse_args;
 
 		if ((ret[j].c.ull & 7) == 0) {
@@ -1743,6 +1751,7 @@ void gfunc_call(int nb_args)
 		    goto failure;
 		}
 	    } else if (ret[j].r == TREG_ST0) {
+		assert(mode == x86_64_mode_x87);
 		int idx = prel_nb_x87_args;
 
 		prel_nb_x87_args++;
@@ -1766,8 +1775,6 @@ void gfunc_call(int nb_args)
 	}
 	goto success; /* for now, we're counting integer arguments, not register arguments, in nb_reg_args */
     }
-    offsets[nb_args] = off;
-    offsets2[nb_args] = off;
 
     /* arguments are collected in runs. Each run is a collection of 8-byte aligned arguments
        and ended by a 16-byte aligned argument. This is because, from the point of view of
@@ -1786,44 +1793,53 @@ void gfunc_call(int nb_args)
         run_end = nb_args;
         stack_adjust = 0;
         for(i = run_start; (i < nb_args) && (run_end == nb_args); i++) {
+	    int i2 = nb_args-1-i;
 	    int off = 0, j;
 	    int arg_gen_reg = gen_reg;
 	    int arg_sse_reg = sse_reg;
             mode = classify_x86_64_arg_new(&vtop[-i].type, ret2, nret, &size, &align, &off);
-	    for(j=off-1; j>=0; j--) {
-		if(ret2[j].c.ull & 7)
+	    assert(off == offsets2[i2] - offsets[i2]);
+	    for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
+		if(ret[offsets[i2]+j].c.ull & 7)
 		    new_eightbyte = 0;
 		else
 		    new_eightbyte = 1;
 
-		switch (mode) {
-		case x86_64_mode_memory:
-		case x86_64_mode_x87:
+		if(mode == x86_64_mode_memory ||
+		   mode == x86_64_mode_x87) {
 		stack_arg:
+		    //assert(ret[offsets2[nb_args-1-i]+j].r == VT_CONST);
 		    //arg_gen_reg = gen_reg;
 		    //arg_sse_reg = sse_reg;
+		    size = type_size(&ret[offsets[i2]+j].type, &align);
+		    size += 7;
+		    size &= -8;
+		    align += 7;
+		    align &= -8;
+		    if (align == 0)
+			align = 1;
 		    if (align == 16)
 			run_end = i;
 		    else
 			stack_adjust += size;
-		    break;
-                
-		case x86_64_mode_sse:
+		} else if(mode == x86_64_mode_sse) {
+		sse_arg:
 		    if (new_eightbyte) {
 			arg_sse_reg--;
 			if (arg_sse_reg >= 8) goto stack_arg;
+			assert(ret[offsets[i2]+j].r >= TREG_XMM0);
+			//assert(ret[offsets2[nb_args-1-i]+j].r < VT_CONST);
 		    }
-
-		    break;
-
-		case x86_64_mode_integer:
+		} else if(mode == x86_64_mode_integer) {
 		    if (new_eightbyte) {
+			if(ret[offsets[i2]+j].r >= TREG_XMM0)
+			    goto sse_arg;
 			arg_gen_reg--;
 			if (arg_gen_reg >= REGN) goto stack_arg;
-			break;
-		    default:
-			break; /* nothing to be done for x86_64_mode_none */
+			assert(ret[offsets[i2]+j].r < TREG_XMM0);
 		    }
+		} else {
+		    assert(0);
 		}
             }
 	    gen_reg = arg_gen_reg;
@@ -1852,6 +1868,7 @@ void gfunc_call(int nb_args)
               and might use more temps. At the end of the loop we keep
               it on the stack and swap it back to its original position
               if it is a register. */
+	    int i2 = nb_args-i-1;
 	    int idx = -i;
             SValue tmp = vtop[0];
             vtop[0] = vtop[idx];
@@ -1953,7 +1970,8 @@ void gfunc_call(int nb_args)
 		vrotb(i+1);
 		assert((vtop->type.t == tmp.type.t) && (vtop->r == tmp.r));
 		vpop();
-		memmove(offsets2+nb_args-1-i, offsets2+nb_args-i, nb_args-i+1 * sizeof(offsets[0]));
+		memmove(offsets+i2, offsets+i2+1, (nb_args+2-i2) * sizeof(offsets[0]));
+		memmove(offsets2+i2, offsets2+i2+1, (nb_args+2-i2) * sizeof(offsets[0]));
 		--nb_args;
 		--run_end;
             } else {
@@ -1965,11 +1983,13 @@ void gfunc_call(int nb_args)
         /* handle 16 byte aligned arguments at end of run */
         run_start = i = run_end;
         while (i < nb_args) {
+	    int i2 = nb_args-1-i;
             /* Rotate argument to top since it will always be popped */
             mode = classify_x86_64_arg_new(&vtop[-i].type, ret2, nret, &size, &align, &reg_count);
             if (align != 16)
               break;
 
+	    int idx = -nb_args+1+i;
 	    vrotb(i+1);
             
             if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
@@ -1996,7 +2016,8 @@ void gfunc_call(int nb_args)
             }
             
             vpop();
-	    memmove(offsets2+nb_args-1-i, offsets2+nb_args-i, nb_args-i+1 * sizeof(offsets[0]));
+	    memmove(offsets+i2, offsets+i2+1, (nb_args+2-i2) * sizeof(offsets[0]));
+	    memmove(offsets2+i2, offsets2+i2+1, (nb_args+2-i2) * sizeof(offsets[0]));
             --nb_args;
 	    assert(nb_args >= 0);
         }
