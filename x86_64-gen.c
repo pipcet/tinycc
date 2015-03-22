@@ -1772,7 +1772,7 @@ void gfunc_call(int nb_args)
     sse_reg = nb_sse_args;
     run_start = 0;
     args_size = 0;
-    while (run_start != nb_args) {
+    while (run_start < nb_args) {
         int run_gen_reg = gen_reg, run_sse_reg = sse_reg;
 	int new_eightbyte = 1;
         
@@ -1843,11 +1843,12 @@ void gfunc_call(int nb_args)
         for(i = run_start; i < run_end;) {
             /* Swap argument to top, it will possibly be changed here,
               and might use more temps. At the end of the loop we keep
-              in on the stack and swap it back to its original position
+              it on the stack and swap it back to its original position
               if it is a register. */
+	    int idx = -i;
             SValue tmp = vtop[0];
-            vtop[0] = vtop[-i];
-            vtop[-i] = tmp;
+            vtop[0] = vtop[idx];
+            vtop[idx] = tmp;
 	    int align;
             
 	    int off = 0, j;
@@ -1866,8 +1867,6 @@ void gfunc_call(int nb_args)
 		case x86_64_mode_x87:
 		push_stack_arg:
 		    arg_stored = 1;
-		    //arg_gen_reg = gen_reg;
-		    //arg_sse_reg = sse_reg;
 		    break;
                 
 		case x86_64_mode_sse:
@@ -1940,8 +1939,8 @@ void gfunc_call(int nb_args)
 
             /* And swap the argument back to its original position.  */
             tmp = vtop[0];
-            vtop[0] = vtop[-i];
-            vtop[-i] = tmp;
+            vtop[0] = vtop[idx];
+            vtop[idx] = tmp;
 
             if (arg_stored) {
 		vrotb(i+1);
@@ -1964,7 +1963,7 @@ void gfunc_call(int nb_args)
             if (align != 16)
               break;
 
-            vrotb(i+1);
+	    vrotb(i+1);
             
             if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
                 gv(RC_ST0);
@@ -2170,6 +2169,7 @@ void gfunc_call(int nb_args)
 
     if (args_size)
         gadd_sp(args_size);
+    assert((vtop->type.t & VT_BTYPE) == VT_FUNC);
     vtop--;
 }
 
@@ -2280,8 +2280,8 @@ void gfunc_prolog(CType *func_type)
     }
     /* define parameters */
     while ((sym = sym->next) != NULL) {
-	SValue ret[16];
-	int nret = 16;
+	SValue ret[256];
+	int nret = 256;
 	int i;
 	for(i=0; i<nret; i++) {
 	    ret[i].type.t = VT_VOID;
