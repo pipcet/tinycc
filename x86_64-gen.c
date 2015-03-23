@@ -2115,7 +2115,9 @@ void gfunc_call(int nb_args)
       oad(0xb8, nb_sse_args < 8 ? nb_sse_args : 8); /* mov nb_sse_args, %eax */
     else {
 	/* we used to clear eax here, but since it's just an upper
-	   bound, we can get away with not doing so. */
+	   bound, we can get away with not doing so. We should really
+	   detect varargs/K&R prototypes and clear %eax only for
+	   them. */
 	//o(0xc031); /*	   xor %eax,%eax */
     }
     save_regset(rc_caller_saved);
@@ -2125,9 +2127,6 @@ void gfunc_call(int nb_args)
 
     gcall_or_jmp(0);
     end_special_use_regset(rc_caller_saved);
-
-    end_special_use(TREG_ST0);
-    /* end_special_use(TREG_ST1); for when we support complex args */
 
     if (args_size)
         gadd_sp(args_size);
