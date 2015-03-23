@@ -777,7 +777,6 @@ ST_FUNC int get_reg(RegSet rs)
        IMPORTANT to start from the bottom to ensure that we don't
        spill registers used in gen_opi()) */
     for(p=vstack;p<=vtop;p++) {
-        /* look at second register (if long long) */
         r = p->r & VT_VALMASK;
 	if (r < VT_CONST && (regset_has(rs, r))) {
 	    if(register_contents[r].special_use)

@@ -1683,6 +1683,87 @@ static int arg_prepare_reg(int idx) {
     return arg_regs[idx];
 }
 
+/* recursively expand the struct (or union) at vtop, leaving
+   non-struct-typed elements on the stack instead; returns the number
+   of elements added overall, so -1 for an empty struct. */
+
+int expand_struct(void) {
+    int ret = 0;
+
+    while((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
+	Sym *f;
+	for(f = vtop->type.ref->next; f; f = f->next) {
+	    vdup();
+	    gaddrof();
+	    vtop->type.t = VT_LLONG;
+	    vpushi(f->c);
+	    gen_op('+');
+	    mk_pointer(&f->type);
+	    vtop->type = f->type;
+	    indir();
+	    int lret = expand_struct();
+	    vrotb(lret+2);
+	    ret += lret+1;
+	}
+	ret--;
+	vtop--;
+    }
+
+    return ret;
+}
+
+/* the ugly version of expand_struct that works in eightbyte units. */
+
+int expand_struct_eightbytes(void) {
+    int ret = 0;
+
+    while((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
+	Sym *f;
+	unsigned long lastc = -1;
+	int lret = 0;
+	for(f = vtop->type.ref->next; f; f = f->next) {
+	    if((f->c & 7) != 0) {
+		if((vtop[-1].type.t & VT_BTYPE) == VT_DOUBLE &&
+		   (f->type.t & VT_BTYPE) != VT_DOUBLE &&
+		   (f->type.t & VT_BTYPE) != VT_FLOAT)
+		    vtop[-1].type.t = VT_LLONG;
+		   
+		continue;
+	    }
+	    if(f->c == lastc)
+		continue;
+	    lastc = f->c;
+	    CType ty = f->type;
+	    if ((f->type.t & VT_BTYPE) == VT_FLOAT ||
+		(f->type.t & VT_BTYPE) == VT_DOUBLE)
+		ty.t = VT_DOUBLE;
+	    else if ((f->type.t & VT_BTYPE) == VT_LDOUBLE)
+		ty.t = VT_LDOUBLE;
+	    else
+		ty.t = VT_LLONG;
+	    vdup();
+	    gaddrof();
+	    vtop->type.t = VT_LLONG;
+	    vpushi(f->c);
+	    gen_op('+');
+	    mk_pointer(&ty);
+	    vtop->type = ty;
+	    indir();
+	    int llret = expand_struct_eightbytes();
+	    vrotb(llret+2);
+	    lret += llret+1;
+	}
+	lret--;
+	ret += lret;
+	vtop--;
+	int i;
+	for(i=lret+1; i>=1; i--)
+	    vrott(i);
+    }
+
+    return ret;
+}
+
 /* Generate function call. The function address is pushed first, then
    all the parameters in call order. This functions pops all the
    parameters and the function address. */
@@ -1791,7 +1872,6 @@ void gfunc_call(int nb_args)
 	prel_nb_reg_args = nb_reg_args;
 	prel_nb_sse_args = nb_sse_args;
 	prel_nb_x87_args = nb_x87_args;
-	goto success; /* for now, we're counting integer arguments, not register arguments, in nb_reg_args */
     }
     if (i < nret)
 	offsets[i] = off;
@@ -1861,21 +1941,33 @@ void gfunc_call(int nb_args)
             oad(0xec81, stack_adjust); /* sub $xxx, %rsp */
             args_size += stack_adjust;
         }
-        
-        for(i = run_start; i < run_end;) {
+
+	int phase = 1; /* 1 - pushing 8-byte args, 2 - pushing 16-byte args */
+        for(i = run_start; i < nb_args; i++) {
+	    int i2 = nb_args-1-i;
+	    int j;
+	    int size, align;
+	    size = type_size(&vtop[-i].type, &align);
+	    size += 7;
+	    size &= -8;
+	    align += 7;
+	    align &= -8;
+
+	    if(phase == 1 && align == 16)
+		phase = 2;
+	    if(phase == 2 && align != 16)
+		break;
+
             /* Swap argument to top, it will possibly be changed here,
               and might use more temps. At the end of the loop we keep
               it on the stack and swap it back to its original position
               if it is a register. */
-	    int i2 = nb_args-i-1;
 	    int idx = -i;
             SValue tmp = vtop[0];
             vtop[0] = vtop[idx];
             vtop[idx] = tmp;
-	    int align;
-            
-	    int j;
-            int arg_stored = 0;
+
+            int arg_stored = 1;
 	    for(j=offsets[i2+1]-1; j>=offsets[i2]; j--) {
 		if(ret[j].type.t == VT_VOID) {
 		    continue;
@@ -1887,8 +1979,6 @@ void gfunc_call(int nb_args)
 		    new_eightbyte = 1;
 
 		if(ret[j].r == VT_CONST) {
-		push_stack_arg:
-		    arg_stored = 1;
 		} else if(ret[j].r >= TREG_XMM0) {
 		    arg_stored = 0;
 		} else if(ret[j].r < TREG_XMM0) {
@@ -1896,114 +1986,67 @@ void gfunc_call(int nb_args)
 		} else {
 		    assert(0);
 		}
-            }
+	    }
 
 	    if (arg_stored) {
-		int size, align;
 		for(j=offsets[i2+1]-1; j>=offsets[i2]; j--) {
 		    ret[j].r = VT_CONST;
-		}
-		size = type_size(&vtop->type, &align);
-		size += 7;
-		size &= -8;
-		switch(vtop->type.t & VT_BTYPE) {
-		case VT_STRUCT:
-		    /* allocate the necessary size on stack */
-		    o(0x48);
-		    oad(0xec81, size); /* sub $xxx, %rsp */
-		    /* generate structure store */
-		    r = get_reg(rc_int);
-		    orex(64, r, 0, 0x89); /* mov %rsp, r */
-		    o(0xe0 + REG_VALUE(r));
-		    vset(&vtop->type, r | VT_LVAL, 0);
-		    vswap();
-		    vstore();
-		    args_size += size;
-		    break;
+		    switch(ret[j].type.t & VT_BTYPE) {
+		    case VT_VOID:
+			break;
 
-		case VT_LDOUBLE:
-		    assert(0);
-		    break;
+		    case VT_STRUCT:
+			/* allocate the necessary size on stack */
+			o(0x48);
+			oad(0xec81, size); /* sub $xxx, %rsp */
+			/* generate structure store */
+			r = get_reg(rc_int);
+			orex(64, r, 0, 0x89); /* mov %rsp, r */
+			o(0xe0 + REG_VALUE(r));
+			vset(&vtop->type, r | VT_LVAL, 0);
+			vswap();
+			vstore();
+			args_size += size;
+			break;
 
-		case VT_FLOAT:
-		case VT_DOUBLE:
-                    r = gv(rc_float);
-                    o(0x50); /* push $rax */
-                    /* movq %xmmN, (%rsp) */
-                    o(0xd60f66);
-                    o(0x04 + REG_VALUE(r)*8);
-                    o(0x24);
-                    args_size += size;
-		    break;
+		    case VT_LDOUBLE:
+			gv(rc_st0);
+			oad(0xec8148, size); /* sub $xxx, %rsp */
+			o(0x7cdb); /* fstpt 0(%rsp) */
+			g(0x24);
+			g(0x00);
+			args_size += size;
+			break;
 
-		default:
-		    /* simple type */
-		    /* XXX: implicit cast ? */
-                    r = gv(rc_int);
-                    orex(0,r,0,0x50 + REG_VALUE(r)); /* push r */
-                    args_size += size;
-		    break;
+		    case VT_FLOAT:
+		    case VT_DOUBLE:
+			r = gv(rc_float);
+			o(0x50); /* push $rax */
+			/* movq %xmmN, (%rsp) */
+			o(0xd60f66);
+			o(0x04 + REG_VALUE(r)*8);
+			o(0x24);
+			args_size += size;
+			break;
+
+		    default:
+			/* simple type */
+			/* XXX: implicit cast ? */
+			r = gv(rc_int);
+			orex(0,r,0,0x50 + REG_VALUE(r)); /* push r */
+			args_size += size;
+			break;
+		    }
 		}
 	    }
+
 
             /* And swap the argument back to its original position.  */
             tmp = vtop[0];
             vtop[0] = vtop[idx];
             vtop[idx] = tmp;
-
-	    ++i;
         }
 
-        /* handle 16 byte aligned arguments at end of run */
-        for(i = run_end; i < nb_args; i++) {
-	    int i2 = nb_args-1-i;
-	    int size, align;
-	    int j = offsets[i2];
-
-	    if(ret[j].type.t == VT_VOID) {
-		continue;
-	    }
-
-	    size = type_size(&vtop[-i].type, &align);
-	    size += 7;
-	    size &= -8;
-	    align += 7;
-	    align &= -8;
-            if (align != 16)
-		break;
-
-	    int idx = -i;
-            SValue tmp = vtop[0];
-            vtop[0] = vtop[idx];
-            vtop[idx] = tmp;
-            
-            if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
-                gv(rc_st0);
-                oad(0xec8148, size); /* sub $xxx, %rsp */
-                o(0x7cdb); /* fstpt 0(%rsp) */
-                g(0x24);
-                g(0x00);
-                args_size += size;
-            } else {
-                /* allocate the necessary size on stack */
-                o(0x48);
-                oad(0xec81, size); /* sub $xxx, %rsp */
-                /* generate structure store */
-                r = get_reg(rc_int);
-                orex(64, r, 0, 0x89); /* mov %rsp, r */
-                o(0xe0 + REG_VALUE(r));
-                vset(&vtop->type, r | VT_LVAL, 0);
-                vswap();
-                vstore();
-                args_size += size;
-            }
-
-            tmp = vtop[0];
-            vtop[0] = vtop[idx];
-            vtop[idx] = tmp;
-
-	    ret[j].r = VT_CONST;
-        }
 	run_start = i;
     }
     
@@ -2011,75 +2054,46 @@ void gfunc_call(int nb_args)
     save_regs(0); /* save used temporary registers */
 
     /* then, we prepare register passing arguments. */
-    for(i = 0; i < nb_args;) {
-	int i2 = nb_args-1-i;
+    while(nb_args > 0) {
+	int i2 = nb_args-1;
+	//    int i2;
+	//  int orig_nb_args = nb_args;
+	//for(i2=0; i2<orig_nb_args; i2++) {
 	int j;
 
-	unsigned long long struct_offset = 0;
-	int pop_structs = 0;
-	/* XXX this needs to be changed if the stack code is changed
-	 * to perform reallocations. */
-	SValue *pop_struct_target = vtop-1;
 	for(j=offsets[i2]; j<offsets[i2+1]; j++) {
 	    if(ret[j].r == VT_CONST) {
 		if (ret[j].type.t == VT_VOID &&
 		    ret[j].c.ull) {
-		    vtop--;
-		    j++;
-		    nb_args--;
+		    continue;
 		} else if (ret[j].type.t == VT_VOID) {
-		    nb_args--;
-		    j++;
 		    continue;
 		} else {
-		    vtop--;
-		    j++;
 		    nb_args--;
+		    vtop--;
 		    continue;
 		}
 	    }
 
-	    /* XXX fix for nested structs */
-	    while((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
-		CType ty = ret[j].type;
-		vdup();
-		gaddrof();
-		vtop->type.t = VT_LLONG;
-		vpushi(ret[j].c.i);
-		if(ret[j].c.i)
-		    nb_args++;
-		gen_op('+');
-		mk_pointer(&ty);
-		vtop->type = ty;
-		indir();
+	    if (ret[j].type.t == VT_VOID) {
+		continue;
 	    }
+
+	    if(ret[j].c.ull & 7) {
+		continue;
+	    }
+
+	    if ((vtop->type.t & VT_BTYPE) == VT_STRUCT)
+		nb_args += expand_struct_eightbytes();
 
 	    int d = ret[j].r;
-	    //int r = gv((d >= TREG_XMM0) ? (rc_xmm0 << (d-TREG_XMM0)) : rc_int);
 	    int r = gv(regset_singleton(d));
 
-	    if(r == d) {
-		/* either we're lucky, or this is the last register. */
-		vtop--;
-		vpushi(0);
-		start_special_use(d);
-	    } else {
-		save_reg(d);
-		vtop--;
-		vpushi(0);
-		get_reg(regset_singleton(d));
-		start_special_use(d);
-
-		orex(64,d,r,0x89); /* mov */
-		o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
-	    }
-
+	    assert(r == d);
 	    vtop--;
+	    start_special_use(d);
+
 	    nb_args--;
-	}
-
-	while (vtop != pop_struct_target) {
-	    vtop--;
 	}
     }
     assert((vtop->type.t & VT_BTYPE) == VT_FUNC);
