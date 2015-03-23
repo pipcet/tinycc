@@ -251,6 +251,8 @@
 #define ST_DATA extern
 #endif
 
+typedef unsigned long long RegSet;
+
 #define TARGET_DEFS_ONLY
 #ifdef TCC_TARGET_I386
 # include "i386-gen.c"
@@ -332,8 +334,6 @@ typedef struct SValue {
     CValue c;              /* constant, if VT_CONST */
     struct Sym *sym;       /* symbol, if (VT_SYM | VT_CONST) */
 } SValue;
-
-typedef unsigned long long RegSet;
 
 /* register contents */
 typedef struct RContents {
