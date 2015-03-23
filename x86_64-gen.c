@@ -28,25 +28,27 @@
 #define NB_REGS         25
 #define NB_ASM_REGS     8
 
-ST_DATA const RegSet rc_int  ;
+ST_DATA const RegSet rc_int;
 ST_DATA const RegSet rc_float;
-ST_DATA const RegSet rc_rax  ;
-ST_DATA const RegSet rc_rcx  ;
-ST_DATA const RegSet rc_rdx  ;
-ST_DATA const RegSet rc_st0  ;
-ST_DATA const RegSet rc_r8   ;
-ST_DATA const RegSet rc_r9   ;
-ST_DATA const RegSet rc_r10  ;
-ST_DATA const RegSet rc_r11  ;
-ST_DATA const RegSet rc_xmm0 ;
-ST_DATA const RegSet rc_xmm1 ;
-ST_DATA const RegSet rc_xmm2 ;
-ST_DATA const RegSet rc_xmm3 ;
-ST_DATA const RegSet rc_xmm4 ;
-ST_DATA const RegSet rc_xmm5 ;
-ST_DATA const RegSet rc_xmm6 ;
-ST_DATA const RegSet rc_xmm7 ;
+ST_DATA const RegSet rc_rax;
+ST_DATA const RegSet rc_rcx;
+ST_DATA const RegSet rc_rdx;
+ST_DATA const RegSet rc_st0;
+ST_DATA const RegSet rc_r8;
+ST_DATA const RegSet rc_r9;
+ST_DATA const RegSet rc_r10;
+ST_DATA const RegSet rc_r11;
+ST_DATA const RegSet rc_xmm0;
+ST_DATA const RegSet rc_xmm1;
+ST_DATA const RegSet rc_xmm2;
+ST_DATA const RegSet rc_xmm3;
+ST_DATA const RegSet rc_xmm4;
+ST_DATA const RegSet rc_xmm5;
+ST_DATA const RegSet rc_xmm6;
+ST_DATA const RegSet rc_xmm7;
 ST_DATA const RegSet rc_flags;
+ST_DATA const RegSet rc_caller_saved;
+ST_DATA const RegSet rc_callee_saved;
 
 #define rc_iret rc_rax
 #define rc_fret rc_xmm0
@@ -143,6 +145,8 @@ ST_DATA const RegSet rc_xmm5  = 1 << 21;
 ST_DATA const RegSet rc_xmm6  = 1 << 22;
 ST_DATA const RegSet rc_xmm7  = 1 << 23;
 ST_DATA const RegSet rc_flags = 1L<< 32;
+ST_DATA const RegSet rc_callee_saved = 0x000000038;
+ST_DATA const RegSet rc_caller_saved = 0x101ffffc7;
 
 static unsigned long func_sub_sp_offset;
 static int func_ret_sub;
@@ -1610,6 +1614,8 @@ static X86_64_Mode classify_x86_64_arg_new(CType *ty, SValue *ret, int nret, int
 	(*offset)++;
 
         *psize = 8;
+	/* FIXME that's just a guess, and it's wrong for arrays of long doubles. */
+	*palign = 8;
         mode = x86_64_mode_integer;
     } else {
         size = type_size(ty, &align);
@@ -1722,6 +1728,12 @@ int expand_struct_eightbytes(void) {
 	unsigned long lastc = -1;
 	int lret = 0;
 	for(f = vtop->type.ref->next; f; f = f->next) {
+	    /* Somewhat surprisingly, the x86-64 ABI mandates that
+	       struct { float x; int y; } be packed into a single
+	       integer register rather than being split up into two
+	       registers.  So when we see that int, we have to go back
+	       to find the float (which has become a double due to
+	       eightbytification) and turn it into a long long. */
 	    if((f->c & 7) != 0) {
 		if((vtop[-1].type.t & VT_BTYPE) == VT_DOUBLE &&
 		   (f->type.t & VT_BTYPE) != VT_DOUBLE &&
@@ -1756,6 +1768,8 @@ int expand_struct_eightbytes(void) {
 	lret--;
 	ret += lret;
 	vtop--;
+	/* this lovely piece of code reverses the return values on the
+	   stack very inefficiently. */
 	int i;
 	for(i=lret+1; i>=1; i--)
 	    vrott(i);
@@ -2050,15 +2064,9 @@ void gfunc_call(int nb_args)
 	run_start = i;
     }
     
-    /* XXX This should be superfluous.  */
-    save_regs(0); /* save used temporary registers */
-
     /* then, we prepare register passing arguments. */
     while(nb_args > 0) {
 	int i2 = nb_args-1;
-	//    int i2;
-	//  int orig_nb_args = nb_args;
-	//for(i2=0; i2<orig_nb_args; i2++) {
 	int j;
 
 	for(j=offsets[i2]; j<offsets[i2+1]; j++) {
@@ -2087,6 +2095,7 @@ void gfunc_call(int nb_args)
 		nb_args += expand_struct_eightbytes();
 
 	    int d = ret[j].r;
+	    save_reg(d);
 	    int r = gv(regset_singleton(d));
 
 	    assert(r == d);
@@ -2097,11 +2106,6 @@ void gfunc_call(int nb_args)
 	}
     }
     assert((vtop->type.t & VT_BTYPE) == VT_FUNC);
-    /* We shouldn't have many operands on the stack anymore, but the
-       call address itself is still there, and it might be in %eax
-       (or edx/ecx) currently, which the below writes would clobber.
-       So evict all remaining operands here.  */
-    save_regs(0);
 
     ib();
     if (nb_sse_args)
@@ -2111,31 +2115,13 @@ void gfunc_call(int nb_args)
 	   bound, we can get away with not doing so. */
 	//o(0xc031); /*	   xor %eax,%eax */
     }
-    save_reg(TREG_RAX);
-    get_reg(regset_singleton(TREG_RAX));
-    start_special_use(TREG_RAX);
-
+    save_regset(rc_caller_saved);
+    start_special_use_regset(rc_caller_saved);
     check_baddies(-1, 0);
     ib();
-    gcall_or_jmp(0);
-    end_special_use(TREG_RAX);
-    end_special_use(TREG_RCX);
-    end_special_use(TREG_RDX);
-    end_special_use(TREG_RSI);
-    end_special_use(TREG_RDI);
-    end_special_use(TREG_R8);
-    end_special_use(TREG_R9);
-    end_special_use(TREG_R10);
-    end_special_use(TREG_R11);
 
-    end_special_use(TREG_XMM0);
-    end_special_use(TREG_XMM1);
-    end_special_use(TREG_XMM2);
-    end_special_use(TREG_XMM3);
-    end_special_use(TREG_XMM4);
-    end_special_use(TREG_XMM5);
-    end_special_use(TREG_XMM6);
-    end_special_use(TREG_XMM7);
+    gcall_or_jmp(0);
+    end_special_use_regset(rc_caller_saved);
 
     end_special_use(TREG_ST0);
     /* end_special_use(TREG_ST1); for when we support complex args */

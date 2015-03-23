@@ -531,6 +531,38 @@ ST_FUNC void vdup(void)
     vpushv(vtop);
 }
 
+/* unlike start_special_use, this function silently accepts registers
+   that are already in special use. */
+ST_FUNC void start_special_use_regset(RegSet rs)
+{
+    int r;
+    SValue *p;
+
+    for(p=vstack;p<=vtop;p++) {
+        if (regset_has(rs, (p->r & VT_VALMASK)))
+	    tcc_error("register already in ordinary use");
+    }
+
+    for(r=0; r<NB_REGS; r++) {
+	if(!regset_has(rs, r))
+	    continue;
+
+	register_contents[r].special_use = 1;
+    }
+}
+
+ST_FUNC void end_special_use_regset(RegSet rs)
+{
+    int r;
+
+    for(r=0; r<NB_REGS; r++) {
+	if(!regset_has(rs, r))
+	    continue;
+
+	register_contents[r].special_use = 0;
+    }
+}
+
 ST_FUNC void start_special_use(int r)
 {
     if(register_contents[r].special_use)
@@ -789,6 +821,19 @@ ST_FUNC int get_reg(RegSet rs)
     }
     /* Should never come here */
     return -1;
+}
+
+ST_FUNC void save_regset(RegSet rs)
+{
+    int r;
+    SValue *p;
+    for(p = vstack;p <= vtop; p++) {
+        r = p->r & VT_VALMASK;
+        if (r < VT_CONST) {
+	    if (regset_has(rs, r))
+		save_reg(r);
+        }
+    }
 }
 
 /* save registers up to (vtop - n) stack entry */
@@ -1060,6 +1105,7 @@ ST_FUNC void gv2(RegSet rc1, RegSet rc2)
 {
     int v;
 
+    /* FIXME: when is a regset more generic than another regset? */
     /* generate more generic register first. But VT_JMP or VT_CMP
        values must be generated first in all cases to avoid possible
        reload errors */

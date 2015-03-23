@@ -760,8 +760,6 @@ struct TCCState {
 #define VT_LLONG           12  /* 64 bit integer */
 #define VT_LONG            13  /* long integer (NEVER USED as type, only
                                   during parsing) */
-#define VT_EIGHTBYTE       14  /* a generic eightbyte, in either an
-				  SSE or integer register */
 #define VT_UNSIGNED    0x0010  /* unsigned type */
 #define VT_ARRAY       0x0020  /* array type (also has VT_PTR) */
 #define VT_BITFIELD    0x0040  /* bitfield modifier */
@@ -1218,6 +1216,9 @@ ST_FUNC void vpushv(SValue *v);
 ST_FUNC void save_reg(int r);
 ST_FUNC int get_reg(RegSet rs);
 ST_FUNC void save_regs(int n);
+ST_FUNC void save_regset(RegSet rs);
+ST_FUNC void start_special_use_regset(RegSet rs);
+ST_FUNC void end_special_use_regset(RegSet rs);
 ST_FUNC int gv(RegSet rc);
 ST_FUNC void gv2(RegSet rc1, RegSet rc2);
 ST_FUNC void vpop(void);
