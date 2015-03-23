@@ -355,7 +355,7 @@ static void vsetc(CType *type, int r, CValue *vc)
     if (vtop >= vstack) {
         v = vtop->r & VT_VALMASK;
         if (v == VT_CMP || (v & ~1) == VT_JMP)
-            gv(RC_INT);
+            gv(rc_int);
     }
     vtop++;
     vtop->type = *type;
@@ -506,7 +506,7 @@ ST_FUNC void vswap(void)
     if (vtop >= vstack) {
         int v = vtop->r & VT_VALMASK;
         if (v == VT_CMP || (v & ~1) == VT_JMP)
-            gv(RC_INT);
+            gv(rc_int);
     }
     tmp = vtop[0];
     vtop[0] = vtop[-1];
@@ -681,7 +681,7 @@ ST_FUNC int get_reg_ex(int rc, int rc2)
     SValue *p;
     
     for(r=0;r<NB_REGS;r++) {
-        if (reg_classes[r] & rc2) {
+        if (regset_has(rc2, r)) {
             int n;
             n=0;
             for(p = vstack; p <= vtop; p++) {
@@ -710,8 +710,8 @@ ST_FUNC int get_specific_reg(int r)
     return r;
  }
 
-/* find a free register of class 'rc'. If none, save one register */
-ST_FUNC int get_reg(int rc)
+/* find a free register in set 'rs'. If none, save one register */
+ST_FUNC int get_reg(RegSet rs)
 {
     static int last_r = -1;
     int r;
@@ -725,7 +725,7 @@ ST_FUNC int get_reg(int rc)
 
     /* find a free register that doesn't have cached data in it */
     for(r=0;r<NB_REGS;r++) {
-        if (reg_classes[r] & rc) {
+	if (regset_has(rs, r)) {
             for(p=vstack;p<=vtop;p++) {
                 if ((p->r & VT_VALMASK) == r)
                     goto notfound1;
@@ -742,7 +742,7 @@ ST_FUNC int get_reg(int rc)
 
     /* find a free register */
     for(r=last_r+1;r<NB_REGS;r++) {
-        if (reg_classes[r] & rc) {
+	if (regset_has(rs, r)) {
             for(p=vstack;p<=vtop;p++) {
                 if ((p->r & VT_VALMASK) == r)
                     goto notfound2;
@@ -758,7 +758,7 @@ ST_FUNC int get_reg(int rc)
 
     /* find a free register */
     for(r=0;r<=last_r;r++) {
-        if (reg_classes[r] & rc) {
+	if (regset_has(rs, r)) {
             for(p=vstack;p<=vtop;p++) {
                 if ((p->r & VT_VALMASK) == r)
                     goto notfound3;
@@ -773,7 +773,7 @@ ST_FUNC int get_reg(int rc)
     }
 
      for(r=0;r<NB_REGS;r++) {
-         if (reg_classes[r] & rc) {
+	if (regset_has(rs, r)) {
              for(p=vstack;p<=vtop;p++) {
                  if ((p->r & VT_VALMASK) == r)
                     goto notfound;
@@ -793,7 +793,7 @@ ST_FUNC int get_reg(int rc)
     for(p=vstack;p<=vtop;p++) {
         /* look at second register (if long long) */
         r = p->r & VT_VALMASK;
-        if (r < VT_CONST && (reg_classes[r] & rc)) {
+	if (r < VT_CONST && (regset_has(rs, r))) {
 	    if(register_contents[r].special_use)
 		continue;
             save_reg(r);
@@ -840,7 +840,7 @@ static void move_reg(int r, int s, int t)
 ST_FUNC void gaddrof(void)
 {
     if (vtop->r & VT_REF)
-        gv(RC_INT);
+        gv(rc_int);
     vtop->r &= ~VT_LVAL;
     /* tricky: if saved lvalue, then we can go back to lvalue */
     if ((vtop->r & VT_VALMASK) == VT_LLOCAL)
@@ -880,10 +880,9 @@ static void gbound(void)
 /* store vtop a register belonging to class 'rc'. lvalues are
    converted to values. Cannot be used if cannot be converted to
    register value (such as structures). */
-ST_FUNC int gv(int rc)
+ST_FUNC int gv(RegSet rc)
 {
     int r, bit_pos, bit_size, size, align, i;
-    int rc2;
 
     /* NOTE: get_reg can modify vstack[] */
     if (vtop->type.t & VT_BITFIELD) {
@@ -958,13 +957,6 @@ ST_FUNC int gv(int rc)
 #endif
 
         r = vtop->r & VT_VALMASK;
-        rc2 = (rc & RC_FLOAT) ? RC_FLOAT : RC_INT;
-        if (rc == RC_IRET)
-            rc2 = RC_LRET;
-#ifdef TCC_TARGET_X86_64
-        else if (rc == RC_FRET)
-            rc2 = RC_QRET;
-#endif
 
         /* need to reload if:
            - constant
@@ -972,15 +964,14 @@ ST_FUNC int gv(int rc)
            - already a register, but not in the right class */
         if (r >= VT_CONST
          || (vtop->r & VT_LVAL)
-         || !(reg_classes[r] & rc)
-            )
+	    || !(regset_has(rc, r)))
         {
 	    int r1 = find_cached_value(vtop);
 	    r = -1;
 
 	    if (r1 != -1)
 		/* XXX understand why this is ever false */
-		if(reg_classes[r1] & rc)
+		if(regset_has(rc, r1))
 		    r = get_specific_reg(r1);
 	    if (r == -1)
 		r = get_reg(rc);
@@ -1080,7 +1071,7 @@ ST_FUNC int gv(int rc)
 }
 
 /* generate vtop[-1] and vtop[0] in resp. classes rc1 and rc2 */
-ST_FUNC void gv2(int rc1, int rc2)
+ST_FUNC void gv2(RegSet rc1, RegSet rc2)
 {
     int v;
 
@@ -1111,15 +1102,15 @@ ST_FUNC void gv2(int rc1, int rc2)
     }
 }
 
-/* wrapper around RC_FRET to return a register by type */
-static int rc_fret(int t)
+/* wrapper around rc_fret to return a register by type */
+static int get_rc_fret(int t)
 {
 #ifdef TCC_TARGET_X86_64
     if (t == VT_LDOUBLE) {
-        return RC_ST0;
+        return rc_st0;
     }
 #endif
-    return RC_FRET;
+    return rc_fret;
 }
 
 /* wrapper around REG_FRET to return a register by type */
@@ -1143,7 +1134,7 @@ ST_FUNC void lexpand(void)
     vtop[0].type.t = VT_LLONG | u;
     vpushi(32);
     gen_op(TOK_SHR);
-    gv2(RC_INT, RC_INT);
+    gv2(rc_int, rc_int);
     vtop[0].type.t = VT_INT | u;
     vtop[-1].type.t = VT_INT | u;
 }
@@ -1190,7 +1181,7 @@ static void lbuild(int t)
     vpushi(32);
     gen_op(TOK_SHR);
     gen_op('+');
-    gv(RC_INT);
+    gv(rc_int);
 }
 
 /* rotate n first stack elements to the bottom 
@@ -1271,19 +1262,19 @@ static void gv_dup(void)
         vswap();
     } else {
         /* duplicate value */
-        rc = RC_INT;
+	RegSet rs = rc_int;
         sv.type.t = ((t & VT_BTYPE) == VT_LLONG) ? t : VT_INT;
         if (is_float(t)) {
-            rc = RC_FLOAT;
+            rs = rc_float;
 #ifdef TCC_TARGET_X86_64
             if ((t & VT_BTYPE) == VT_LDOUBLE) {
-                rc = RC_ST0;
+                rs = rc_st0;
             }
 #endif
             sv.type.t = t;
         }
-        r = gv(rc);
-        r1 = get_reg(rc);
+        r = gv(rs);
+        r1 = get_reg(rs);
         sv.r = r;
         sv.c.ul = 0;
         load(r1, &sv); /* move r to r1 */
@@ -2072,7 +2063,7 @@ static void gen_cast(CType *type)
 
     /* bitfields first get cast to ints */
     if (vtop->type.t & VT_BITFIELD) {
-        gv(RC_INT);
+        gv(rc_int);
     }
 
     dbt = type->t & (VT_BTYPE | VT_UNSIGNED);
@@ -2177,11 +2168,11 @@ static void gen_cast(CType *type)
                 if ((sbt & VT_BTYPE) != VT_LLONG) {
                     /* scalar to long long */
                     /* machine independent conversion */
-                    gv(RC_INT);
+                    gv(rc_int);
                     /* generate high word */
                     if (sbt == (VT_INT | VT_UNSIGNED)) {
                         vpushi(0);
-                        gv(RC_INT);
+                        gv(rc_int);
                     } else {
                         if (sbt == VT_PTR) {
                             /* cast from pointer to int before we apply
@@ -2204,7 +2195,7 @@ static void gen_cast(CType *type)
                     (sbt & VT_BTYPE) != VT_PTR &&
                     (sbt & VT_BTYPE) != VT_FUNC) {
                     /* need to convert from 32bit to 64bit */
-                    int r = gv(RC_INT);
+                    int r = gv(rc_int);
                     if (sbt != (VT_INT | VT_UNSIGNED)) {
                         /* x86_64 specific: movslq */
 			orex(64, r, r, 0x63);
@@ -2546,7 +2537,7 @@ static void gen_assign_cast(CType *dt)
             goto type_ok;
         }
         type1 = pointed_type(dt);
-        /* a function is implicitely a function pointer */
+        /* a function is implicitly a function pointer */
         if (sbt == VT_FUNC) {
             if ((type1->t & VT_BTYPE) != VT_VOID &&
                 !is_compatible_types(pointed_type(dt), st))
@@ -2753,12 +2744,12 @@ ST_FUNC void vstore(void)
             } else
 #endif
 	    {
-		rc = RC_INT;
+		rc = rc_int;
 		if (is_float(ft)) {
-		    rc = RC_FLOAT;
+		    rc = rc_float;
 #ifdef TCC_TARGET_X86_64
 		    if ((ft & VT_BTYPE) == VT_LDOUBLE) {
-			rc = RC_ST0;
+			rc = rc_st0;
 		    }
 #endif
 		}
@@ -2766,7 +2757,7 @@ ST_FUNC void vstore(void)
 		/* if lvalue was saved on stack, must read it */
 		if ((vtop[-1].r & VT_VALMASK) == VT_LLOCAL) {
 		    SValue sv;
-		    t = get_reg(RC_INT);
+		    t = get_reg(rc_int);
 #ifdef TCC_TARGET_X86_64
 		    sv.type.t = VT_PTR;
 #else
@@ -3659,7 +3650,7 @@ ST_FUNC void indir(void)
         expect("pointer");
     }
     if ((vtop->r & VT_LVAL) && !nocode_wanted)
-        gv(RC_INT);
+        gv(rc_int);
     vtop->type = *pointed_type(&vtop->type);
     /* Arrays and functions are never lvalues */
     if (!(vtop->type.t & VT_ARRAY) && !(vtop->type.t & VT_VLA)
@@ -4460,15 +4451,15 @@ static void expr_cond(void)
                 /* needed to avoid having different registers saved in
                    each branch */
                 if (is_float(vtop->type.t)) {
-                    rc = RC_FLOAT;
+                    rc = rc_float;
 #ifdef TCC_TARGET_X86_64
                     if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
-                        rc = RC_ST0;
+                        rc = rc_st0;
                     }
 #endif
                 }
                 else
-                    rc = RC_FLAGS|RC_INT; /* XXX only where we have flags */
+                    rc = regset_union(rc_flags, rc_int); /* XXX only where we have flags */
                 gv(rc);
                 save_regs(1);
             }
@@ -4541,18 +4532,18 @@ static void expr_cond(void)
             gen_cast(&type);
             if (VT_STRUCT == (vtop->type.t & VT_BTYPE))
                 gaddrof();
-            rc = RC_INT;
+            rc = rc_int;
             if (is_float(type.t)) {
-                rc = RC_FLOAT;
+                rc = rc_float;
 #ifdef TCC_TARGET_X86_64
                 if ((type.t & VT_BTYPE) == VT_LDOUBLE) {
-                    rc = RC_ST0;
+                    rc = rc_st0;
                 }
 #endif
             } else if ((type.t & VT_BTYPE) == VT_LLONG) {
                 /* for long longs, we use fixed registers to avoid having
                    to handle a complicated move */
-                rc = RC_IRET; 
+                rc = rc_iret;
             }
             
             r2 = gv(rc);
@@ -4873,9 +4864,9 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
 		    }
                 }
             } else if (is_float(func_vt.t)) {
-                gv(rc_fret(func_vt.t));
+                gv(get_rc_fret(func_vt.t));
             } else {
-                gv(RC_IRET);
+                gv(rc_iret);
             }
             vtop--; /* NOT vpop() because on x86 it would flush the fp stack */
         }
@@ -4958,7 +4949,7 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
         skip('(');
         gexpr();
         /* XXX: other types than integer */
-        case_reg = gv(RC_INT);
+        case_reg = gv(rc_int);
         vpop();
         skip(')');
         a = 0;

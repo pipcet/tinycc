@@ -971,7 +971,7 @@ static void parse_asm_operands(ASMOperand *operands, int *nb_operands_ptr,
                     ((vtop->r & VT_VALMASK) == VT_LLOCAL ||
                      (vtop->r & VT_VALMASK) < VT_CONST) &&
                     !strchr(op->constraint, 'm')) {
-                    gv(RC_INT);
+                    gv(rc_int);
                 }
             }
             op->vt = vtop;

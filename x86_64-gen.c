@@ -20,38 +20,42 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include "tcc.h"
+
 #ifdef TARGET_DEFS_ONLY
 
 /* number of available registers */
 #define NB_REGS         25
 #define NB_ASM_REGS     8
 
+ST_DATA const RegSet rc_int  ;
+ST_DATA const RegSet rc_float;
+ST_DATA const RegSet rc_rax  ;
+ST_DATA const RegSet rc_rcx  ;
+ST_DATA const RegSet rc_rdx  ;
+ST_DATA const RegSet rc_st0  ;
+ST_DATA const RegSet rc_r8   ;
+ST_DATA const RegSet rc_r9   ;
+ST_DATA const RegSet rc_r10  ;
+ST_DATA const RegSet rc_r11  ;
+ST_DATA const RegSet rc_xmm0 ;
+ST_DATA const RegSet rc_xmm1 ;
+ST_DATA const RegSet rc_xmm2 ;
+ST_DATA const RegSet rc_xmm3 ;
+ST_DATA const RegSet rc_xmm4 ;
+ST_DATA const RegSet rc_xmm5 ;
+ST_DATA const RegSet rc_xmm6 ;
+ST_DATA const RegSet rc_xmm7 ;
+ST_DATA const RegSet rc_flags;
+
+#define rc_iret rc_rax
+#define rc_fret rc_xmm0
+#define rc_lret rc_rdx
+#define rc_qret rc_xmm1
+
 /* a register can belong to several classes. The classes must be
    sorted from more general to more precise (see gv2() code which does
    assumptions on it). */
-#define RC_INT     0x0001 /* generic integer register */
-#define RC_FLOAT   0x0002 /* generic float register */
-#define RC_RAX     0x0004
-#define RC_RCX     0x0008
-#define RC_RDX     0x0010
-#define RC_ST0     0x0080 /* only for long double */
-#define RC_R8      0x0100
-#define RC_R9      0x0200
-#define RC_R10     0x0400
-#define RC_R11     0x0800
-#define RC_XMM0    0x1000
-#define RC_XMM1    0x2000
-#define RC_XMM2    0x4000
-#define RC_XMM3    0x8000
-#define RC_XMM4    0x10000
-#define RC_XMM5    0x20000
-#define RC_XMM6    0x40000
-#define RC_XMM7    0x80000
-#define RC_FLAGS  0x100000 /* check vtop->r to see which flag */
-#define RC_IRET    RC_RAX /* function return: integer register */
-#define RC_LRET    RC_RDX /* function return: second integer register */
-#define RC_FRET    RC_XMM0 /* function return: float register */
-#define RC_QRET    RC_XMM1 /* function return: second float register */
 
 /* pretty names for the registers */
 enum {
@@ -122,39 +126,43 @@ enum {
 #include "tcc.h"
 #include <assert.h>
 
-ST_DATA const int reg_classes[NB_REGS] = {
-    /* eax */ RC_INT | RC_RAX,
-    /* ecx */ RC_INT | RC_RCX,
-    /* edx */ RC_INT | RC_RDX,
-    /* rbx, callee-saved */ 0,
-    0,
-    0,
-    RC_INT,
-    RC_INT,
-    RC_INT | RC_R8,
-    RC_INT | RC_R9,
-    RC_INT | RC_R10,
-    RC_INT | RC_R11,
-    /* %r12, callee-saved */ 0,
-    /* %r13, callee-saved */ 0,
-    /* %r14, callee-saved */ 0,
-    /* %r15, callee-saved */ 0,
-    /* xmm0 */ RC_FLOAT | RC_XMM0,
-    /* xmm1 */ RC_FLOAT | RC_XMM1,
-    /* xmm2 */ RC_FLOAT | RC_XMM2,
-    /* xmm3 */ RC_FLOAT | RC_XMM3,
-    /* xmm4 */ RC_FLOAT | RC_XMM4,
-    /* xmm5 */ RC_FLOAT | RC_XMM5,
-    /* xmm6 an xmm7 are included so gv() can be used on them,
-       but they are not tagged with RC_FLOAT because they are
-       callee saved on Windows */
-    RC_XMM6,
-    RC_XMM7,
-    /* st0 */ RC_ST0
-};
+ST_DATA const RegSet rc_int   = 0x0f07;
+ST_DATA const RegSet rc_float = 0xff0000;
+ST_DATA const RegSet rc_rax   = 1 <<  0;
+ST_DATA const RegSet rc_rcx   = 1 <<  1;
+ST_DATA const RegSet rc_rdx   = 1 <<  2;
+ST_DATA const RegSet rc_st0   = 1 << 24;
+ST_DATA const RegSet rc_r8    = 1 <<  8;
+ST_DATA const RegSet rc_r9    = 1 <<  9;
+ST_DATA const RegSet rc_r10   = 1 << 10;
+ST_DATA const RegSet rc_r11   = 1 << 11;
+ST_DATA const RegSet rc_xmm0  = 1 << 16;
+ST_DATA const RegSet rc_xmm1  = 1 << 17;
+ST_DATA const RegSet rc_xmm2  = 1 << 18;
+ST_DATA const RegSet rc_xmm3  = 1 << 19;
+ST_DATA const RegSet rc_xmm4  = 1 << 20;
+ST_DATA const RegSet rc_xmm5  = 1 << 21;
+ST_DATA const RegSet rc_xmm6  = 1 << 22;
+ST_DATA const RegSet rc_xmm7  = 1 << 23;
+ST_DATA const RegSet rc_flags = 1L<< 32;
 
 static unsigned long func_sub_sp_offset;
 static int func_ret_sub;
+
+ST_FUNC int regset_has(RegSet rs, int reg)
+{
+    return ((1LL<<reg) & rs) != 0;
+}
+
+ST_FUNC RegSet regset_singleton(int reg)
+{
+    return 1LL << reg;
+}
+
+ST_FUNC RegSet regset_union(RegSet rs1, RegSet rs2)
+{
+    return rs1|rs2;
+}
 
 #if 0 /* no last instructions */
 #define ib() do { } while(0)
@@ -776,7 +784,7 @@ void load(int r, SValue *sv)
         int tr = r | TREG_MEM;
         if (is_float(ft)) {
             /* we cannot use float registers as a temporal register */
-            tr = get_reg(RC_INT) | TREG_MEM;
+            tr = get_reg(rc_int) | TREG_MEM;
         }
         gen_modrm64(0x8b, tr, fr, sv->sym, 0);
 
@@ -794,8 +802,9 @@ void load(int r, SValue *sv)
             v1.c.ul = fc;
             fr = r;
 	    /* when we load %r11, use %r11 as a temp register, not another integer register. */
-            if (!(reg_classes[fr] & (RC_R11 | RC_INT)))
-                fr = get_reg(RC_INT);
+            if (!(fr == TREG_R11 ||
+		  regset_has(rc_int, fr)))
+                fr = get_reg(rc_int);
             load(fr, &v1);
         }
         ll = 0;
@@ -970,7 +979,7 @@ void store_pic(int r,SValue *v)
     fr = v->r & VT_VALMASK;
     bt = ft & VT_BTYPE;
 
-    pic_reg = get_reg(RC_INT);
+    pic_reg = get_reg(rc_int);
     start_special_use(pic_reg);
     /* mov xx(%rip), %rXX */
     orex(64, 0, pic_reg, 0x8b);
@@ -1095,7 +1104,7 @@ static void gcall_or_jmp(int is_jmp)
         oad(0xe8 + is_jmp, vtop->c.ul - 4); /* call/jmp im */
     } else {
         /* otherwise, indirect call. XXX use gv(RC_INT) instead. */
-        r = get_reg(RC_INT);
+        r = get_reg(rc_int);
 	save_reg(r);
 	start_special_use(r);
         load(r, vtop);
@@ -1201,7 +1210,7 @@ void gfunc_call(int nb_args)
             /* align to stack align size */
             size = (size + 15) & ~15;
             /* generate structure store */
-            r = get_reg(RC_INT);
+            r = get_reg(rc_int);
             gen_offs_sp(0x8d, r, struct_size);
             struct_size += size;
 
@@ -1211,7 +1220,7 @@ void gfunc_call(int nb_args)
             vstore();
             --vtop;
         } else if (bt == VT_LDOUBLE) {
-            gv(RC_ST0);
+            gv(rc_st0);
             gen_offs_sp(0xdb, 0x107, struct_size);
             struct_size += 16;
         }
@@ -1232,7 +1241,7 @@ void gfunc_call(int nb_args)
             /* align to stack align size */
             size = (size + 15) & ~15;
             if (arg >= REGN) {
-                d = get_reg(RC_INT);
+                d = get_reg(rc_int);
                 gen_offs_sp(0x8d, d, struct_size);
                 gen_offs_sp(0x89, d, arg*8);
             } else {
@@ -1243,7 +1252,7 @@ void gfunc_call(int nb_args)
             struct_size += size;
         } else {
             if (is_sse_float(vtop->type.t)) {
-                gv(RC_XMM0); /* only use one float register */
+                gv(rc_xmm0); /* only use one float register */
                 if (arg >= REGN) {
                     /* movq %xmm0, j*8(%rsp) */
                     gen_offs_sp(0xd60f66, 0x100, arg*8);
@@ -1265,7 +1274,7 @@ void gfunc_call(int nb_args)
                         : size > 1 ? VT_SHORT : VT_BYTE;
                 }
                 
-                r = gv(RC_INT);
+                r = gv(rc_int);
                 if (arg >= REGN) {
                     gen_offs_sp(0x89, r, arg*8);
                 } else {
@@ -1845,7 +1854,7 @@ void gfunc_call(int nb_args)
         if (stack_adjust &= 15) {
             /* fetch cpu flag before the following sub will change the value. What about VT_JMP[I]? */
             if (vtop >= vstack && (vtop->r & VT_VALMASK) == VT_CMP)
-                gv(RC_INT);
+                gv(rc_int);
 
             stack_adjust = 16 - stack_adjust;
             o(0x48);
@@ -1903,7 +1912,7 @@ void gfunc_call(int nb_args)
 		    o(0x48);
 		    oad(0xec81, size); /* sub $xxx, %rsp */
 		    /* generate structure store */
-		    r = get_reg(RC_INT);
+		    r = get_reg(rc_int);
 		    orex(64, r, 0, 0x89); /* mov %rsp, r */
 		    o(0xe0 + REG_VALUE(r));
 		    vset(&vtop->type, r | VT_LVAL, 0);
@@ -1918,7 +1927,7 @@ void gfunc_call(int nb_args)
 
 		case VT_FLOAT:
 		case VT_DOUBLE:
-                    r = gv(RC_FLOAT);
+                    r = gv(rc_float);
                     o(0x50); /* push $rax */
                     /* movq %xmmN, (%rsp) */
                     o(0xd60f66);
@@ -1930,7 +1939,7 @@ void gfunc_call(int nb_args)
 		default:
 		    /* simple type */
 		    /* XXX: implicit cast ? */
-                    r = gv(RC_INT);
+                    r = gv(rc_int);
                     orex(0,r,0,0x50 + REG_VALUE(r)); /* push r */
                     args_size += size;
 		    break;
@@ -1968,7 +1977,7 @@ void gfunc_call(int nb_args)
             vtop[idx] = tmp;
             
             if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
-                gv(RC_ST0);
+                gv(rc_st0);
                 oad(0xec8148, size); /* sub $xxx, %rsp */
                 o(0x7cdb); /* fstpt 0(%rsp) */
                 g(0x24);
@@ -1979,7 +1988,7 @@ void gfunc_call(int nb_args)
                 o(0x48);
                 oad(0xec81, size); /* sub $xxx, %rsp */
                 /* generate structure store */
-                r = get_reg(RC_INT);
+                r = get_reg(rc_int);
                 orex(64, r, 0, 0x89); /* mov %rsp, r */
                 o(0xe0 + REG_VALUE(r));
                 vset(&vtop->type, r | VT_LVAL, 0);
@@ -2044,7 +2053,8 @@ void gfunc_call(int nb_args)
 	    }
 
 	    int d = ret[offsets[i2]+j].r;
-	    int r = gv((d >= TREG_XMM0) ? (RC_XMM0 << (d-TREG_XMM0)) : RC_INT);
+	    //int r = gv((d >= TREG_XMM0) ? (rc_xmm0 << (d-TREG_XMM0)) : rc_int);
+	    int r = gv(regset_singleton(d));
 
 	    if(r == d) {
 		/* either we're lucky, or this is the last register. */
@@ -2403,7 +2413,7 @@ int gtst(int inv, int t)
 		ll = 1;
             /* test v,v
              * jXX t */
-            v = gv(RC_INT);
+            v = gv(rc_int);
             /* and $constant, r */
             int test = 0xe081 + 0x100 * REG_VALUE(v);
             if (check_last_instruction(test, 6)) {
@@ -2471,13 +2481,13 @@ void gen_opi(int op)
 	    find_cached_value(vtop) == -1) {
             /* constant case */
             vswap();
-            r = gv(RC_INT);
+            r = gv(rc_int);
             vswap();
             c = vtop->c.i;
 	    ib();
 	    /* lea 0xXXXX(r), or */
 	    if (opc == 0) {
-		int or = get_reg(RC_INT);
+		int or = get_reg(rc_int);
 
 		uncache_value_by_register(or);
 
@@ -2505,8 +2515,8 @@ void gen_opi(int op)
             }
         } else {
 	    if (opc == 0) {
-		int or = get_reg(RC_INT);
-		gv2(RC_INT, RC_INT);
+		int or = get_reg(rc_int);
+		gv2(rc_int, rc_int);
 		r = vtop[-1].r;
 		fr = vtop[0].r;
 		ib();
@@ -2517,7 +2527,7 @@ void gen_opi(int op)
 		vtop[-1].r = or;
 		uncache = 0;
 	    } else {
-		gv2(RC_INT, RC_INT);
+		gv2(rc_int, rc_int);
 		r = vtop[-1].r;
 		fr = vtop[0].r;
 		ib();
@@ -2553,7 +2563,7 @@ void gen_opi(int op)
         opc = 1;
         goto gen_op8;
     case '*':
-        gv2(RC_INT, RC_INT);
+        gv2(rc_int, rc_int);
         r = vtop[-1].r;
         fr = vtop[0].r;
         orex(ll?64:32, fr, r, 0xaf0f); /* imul fr, r */
@@ -2575,14 +2585,14 @@ void gen_opi(int op)
 	    /* XXX cc = 1,2,3 -> lea */
             /* constant case */
             vswap();
-            r = gv(RC_INT);
+            r = gv(rc_int);
             vswap();
             orex(ll?64:32, r, 0, 0xc1); /* shl/shr/sar $xxx, r */
             o(opc | REG_VALUE(r));
             g(vtop->c.i & (ll ? 63 : 31));
         } else {
             /* we generate the shift in ecx */
-            gv2(RC_INT, RC_RCX);
+            gv2(rc_int, rc_rcx);
             r = vtop[-1].r;
             orex(ll?64:32, r, 0, 0xd3); /* shl/shr/sar %cl, r */
             o(opc | REG_VALUE(r));
@@ -2602,7 +2612,7 @@ void gen_opi(int op)
     divmod:
         /* first operand must be in eax */
         /* XXX: need better constraint for second operand */
-        gv2(RC_RAX, RC_RCX);
+        gv2(rc_rax, rc_rcx);
         r = vtop[-1].r;
         fr = vtop[0].r;
         vtop--;
@@ -2634,8 +2644,8 @@ void gen_opl(int op)
 void gen_opf(int op)
 {
     int a, ft, fc, swapped, r;
-    int float_type =
-        (vtop->type.t & VT_BTYPE) == VT_LDOUBLE ? RC_ST0 : RC_FLOAT;
+    RegSet float_type =
+        (vtop->type.t & VT_BTYPE) == VT_LDOUBLE ? rc_st0 : rc_float;
 
     /* convert constants to memory references */
     if ((vtop[-1].r & (VT_VALMASK | VT_LVAL)) == VT_CONST) {
@@ -2727,7 +2737,7 @@ void gen_opf(int op)
             fc = vtop->c.ul;
             if ((r & VT_VALMASK) == VT_LLOCAL) {
                 SValue v1;
-                r = get_reg(RC_INT);
+                r = get_reg(rc_int);
                 v1.type.t = VT_PTR;
                 v1.r = VT_LOCAL | VT_LVAL;
                 v1.c.ul = fc;
@@ -2748,7 +2758,7 @@ void gen_opf(int op)
             }
 
             if (swapped) {
-                gv(RC_FLOAT);
+                gv(rc_float);
                 vswap();
             }
             assert(!(vtop[-1].r & VT_LVAL));
@@ -2792,7 +2802,7 @@ void gen_opf(int op)
             /* if saved lvalue, then we must reload it */
             if ((vtop->r & VT_VALMASK) == VT_LLOCAL) {
                 SValue v1;
-                r = get_reg(RC_INT);
+                r = get_reg(rc_int);
                 v1.type.t = VT_PTR;
                 v1.r = VT_LOCAL | VT_LVAL;
                 v1.c.ul = fc;
@@ -2803,7 +2813,7 @@ void gen_opf(int op)
             assert(!(vtop[-1].r & VT_LVAL));
             if (swapped) {
                 assert(vtop->r & VT_LVAL);
-                gv(RC_FLOAT);
+                gv(rc_float);
                 vswap();
             }
             
@@ -2838,7 +2848,7 @@ void gen_cvt_itof(int t)
 {
     if ((t & VT_BTYPE) == VT_LDOUBLE) {
         save_reg(TREG_ST0);
-        gv(RC_INT);
+        gv(rc_int);
         if ((vtop->type.t & VT_BTYPE) == VT_LLONG) {
             /* signed long long to float/double/long double (unsigned case
                is handled generically) */
@@ -2864,9 +2874,9 @@ void gen_cvt_itof(int t)
         }
         vtop->r = TREG_ST0;
     } else {
-        int r = get_reg(RC_FLOAT);
+        int r = get_reg(rc_float);
 	int bs = 32;
-        gv(RC_INT);
+        gv(rc_int);
         o(0xf2 + ((t & VT_BTYPE) == VT_FLOAT?1:0));
         if ((vtop->type.t & (VT_BTYPE | VT_UNSIGNED)) ==
             (VT_INT | VT_UNSIGNED) ||
@@ -2889,7 +2899,7 @@ void gen_cvt_ftof(int t)
     tbt = t & VT_BTYPE;
     
     if (bt == VT_FLOAT) {
-        gv(RC_FLOAT);
+        gv(rc_float);
         if (tbt == VT_DOUBLE) {
 	    orex(0, vtop->r, vtop->r, 0);
             o(0x140f); /* unpcklps */
@@ -2898,7 +2908,7 @@ void gen_cvt_ftof(int t)
             o(0x5a0f); /* cvtps2pd */
             o(0xc0 + REG_VALUE(vtop->r)*9);
         } else if (tbt == VT_LDOUBLE) {
-            save_reg(RC_ST0);
+            save_reg(rc_st0);
             /* movss %xmm0,-0x10(%rsp) */
             o(0x110ff3);
 	    orex(0, vtop->r, 0, 0);
@@ -2908,7 +2918,7 @@ void gen_cvt_ftof(int t)
             vtop->r = TREG_ST0;
         }
     } else if (bt == VT_DOUBLE) {
-        gv(RC_FLOAT);
+        gv(rc_float);
         if (tbt == VT_FLOAT) {
 	    orex(0, vtop->r, vtop->r, 0);
             o(0x140f66); /* unpcklpd */
@@ -2917,7 +2927,7 @@ void gen_cvt_ftof(int t)
             o(0x5a0f66); /* cvtpd2ps */
             o(0xc0 + REG_VALUE(vtop->r)*9);
         } else if (tbt == VT_LDOUBLE) {
-            save_reg(RC_ST0);
+            save_reg(rc_st0);
             /* movsd %xmm0,-0x10(%rsp) */
 	    orex(0, 0, vtop->r, 0);
             o(0x110ff2);
@@ -2928,8 +2938,8 @@ void gen_cvt_ftof(int t)
         }
     } else {
         int r;
-        gv(RC_ST0);
-        r = get_reg(RC_FLOAT);
+        gv(rc_st0);
+        r = get_reg(rc_float);
         if (tbt == VT_DOUBLE) {
             o(0xf0245cdd); /* fstpl -0x10(%rsp) */
             /* movsd -0x10(%rsp),%xmm0 */
@@ -2961,13 +2971,13 @@ void gen_cvt_ftoi(int t)
         bt = VT_DOUBLE;
     }
 
-    gv(RC_FLOAT);
+    gv(rc_float);
     if (t != VT_INT)
         size = 8;
     else
         size = 4;
 
-    r = get_reg(RC_INT);
+    r = get_reg(rc_int);
     if (bt == VT_FLOAT) {
         o(0xf3);
     } else if (bt == VT_DOUBLE) {
@@ -3009,7 +3019,7 @@ ST_FUNC void gen_vla_alloc(CType *type, int align) {
     vset(type, REG_IRET, 0);
 #else
     int r;
-    r = gv(RC_INT); /* allocation size */
+    r = gv(rc_int); /* allocation size */
     /* sub r,%rsp */
     orex(64, r, 0, 0x2b);
     o(0xe0 | REG_VALUE(r));

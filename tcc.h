@@ -241,6 +241,16 @@
 /* -------------------------------------------- */
 /* include the target specific definitions */
 
+#ifdef ONE_SOURCE
+#define ST_INLN static inline
+#define ST_FUNC static
+#define ST_DATA static
+#else
+#define ST_INLN
+#define ST_FUNC
+#define ST_DATA extern
+#endif
+
 #define TARGET_DEFS_ONLY
 #ifdef TCC_TARGET_I386
 # include "i386-gen.c"
@@ -322,6 +332,8 @@ typedef struct SValue {
     CValue c;              /* constant, if VT_CONST */
     struct Sym *sym;       /* symbol, if (VT_SYM | VT_CONST) */
 } SValue;
+
+typedef unsigned long long RegSet;
 
 /* register contents */
 typedef struct RContents {
@@ -1005,16 +1017,6 @@ static inline int toup(int c)
 # define PUB_FUNC
 #endif
 
-#ifdef ONE_SOURCE
-#define ST_INLN static inline
-#define ST_FUNC static
-#define ST_DATA static
-#else
-#define ST_INLN
-#define ST_FUNC
-#define ST_DATA extern
-#endif
-
 /* ------------ libtcc.c ------------ */
 
 /* use GNU C extensions */
@@ -1192,6 +1194,10 @@ ST_DATA int func_vc;
 ST_DATA int last_line_num, last_ind, func_ind; /* debug last line number and pc */
 ST_DATA char *funcname;
 
+ST_FUNC int regset_has(RegSet, int);
+ST_FUNC RegSet regset_singleton(int);
+ST_FUNC RegSet regset_union(RegSet, RegSet);
+
 ST_INLN int is_float(int t);
 ST_FUNC int ieee_finite(double d);
 ST_FUNC void test_lvalue(void);
@@ -1210,10 +1216,10 @@ ST_FUNC void lexpand_nr(void);
 #endif
 ST_FUNC void vpushv(SValue *v);
 ST_FUNC void save_reg(int r);
-ST_FUNC int get_reg(int rc);
+ST_FUNC int get_reg(RegSet rs);
 ST_FUNC void save_regs(int n);
-ST_FUNC int gv(int rc);
-ST_FUNC void gv2(int rc1, int rc2);
+ST_FUNC int gv(RegSet rc);
+ST_FUNC void gv2(RegSet rc1, RegSet rc2);
 ST_FUNC void vpop(void);
 ST_FUNC void gen_op(int op);
 ST_FUNC int type_size(CType *type, int *a);
