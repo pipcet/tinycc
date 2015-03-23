@@ -2047,6 +2047,8 @@ void gfunc_call(int nb_args)
 		gaddrof();
 		vtop->type.t = VT_LLONG;
 		vpushi(ret[offsets[i2]+j].c.i);
+		if(ret[offsets[i2]+j].c.i)
+		    nb_args++;
 		gen_op('+');
 		mk_pointer(&ty);
 		vtop->type = ty;
@@ -2080,11 +2082,6 @@ void gfunc_call(int nb_args)
 	while (vtop != pop_struct_target) {
 	    vtop--;
 	}
-    }
-    /* XXXX this is wrong */
-    while ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
-	tcc_warning("failed to pop an argument!");
-	vtop--;
     }
     assert((vtop->type.t & VT_BTYPE) == VT_FUNC);
     /* We shouldn't have many operands on the stack anymore, but the
