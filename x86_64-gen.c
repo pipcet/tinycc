@@ -555,7 +555,7 @@ void orex(int bitsize, int r, int r2, int b)
     int emit = bitsize == 64;
 
     ib();
-    if ((b & 0xff) == 0x66) {
+    while ((b & 0xff) == 0x66 || (b & 0xff) == 0xf3 || (b & 0xff) == 0xf2) {
 	o(b&0xff);
 	b>>=8;
     }
