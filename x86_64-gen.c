@@ -2018,6 +2018,9 @@ void gfunc_call(int nb_args)
 
 	unsigned long long struct_offset = 0;
 	int pop_structs = 0;
+	/* XXX this needs to be changed if the stack code is changed
+	 * to perform reallocations. */
+	SValue *pop_struct_target = vtop-1;
 	for(j=0; j<off; j++) {
 	    if(ret[offsets[i2]+j].r == VT_CONST) {
 		if (ret[offsets[i2]+j].type.t == VT_VOID &&
@@ -2044,8 +2047,6 @@ void gfunc_call(int nb_args)
 		gaddrof();
 		vtop->type.t = VT_LLONG;
 		vpushi(ret[offsets[i2]+j].c.i);
-		if(ret[offsets[i2]+j].c.i == 0)
-		    pop_structs++;
 		gen_op('+');
 		mk_pointer(&ty);
 		vtop->type = ty;
@@ -2076,10 +2077,14 @@ void gfunc_call(int nb_args)
 	    nb_args--;
 	}
 
-	if (pop_structs--) {
-	    assert((vtop->type.t & VT_BTYPE) == VT_STRUCT);
+	while (vtop != pop_struct_target) {
 	    vtop--;
 	}
+    }
+    /* XXXX this is wrong */
+    while ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
+	tcc_warning("failed to pop an argument!");
+	vtop--;
     }
     assert((vtop->type.t & VT_BTYPE) == VT_FUNC);
     /* We shouldn't have many operands on the stack anymore, but the
