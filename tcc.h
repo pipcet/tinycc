@@ -1192,6 +1192,15 @@ ST_DATA int func_vc;
 ST_DATA int last_line_num, last_ind, func_ind; /* debug last line number and pc */
 ST_DATA char *funcname;
 
+ST_FUNC void uncache_value_by_register(int r);
+ST_FUNC void uncache_value(SValue *);
+ST_FUNC void uncache_values(void);
+ST_FUNC void cache_value(SValue *, int);
+ST_FUNC int find_cached_value(SValue *v);
+
+ST_FUNC void start_special_use(int);
+ST_FUNC void end_special_use(int);
+
 ST_FUNC int regset_has(RegSet, int);
 ST_FUNC RegSet regset_singleton(int);
 ST_FUNC RegSet regset_union(RegSet, RegSet);
@@ -1226,6 +1235,7 @@ ST_FUNC void gen_op(int op);
 ST_FUNC int type_size(CType *type, int *a);
 ST_FUNC void mk_pointer(CType *type);
 ST_FUNC void vstore(void);
+ST_FUNC void vdup(void);
 ST_FUNC void inc(int post, int c);
 ST_FUNC void parse_asm_str(CString *astr);
 ST_FUNC int lvalue_type(int t);
@@ -1233,6 +1243,7 @@ ST_FUNC void indir(void);
 ST_FUNC void unary(void);
 ST_FUNC void expr_prod(void);
 ST_FUNC void expr_sum(void);
+ST_FUNC void gaddrof(void);
 ST_FUNC void gexpr(void);
 ST_FUNC int expr_const(void);
 ST_FUNC void gen_inline_functions(void);

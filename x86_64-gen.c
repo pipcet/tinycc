@@ -249,7 +249,6 @@ int check_nth_last_instruction(int n, unsigned long long c, int length)
 
 void dump_ibs(void)
 {
-    int i=0;
     int n=0;
 
     int prev_ib = ind;
@@ -975,12 +974,9 @@ void load(int r, SValue *sv)
 
 void store_pic(int r,SValue *v)
 {
-    int fr, bt, ft, fc;
-    int op64 = 0;
+    int bt, ft;
     /* store the REX prefix in this variable when PIC is enabled */
-    int pic = 0;
     int pic_reg = -1;
-    int bs;
 
 #ifdef TCC_TARGET_PE
     SValue v2;
@@ -988,8 +984,6 @@ void store_pic(int r,SValue *v)
 #endif
 
     ft = v->type.t;
-    fc = v->c.ul;
-    fr = v->r & VT_VALMASK;
     bt = ft & VT_BTYPE;
 
     pic_reg = get_reg(rc_int);
@@ -998,7 +992,6 @@ void store_pic(int r,SValue *v)
     orex(64, 0, pic_reg, 0x8b);
     o(0x05 | REG_VALUE(pic_reg) * 8);
     gen_gotpcrel(pic_reg, v->sym, v->c.ul);
-    bs = is64_type(bt) ? 64 : 32;
 
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
@@ -1038,7 +1031,6 @@ void store_pic(int r,SValue *v)
 void store(int r, SValue *v)
 {
     int fr, bt, ft, fc;
-    int op64 = 0;
 
 #ifdef TCC_TARGET_PE
     SValue v2;
@@ -1472,7 +1464,6 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
     case VT_FUNC:
     case VT_ENUM:
 	if (nret > 0) {
-	    int align;
 	    ret[0].type = *ty;
 	    ret[0].c.ull = 0;
 	    ret[0].r = TREG_RAX;
@@ -1483,7 +1474,6 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
     case VT_FLOAT:
     case VT_DOUBLE:
 	if (nret > 0) {
-	    int align;
 	    ret[0].type = *ty;
 	    ret[0].c.ull = 0;
 	    ret[0].r = TREG_XMM0;
@@ -1605,7 +1595,7 @@ static X86_64_Mode classify_x86_64_inner_new(CType *ty, SValue *ret, int nret, i
 
 static X86_64_Mode classify_x86_64_arg_new(CType *ty, SValue *ret, int nret, int *psize, int *palign, int *offset) {
     X86_64_Mode mode;
-    int size, align, ret_t = 0;
+    int size, align;
 
     if (nret)
 	ret[0].type.ref = ty->ref;
@@ -1787,8 +1777,7 @@ int expand_struct_eightbytes(void) {
    parameters and the function address. */
 void gfunc_call(int nb_args)
 {
-    CType type;
-    int r, args_size, stack_adjust, run_start, run_end, i, j;
+    int r, args_size, stack_adjust, run_start, run_end, i;
     int nb_reg_args = 0;
     int nb_sse_args = 0;
     int nb_x87_args = 0;
@@ -1846,7 +1835,7 @@ void gfunc_call(int nb_args)
 		}
 	    } else if (ret[j].r == TREG_XMM0 ||
 		       ret[j].r == TREG_XMM1) {
-		assert(mode == x86_64_mode_sse || off > start + 1 && mode == x86_64_mode_integer);
+		assert(mode == x86_64_mode_sse || (off > start + 1 && mode == x86_64_mode_integer));
 		int idx = prel_nb_sse_args;
 
 		if ((ret[j].c.ull & 7) != 0) {
@@ -1877,7 +1866,6 @@ void gfunc_call(int nb_args)
 	    }
 	}
 
-    success:
 	/* success */
 	nb_reg_args = prel_nb_reg_args;
 	nb_sse_args = prel_nb_sse_args;
@@ -1921,7 +1909,6 @@ void gfunc_call(int nb_args)
 
 		if(ret[j].r == VT_CONST) {
 		    int size, align;
-		stack_arg:
 		    size = type_size(&ret[j].type, &align);
 		    size += 7;
 		    size &= -8;
@@ -1934,7 +1921,6 @@ void gfunc_call(int nb_args)
 		    else
 			stack_adjust += size;
 		} else if(ret[j].r >= TREG_XMM0) {
-		sse_arg:
 		    if (new_eightbyte) {
 			assert(ret[j].r >= TREG_XMM0);
 		    }
@@ -2486,11 +2472,11 @@ void gen_opi(int op)
 		vtop[-1].r = or;
 		cache_value(&vtop[0], vtop[0].r);
 		uncache = 0;
-	    } else if (c == 1 && opc == 0 || c == -1 && opc == 5) {
+	    } else if ((c == 1 && opc == 0) || (c == -1 && opc == 5)) {
                 /* inc r */
                 orex(ll?64:32, r, 0, 0xff);
                 o(0xc0 + REG_VALUE(r));
-            } else if (c == -1 && opc == 0 || c == 1 && opc == 5) {
+            } else if ((c == -1 && opc == 0) || (c == 1 && opc == 5)) {
                 /* dec r */
                 orex(ll?64:32, r, 0, 0xff);
                 o(0xc8 + REG_VALUE(r));

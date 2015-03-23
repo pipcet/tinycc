@@ -589,8 +589,6 @@ ST_FUNC void cache_value(SValue *v, int r)
     }
 }
 
-ST_FUNC int find_cached_value(SValue *v);
-
 ST_FUNC void uncache_value_by_register(int r)
 {
     if(r >= 0 && r<NB_REGS) {
@@ -1273,7 +1271,7 @@ ST_FUNC void vpop(void)
    register */
 static void gv_dup(void)
 {
-    int rc, t, r, r1;
+    int t, r, r1;
     SValue sv;
 
     t = vtop->type.t;
@@ -4173,7 +4171,7 @@ ST_FUNC void unary(void)
         } else if (tok == '(') {
             SValue ret[16];
             Sym *sa;
-            int nb_args, nb_ret, sret, sret_addr;
+            int nb_args, sret, sret_addr;
 	    int i;
 
 	    for(i=0; i<16; i++) {
@@ -4203,10 +4201,8 @@ ST_FUNC void unary(void)
             next();
             sa = s->next; /* first parameter */
             nb_args = 0;
-	    nb_ret = 1;
             /* compute first implicit argument if a structure is returned */
 	    int ret_align;
-	    CType dummy;
 
 	    sret = gfunc_sret_new(&s->type, ret, 16, &ret_align);
 	    if (sret) {
@@ -4219,10 +4215,8 @@ ST_FUNC void unary(void)
 		vseti(VT_LOCAL, loc);
 		vtop[0].type.t = VT_LLONG;
 		nb_args++;
-		nb_ret = 0;
 		save_regs(0); /* XXX */
 	    } else {
-		nb_ret = (ret[0].type.t != VT_VOID) + (ret[1].type.t != VT_VOID);
 		save_regs(0); /* XXX */
             }
 
@@ -4861,7 +4855,6 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
 		}
 
                 if (gfunc_sret_new(&func_vt, ret, 16, &ret_align)) {
-		    CType ret_type = ret[0].type;
                     /* if returning structure, must copy it to implicit
                        first pointer arg location */
                     type = func_vt;
