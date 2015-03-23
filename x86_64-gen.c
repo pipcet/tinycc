@@ -81,8 +81,6 @@ enum {
     TREG_XMM7 = 23,
 
     TREG_ST0 = 24,
-
-    TREG_MEM = 0x20,
 };
 
 #define REX_BASE(reg) (((reg) >> 3) & 1)
@@ -126,7 +124,7 @@ enum {
 #include "tcc.h"
 #include <assert.h>
 
-ST_DATA const RegSet rc_int   = 0x0f07;
+ST_DATA const RegSet rc_int   = 0x00c7;
 ST_DATA const RegSet rc_float = 0xff0000;
 ST_DATA const RegSet rc_rax   = 1 <<  0;
 ST_DATA const RegSet rc_rcx   = 1 <<  1;
@@ -710,7 +708,7 @@ static void gen_gotpcrel(int r, Sym *sym, int c)
     }
 }
 
-static void gen_modrm_impl(int op_reg, int r, Sym *sym, int c, int is_got)
+static void gen_modrm_impl(int op_reg, int r, Sym *sym, int c, int is_got, int is_mem)
 {
     op_reg = REG_VALUE(op_reg) << 3;
     if ((r & VT_VALMASK) == VT_CONST) {
@@ -721,6 +719,13 @@ static void gen_modrm_impl(int op_reg, int r, Sym *sym, int c, int is_got)
         } else {
             gen_addrpc32(r, sym, c);
         }
+    } else if (is_mem) {
+        if (c) {
+            g(0x80 | op_reg | REG_VALUE(r));
+            gen_le32(c);
+        } else {
+            g(0x00 | op_reg | REG_VALUE(r));
+        }
     } else if ((r & VT_VALMASK) == VT_LOCAL) {
         /* currently, we use only ebp as base */
         if (c == (char)c) {
@@ -730,13 +735,6 @@ static void gen_modrm_impl(int op_reg, int r, Sym *sym, int c, int is_got)
         } else {
             oad(0x85 | op_reg, c);
         }
-    } else if ((r & VT_VALMASK) >= TREG_MEM) {
-        if (c) {
-            g(0x80 | op_reg | REG_VALUE(r));
-            gen_le32(c);
-        } else {
-            g(0x00 | op_reg | REG_VALUE(r));
-        }
     } else {
         g(0x00 | op_reg | REG_VALUE(r));
     }
@@ -744,25 +742,25 @@ static void gen_modrm_impl(int op_reg, int r, Sym *sym, int c, int is_got)
 
 /* generate a modrm reference. 'op_reg' contains the additional 3
    opcode bits */
-static void gen_modrm(int op_reg, int r, Sym *sym, int c)
+static void gen_modrm(int op_reg, int r, Sym *sym, int c, int is_mem)
 {
-    gen_modrm_impl(op_reg, r, sym, c, 0);
+    gen_modrm_impl(op_reg, r, sym, c, 0, is_mem);
 }
 
 /* generate a modrm reference. 'op_reg' contains the additional 3
    opcode bits */
-static void gen_modrm64(int opcode, int op_reg, int r, Sym *sym, int c)
+static void gen_modrm64(int opcode, int op_reg, int r, Sym *sym, int c, int is_mem)
 {
     int is_got;
-    is_got = (op_reg & TREG_MEM) && !(sym->type.t & VT_STATIC);
+    is_got = is_mem && !(sym->type.t & VT_STATIC);
     orex(64, r, op_reg, opcode);
-    gen_modrm_impl(op_reg, r, sym, c, is_got);
+    gen_modrm_impl(op_reg, r, sym, c, is_got, is_mem);
 }
 
 /* load 'r' from value 'sv' */
 void load(int r, SValue *sv)
 {
-    int v, t, ft, fc, fr;
+    int v, t, ft, fc, fr, is_mem = 0;
     SValue v1;
 
     uncache_value_by_register(r);
@@ -781,12 +779,13 @@ void load(int r, SValue *sv)
     if ((fr & VT_VALMASK) == VT_CONST && (fr & VT_SYM) &&
         (fr & VT_LVAL) && !(sv->sym->type.t & VT_STATIC)) {
         /* use the result register as a temporal register */
-        int tr = r | TREG_MEM;
+        int tr = r;
+	is_mem = 1;
         if (is_float(ft)) {
             /* we cannot use float registers as a temporal register */
-            tr = get_reg(rc_int) | TREG_MEM;
+            tr = get_reg(rc_int);
         }
-        gen_modrm64(0x8b, tr, fr, sv->sym, 0);
+        gen_modrm64(0x8b, tr, fr, sv->sym, 0, is_mem);
 
         /* load from the temporal register */
         fr = tr | VT_LVAL;
@@ -801,6 +800,7 @@ void load(int r, SValue *sv)
             v1.r = VT_LOCAL | VT_LVAL;
             v1.c.ul = fc;
             fr = r;
+	    is_mem = 0;
 	    /* when we load %r11, use %r11 as a temp register, not another integer register. */
             if (!(fr == TREG_R11 ||
 		  regset_has(rc_int, fr)))
@@ -840,10 +840,10 @@ void load(int r, SValue *sv)
 	    bs = is64_type(ft) ? 64 : 32;
         }
         if (ll) {
-            gen_modrm64(b, r, fr, sv->sym, fc);
+            gen_modrm64(b, r, fr, sv->sym, fc, is_mem);
         } else {
             orex(bs, fr, r, b);
-            gen_modrm(r, fr, sv->sym, fc);
+            gen_modrm(r, fr, sv->sym, fc, is_mem);
         }
 	uncache_value_by_register(r);
 	cache_value(sv, r);
@@ -884,7 +884,7 @@ void load(int r, SValue *sv)
             }
         } else if (v == VT_LOCAL) {
             orex(64,0,r,0x8d); /* lea xxx(%ebp), r */
-            gen_modrm(r, VT_LOCAL, sv->sym, fc);
+            gen_modrm(r, VT_LOCAL, sv->sym, fc, 0);
         } else if (v == VT_CMP) {
 	    flags_used_counter++;
 	    ib();
@@ -1074,7 +1074,7 @@ void store(int r, SValue *v)
     }
 
     if (fr == VT_CONST || fr == VT_LOCAL || (v->r & VT_LVAL)) {
-	gen_modrm(r, v->r, v->sym, fc);
+	gen_modrm(r, v->r, v->sym, fc, 0);
     } else if (fr != r) {
 	o(0xc0 + REG_VALUE(fr) + REG_VALUE(r) * 8); /* mov r, fr */
     }
@@ -1327,7 +1327,7 @@ void gfunc_prolog(CType *func_type)
     func_vt = sym->type;
     size = gfunc_arg_size(&func_vt);
     if (size > 8) {
-        gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
+        gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr, 0);
 	/* does this not break for nested functions ? */
         func_vc = addr;
         reg_param_index++;
@@ -1341,7 +1341,7 @@ void gfunc_prolog(CType *func_type)
         size = gfunc_arg_size(type);
         if (size > 8) {
             if (reg_param_index < REGN) {
-                gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
+                gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr, 0);
             }
             sym_push(sym->v & ~SYM_FIELD, type, VT_LOCAL | VT_LVAL | VT_REF, addr);
         } else {
@@ -1349,9 +1349,9 @@ void gfunc_prolog(CType *func_type)
                 /* save arguments passed by register */
                 if ((bt == VT_FLOAT) || (bt == VT_DOUBLE)) {
                     o(0xd60f66); /* movq */
-                    gen_modrm(reg_param_index, VT_LOCAL, NULL, addr);
+                    gen_modrm(reg_param_index, VT_LOCAL, NULL, addr, 0);
                 } else {
-                    gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
+                    gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr, 0);
                 }
             }
             sym_push(sym->v & ~SYM_FIELD, type, VT_LOCAL | VT_LVAL, addr);
@@ -1362,7 +1362,7 @@ void gfunc_prolog(CType *func_type)
 
     while (reg_param_index < REGN) {
         if (func_type->ref->c == FUNC_ELLIPSIS) {
-            gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
+            gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr, 0);
             addr += 8;
         }
         reg_param_index++;
@@ -2134,7 +2134,7 @@ void gfunc_call(int nb_args)
 
 static void push_arg_reg(int i) {
     loc -= 8;
-    gen_modrm64(0x89, arg_regs[i], VT_LOCAL, NULL, loc);
+    gen_modrm64(0x89, arg_regs[i], VT_LOCAL, NULL, loc, 0);
 }
 
 /* generate function prolog of type 't' */
@@ -2210,7 +2210,7 @@ void gfunc_prolog(CType *func_type)
         for (i = 0; i < 8; i++) {
             loc -= 16;
             o(0xd60f66); /* movq */
-            gen_modrm(7 - i, VT_LOCAL, NULL, loc);
+            gen_modrm(7 - i, VT_LOCAL, NULL, loc, 0);
             /* movq $0, loc+8(%rbp) */
             o(0x85c748);
             gen_le32(loc + 8);
@@ -2277,14 +2277,14 @@ void gfunc_prolog(CType *func_type)
 		int r = ret[i].r;
 
 		if (r < 16) {
-		    gen_modrm64(0x89, r, VT_LOCAL, NULL, param_addr + ret[i].c.ull);
+		    gen_modrm64(0x89, r, VT_LOCAL, NULL, param_addr + ret[i].c.ull, 0);
 		} else if (r >= TREG_XMM0 && r <= TREG_XMM7) {
 		    /* strictly speaking, we don't need orex here for
 		       the default ABI, but in case someone modifies it
 		       to pass more than eight SSE arguments ... */
 		    o(0x66);
 		    orex(0, r, 0, 0xd60f); /* movq */
-                    gen_modrm(r, VT_LOCAL, NULL, param_addr + ret[i].c.ull);
+                    gen_modrm(r, VT_LOCAL, NULL, param_addr + ret[i].c.ull, 0);
 		}
 	    }
             break;
@@ -2768,7 +2768,7 @@ void gen_opf(int op)
             
             if (vtop->r & VT_LVAL) {
 		orex(0, r, vtop[-1].r, 0x2e0f); /* ucomisd */
-                gen_modrm(vtop[-1].r, r, vtop->sym, fc);
+                gen_modrm(vtop[-1].r, r, vtop->sym, fc, 0);
             } else {
 		orex(0, vtop[0].r, vtop[-1].r, 0x2e0f); /* ucomisd */
                 o(0xc0 + REG_VALUE(vtop[0].r) + REG_VALUE(vtop[-1].r)*8);
@@ -2832,7 +2832,7 @@ void gen_opf(int op)
             o(0x58 + a);
             
             if (vtop->r & VT_LVAL) {
-                gen_modrm(vtop[-1].r, r, vtop->sym, fc);
+                gen_modrm(vtop[-1].r, r, vtop->sym, fc, 0);
             } else {
                 o(0xc0 + REG_VALUE(vtop[0].r) + REG_VALUE(vtop[-1].r)*8);
             }
@@ -3001,12 +3001,12 @@ void ggoto(void)
 /* Save the stack pointer onto the stack and return the location of its address */
 ST_FUNC void gen_vla_sp_save(int addr) {
     /* mov %rsp,addr(%rbp)*/
-    gen_modrm64(0x89, TREG_RSP, VT_LOCAL, NULL, addr);
+    gen_modrm64(0x89, TREG_RSP, VT_LOCAL, NULL, addr, 0);
 }
 
 /* Restore the SP from a location on the stack */
 ST_FUNC void gen_vla_sp_restore(int addr) {
-    gen_modrm64(0x8b, TREG_RSP, VT_LOCAL, NULL, addr);
+    gen_modrm64(0x8b, TREG_RSP, VT_LOCAL, NULL, addr, 0);
 }
 
 /* Subtract from the stack pointer, and push the resulting value onto the stack */
