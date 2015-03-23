@@ -911,17 +911,20 @@ void load(int r, SValue *sv)
 		oad(0xb8 + REG_VALUE(r), 0); /* mov $0, r */
 	    check_baddies(r, 0);
 	    ib();
+	    int l = 0;
             if (fc & 0x100)
               {
                 /* This was a float compare.  If the parity bit is
                    set the result was unordered, meaning false for everything
                    except TOK_NE, and true for TOK_NE.  */
                 fc &= ~0x100;
-                o(0x047a);
+		l = psym(0x8a0f, 0);
               }
             orex_always(8,r,0, 0x0f); /* setxx %br XXX mov $0,r; setxx %rb -> setxx, and */
             o(fc);
             o(0xc0 + REG_VALUE(r));
+	    if (l)
+		gsym(l);
 	    flags_used_counter--;
         } else if (v == VT_JMP || v == VT_JMPI) {
 	    flags_used_counter++;
@@ -931,12 +934,13 @@ void load(int r, SValue *sv)
             oad(0xb8 + REG_VALUE(r), t); /* mov $1, r */
 	    check_baddies(r, 0);
 	    ib();
-            o(0x06eb); /* jmp after */
+	    int l = gjmp(0);
             if(gsym_nocommit(fc) > 1)
 	      commit_instructions();
 	    ib();
             orex_always(0,r,0,0); /* not orex! */
             oad(0xb8 + REG_VALUE(r), t ^ 1); /* mov $0, r */
+	    gsym(l);
 	    check_baddies(r, 0);
 	    flags_used_counter--;
         } else if (v != r) {
@@ -2330,6 +2334,7 @@ int gtst(int inv, int t)
 
     v = vtop->r & VT_VALMASK;
     if (v == VT_CMP) {
+	int l = 0;
         /* fast case : can jump directly since flags are set */
 	if (vtop->c.i & 0x100)
 	  {
@@ -2342,7 +2347,7 @@ int gtst(int inv, int t)
 	       otherwise if unordered we don't want to jump.  */
 	    vtop->c.i &= ~0x100;
 	    if (!inv == (vtop->c.i != TOK_NE))
-	      o(0x067a);  /* jp +6 */
+		l = oad(0x8a0f, 0);
 	    else
 	      {
 	        g(0x0f);
@@ -2354,6 +2359,8 @@ int gtst(int inv, int t)
 	ib();
         g(0x0f);
         t = psym((vtop->c.i - 16) ^ inv, t);
+	if (l)
+	    gsym(l);
 	commit_instructions();
     } else if (v == VT_JMP || v == VT_JMPI) {
         /* && or || optimization */
@@ -2796,16 +2803,12 @@ void gen_opf(int op)
                 gv(rc_float);
                 vswap();
             }
-            
-            if ((ft & VT_BTYPE) == VT_DOUBLE) {
-                o(0xf2);
-            } else {
-                o(0xf3);
-            }
+
+	    int is_double = ((ft & VT_BTYPE) == VT_DOUBLE);
             if (vtop->r & VT_LVAL) {
-		orex(0, r, vtop[-1].r, 0);
+		orex(0, r, vtop[-1].r, is_double ? 0xf2 : 0xf3);
             } else {
-		orex(0, vtop[-1].r, vtop[0].r, 0);
+		orex(0, vtop[-1].r, vtop[0].r, is_double ? 0xf2 : 0xf3);
             }
 
             o(0x0f);
@@ -2893,8 +2896,7 @@ void gen_cvt_ftof(int t)
         } else if (tbt == VT_LDOUBLE) {
             save_reg(rc_st0);
             /* movss %xmm0,-0x10(%rsp) */
-            o(0x110ff3);
-	    orex(0, vtop->r, 0, 0);
+	    orex(0, vtop->r, 0, 0x110ff3);
             o(0x44 + REG_VALUE(vtop->r)*8);
             o(0xf024);
             o(0xf02444d9); /* flds -0x10(%rsp) */
@@ -2964,14 +2966,8 @@ void gen_cvt_ftoi(int t)
 
     r = get_reg(rc_int);
     get_flags();
-    if (bt == VT_FLOAT) {
-        o(0xf3);
-    } else if (bt == VT_DOUBLE) {
-        o(0xf2);
-    } else {
-        assert(0);
-    }
-    orex(size * 8, vtop->r&8, r, 0); /* cvttss2si or cvttsd2si */
+    int is_double = (bt == VT_DOUBLE);
+    orex(size * 8, vtop->r&8, r, is_double ? 0xf2 : 0xf3); /* cvttss2si or cvttsd2si */
     o(0x2c0f);
     o(0xc0 + REG_VALUE(vtop->r) + REG_VALUE(r)*8);
     vtop->r = r;
