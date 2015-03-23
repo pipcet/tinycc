@@ -1695,7 +1695,6 @@ void gfunc_call(int nb_args)
     int nb_x87_args = 0;
     // int offsets[nb_args+1]; VLAs broken in upstream
     int offsets[256];
-    int offsets2[256];
     SValue ret[256]; /* XXX */
     int nret = 256;
     int off = 0;
@@ -1721,7 +1720,6 @@ void gfunc_call(int nb_args)
 
 	offsets[i] = off;
         mode = classify_x86_64_arg_new(&vtop[-i2].type, ret+off, nret-off, &size, &align, &off);
-	offsets2[i] = off;
 
 	if (mode == x86_64_mode_memory)
 	    continue;
@@ -1795,6 +1793,8 @@ void gfunc_call(int nb_args)
 	prel_nb_x87_args = nb_x87_args;
 	goto success; /* for now, we're counting integer arguments, not register arguments, in nb_reg_args */
     }
+    if (i < nret)
+	offsets[i] = off;
 
     /* arguments are collected in runs. Each run is a collection of 8-byte aligned arguments
        and ended by a 16-byte aligned argument. This is because, from the point of view of
@@ -1812,7 +1812,7 @@ void gfunc_call(int nb_args)
         for(i = run_start; (i < nb_args) && (run_end == nb_args); i++) {
 	    int i2 = nb_args-1-i;
 	    int off = 0, j;
-	    for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
+	    for(j=offsets[i2+1]-offsets[i2]-1; j>=0; j--) {
 		if(ret[offsets[i2]+j].type.t == VT_VOID)
 		    continue;
 
@@ -1876,7 +1876,7 @@ void gfunc_call(int nb_args)
             
 	    int off = 0, j;
             int arg_stored = 0;
-	    for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
+	    for(j=offsets[i2+1]-offsets[i2]-1; j>=0; j--) {
 		if(ret[offsets[i2]+j].type.t == VT_VOID) {
 		    continue;
 		}
@@ -1900,7 +1900,7 @@ void gfunc_call(int nb_args)
 
 	    if (arg_stored) {
 		int size, align;
-		for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
+		for(j=offsets[i2+1]-offsets[i2]-1; j>=0; j--) {
 		    ret[offsets[i2]+j].r = VT_CONST;
 		}
 		size = type_size(&vtop->type, &align);
@@ -2014,7 +2014,7 @@ void gfunc_call(int nb_args)
 	int i2 = nb_args-1-i;
 	int off = 0, j;
 
-	off = offsets2[i2] - offsets[i2];
+	off = offsets[i2+1] - offsets[i2];
 
 	unsigned long long struct_offset = 0;
 	int pop_structs = 0;
