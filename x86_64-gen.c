@@ -1112,13 +1112,13 @@ static void gcall_or_jmp(int is_jmp)
         }
         oad(0xe8 + is_jmp, vtop->c.ul - 4); /* call/jmp im */
     } else {
-        /* otherwise, indirect call. XXX use gv(RC_INT) instead. */
+        /* otherwise, indirect call. */
         r = get_reg(rc_int);
 	save_reg(r);
 	start_special_use(r);
         load(r, vtop);
-	orex(32 /* XXX or 64? */, r, 0, 0xff);
-        o(0xd0 + REG_VALUE(r) + (is_jmp << 4));
+	orex(0, r, 0, 0xff);
+        o(0xd0 + REG_VALUE(r) + (is_jmp ? 0x10 : 0));
 	end_special_use(r);
     }
     commit_instructions(); /* all caller-saved registers have been clobbered */
