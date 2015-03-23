@@ -553,6 +553,13 @@ void gen_le64(int64_t c)
 void orex(int bitsize, int r, int r2, int b)
 {
     int emit = bitsize == 64;
+
+    ib();
+    if ((b & 0xff) == 0x66) {
+	o(b&0xff);
+	b>>=8;
+    }
+
     if (bitsize == 8 && r >= 4)
 	emit = 1;
     if (bitsize == 8 && r2 >= 4)
@@ -560,7 +567,6 @@ void orex(int bitsize, int r, int r2, int b)
     int rex = 0x40 | REX_BASE(r) | (REX_BASE(r2) << 2) | ((bitsize == 64) << 3);
     if (rex != 0x40)
 	emit = 1;
-    ib();
     if ((r & VT_VALMASK) >= VT_CONST)
         r = 0;
     if ((r2 & VT_VALMASK) >= VT_CONST)
@@ -821,12 +827,10 @@ void load(int r, SValue *sv)
         }
         ll = 0;
         if ((ft & VT_BTYPE) == VT_FLOAT) {
-	    o(0x66);
-            b = 0x6e0f;
+            b = 0x6e0f66;
 	    bs = 0;
         } else if ((ft & VT_BTYPE) == VT_DOUBLE) {
-	    o(0xf3);
-            b = 0x7e0f; /* movq */
+            b = 0x7e0ff3; /* movq */
 	    bs = 0;
         } else if ((ft & VT_BTYPE) == VT_LDOUBLE) {
             b = 0xdb, r = 5; /* fldt */
@@ -995,16 +999,14 @@ void store_pic(int r,SValue *v)
 
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
-	o(0x66);
-	orex(0, v->r, r, 0x0f);
+	orex(0, v->r, r, 0x0f66);
 	if (r < TREG_XMM0)
 	    o(0x7e); /* movd/movq */
 	else
 	    o(0xd6);
         r = REG_VALUE(r);
     } else if (bt == VT_DOUBLE) {
-        o(0x66);
-        orex(0, pic_reg, r, 0x0f);
+        orex(0, pic_reg, r, 0x0f66);
         o(0xd6); /* movq */
         r = REG_VALUE(r);
     } else if (bt == VT_LDOUBLE) {
@@ -1012,9 +1014,10 @@ void store_pic(int r,SValue *v)
         r = 7;
         orex(0, pic_reg, r, 0xdb); /* fstpt */
     } else {
-        if (bt == VT_SHORT)
-	    o(0x66);
-        if (bt == VT_BYTE || bt == VT_BOOL) {
+	ib();
+        if (bt == VT_SHORT) {
+	    orex(16, pic_reg, r, 0x8966);
+	} else if (bt == VT_BYTE || bt == VT_BOOL) {
             orex(8, pic_reg, r, 0x88);
         } else if (is64_type(bt)) {
 	    orex(64, pic_reg, r, 0x89);
@@ -1051,24 +1054,22 @@ void store(int r, SValue *v)
 #endif
 
     if (bt == VT_FLOAT) {
-	o(0x66);
-	orex(0, fr, r, 0x0f);
+	orex(0, fr, r, 0x0f66);
 	if (fr < TREG_XMM0 || fr > TREG_XMM0 + 15)
 	    o(0x7e); /* movd */
 	else
 	    o(0xd6); /* movq */
     } else if (bt == VT_DOUBLE) {
-        o(0x66);
-	orex(0, v->r, r, 0x0f);
+	orex(0, v->r, r, 0x0f66);
         o(0xd6); /* movq */
     } else if (bt == VT_LDOUBLE) {
         o(0xc0d9); /* fld %st(0) */
         r = 7;
 	orex(0, fr, 0, 0xdb); /* fstpt */
     } else {
-        if (bt == VT_SHORT)
-	    o(0x66);
-        if (bt == VT_BYTE || bt == VT_BOOL) {
+        if (bt == VT_SHORT) {
+	    orex(16, fr, r, 0x8966);
+        } else if (bt == VT_BYTE || bt == VT_BOOL) {
             orex(8, fr, r, 0x88);
         } else if (is64_type(bt)) {
 	    orex(64, fr, r, 0x89);
@@ -1262,8 +1263,7 @@ void gfunc_call(int nb_args)
                     o(0xc0 + (arg << 3));
                     d = arg_prepare_reg(arg);
                     /* mov %xmm0, %rxx */
-                    o(0x66);
-                    orex(64,d,0, 0x7e0f);
+                    orex(64,d,0, 0x7e0f66);
                     o(0xc0 + REG_VALUE(d));
 		    start_special_use(d);
                 }
@@ -2256,8 +2256,7 @@ void gfunc_prolog(CType *func_type)
 		    /* strictly speaking, we don't need orex here for
 		       the default ABI, but in case someone modifies it
 		       to pass more than eight SSE arguments ... */
-		    o(0x66);
-		    orex(0, r, 0, 0xd60f); /* movq */
+		    orex(0, r, 0, 0xd60f66); /* movq */
                     gen_modrm(r, VT_LOCAL, NULL, param_addr + ret[i].c.ull, 0);
 		}
 	    }
@@ -2743,15 +2742,14 @@ void gen_opf(int op)
                 vswap();
             }
             assert(!(vtop[-1].r & VT_LVAL));
-            
-            if ((vtop->type.t & VT_BTYPE) == VT_DOUBLE)
-                o(0x66);
+
+	    int is_double = ((vtop->type.t & VT_BTYPE) == VT_DOUBLE);
             
             if (vtop->r & VT_LVAL) {
-		orex(0, r, vtop[-1].r, 0x2e0f); /* ucomisd */
+		orex(0, r, vtop[-1].r, is_double ? 0x2e0f66 : 0x2e0f); /* ucomisd */
                 gen_modrm(vtop[-1].r, r, vtop->sym, fc, 0);
             } else {
-		orex(0, vtop[0].r, vtop[-1].r, 0x2e0f); /* ucomisd */
+		orex(0, vtop[0].r, vtop[-1].r, is_double ? 0x2e0f66 : 0x2e0f); /* ucomisd */
                 o(0xc0 + REG_VALUE(vtop[0].r) + REG_VALUE(vtop[-1].r)*8);
             }
 
