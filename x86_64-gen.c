@@ -1668,6 +1668,7 @@ int gfunc_sret_new(CType *vt, SValue *ret, int nret, int *ret_align) {
 static const uint8_t arg_regs[REGN] = {
     TREG_RDI, TREG_RSI, TREG_RDX, TREG_RCX, TREG_R8, TREG_R9
 };
+#define REGN_SSE 8
 
 static int arg_prepare_reg(int idx) {
     return arg_regs[idx];
@@ -1679,7 +1680,7 @@ static int arg_prepare_reg(int idx) {
 void gfunc_call(int nb_args)
 {
     CType type;
-    int size, align, r, args_size, stack_adjust, run_start, run_end, i, j, reg_count;
+    int r, args_size, stack_adjust, run_start, run_end, i, j;
     int nb_reg_args = 0;
     int nb_sse_args = 0;
     int nb_x87_args = 0;
@@ -1707,6 +1708,7 @@ void gfunc_call(int nb_args)
 	int j;
 	int i2 = nb_args-1-i;
 	int last_eightbyte = -1;
+	int size, align;
 
 	offsets[i] = off;
         mode = classify_x86_64_arg_new(&vtop[-i2].type, ret+off, nret-off, &size, &align, &off);
@@ -1751,7 +1753,7 @@ void gfunc_call(int nb_args)
 		prel_nb_sse_args++;
 		last_eightbyte = j;
 
-		if (idx < 8) {
+		if (idx < REGN_SSE) {
 		    ret[j].r = TREG_XMM0 + idx;
 		} else {
 		    goto failure;
@@ -1811,6 +1813,7 @@ void gfunc_call(int nb_args)
 		    new_eightbyte = 1;
 
 		if(ret[offsets[i2]+j].r == VT_CONST) {
+		    int size, align;
 		stack_arg:
 		    size = type_size(&ret[offsets[i2]+j].type, &align);
 		    size += 7;
@@ -1850,8 +1853,6 @@ void gfunc_call(int nb_args)
             args_size += stack_adjust;
         }
         
-	reg_count = 0;
-
         for(i = run_start; i < run_end;) {
             /* Swap argument to top, it will possibly be changed here,
               and might use more temps. At the end of the loop we keep
@@ -1889,6 +1890,7 @@ void gfunc_call(int nb_args)
             }
 
 	    if (arg_stored) {
+		int size, align;
 		for(j=offsets2[i2]-offsets[i2]-1; j>=0; j--) {
 		    ret[offsets[i2]+j].r = VT_CONST;
 		}
@@ -1943,18 +1945,15 @@ void gfunc_call(int nb_args)
 	    ++i;
         }
 
-	reg_count = 0;
         /* handle 16 byte aligned arguments at end of run */
-        i = run_end;
-        while (i < nb_args) {
+        for(i = run_end; i < nb_args; i++) {
 	    int i2 = nb_args-1-i;
+	    int size, align;
 
 	    if(ret[offsets[i2]].type.t == VT_VOID) {
-		i++;
 		continue;
 	    }
 
-            /* Rotate argument to top since it will always be popped */
 	    size = type_size(&vtop[-i].type, &align);
 	    size += 7;
 	    size &= -8;
@@ -1963,7 +1962,10 @@ void gfunc_call(int nb_args)
             if (align != 16)
 		break;
 
-	    vrotb(i+1);
+	    int idx = -i;
+            SValue tmp = vtop[0];
+            vtop[0] = vtop[idx];
+            vtop[idx] = tmp;
             
             if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
                 gv(RC_ST0);
@@ -1986,10 +1988,11 @@ void gfunc_call(int nb_args)
                 args_size += size;
             }
 
-	    vrott(i+1);
+            tmp = vtop[0];
+            vtop[0] = vtop[idx];
+            vtop[idx] = tmp;
+
 	    ret[offsets[i2]].r = VT_CONST;
-	    i++;
-	    assert(nb_args >= 0);
         }
 	run_start = i;
     }
@@ -2004,23 +2007,22 @@ void gfunc_call(int nb_args)
 
 	off = offsets2[i2] - offsets[i2];
 
-	int retj = 0;
 	unsigned long long struct_offset = 0;
 	int pop_structs = 0;
-	for(j=0; retj<off; j++) {
-	    if(ret[offsets[i2]+retj].r == VT_CONST) {
-		if (ret[offsets[i2]+retj].type.t == VT_VOID &&
-		    ret[offsets[i2]+retj].c.ull) {
+	for(j=0; j<off; j++) {
+	    if(ret[offsets[i2]+j].r == VT_CONST) {
+		if (ret[offsets[i2]+j].type.t == VT_VOID &&
+		    ret[offsets[i2]+j].c.ull) {
 		    vtop--;
-		    retj++;
+		    j++;
 		    nb_args--;
-		} else if (ret[offsets[i2]+retj].type.t == VT_VOID) {
+		} else if (ret[offsets[i2]+j].type.t == VT_VOID) {
 		    nb_args--;
-		    retj++;
+		    j++;
 		    continue;
 		} else {
 		    vtop--;
-		    retj++;
+		    j++;
 		    nb_args--;
 		    continue;
 		}
@@ -2028,12 +2030,12 @@ void gfunc_call(int nb_args)
 
 	    /* XXX fix for nested structs */
 	    while((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
-		CType ty = ret[offsets[i2]+retj].type;
+		CType ty = ret[offsets[i2]+j].type;
 		vdup();
 		gaddrof();
 		vtop->type.t = VT_LLONG;
-		vpushi(ret[offsets[i2]+retj].c.i);
-		if(ret[offsets[i2]+retj].c.i == 0)
+		vpushi(ret[offsets[i2]+j].c.i);
+		if(ret[offsets[i2]+j].c.i == 0)
 		    pop_structs++;
 		gen_op('+');
 		mk_pointer(&ty);
@@ -2041,7 +2043,7 @@ void gfunc_call(int nb_args)
 		indir();
 	    }
 
-	    int d = ret[offsets[i2]+retj].r;
+	    int d = ret[offsets[i2]+j].r;
 	    int r = gv((d >= TREG_XMM0) ? (RC_XMM0 << (d-TREG_XMM0)) : RC_INT);
 
 	    if(r == d) {
@@ -2062,7 +2064,6 @@ void gfunc_call(int nb_args)
 
 	    vtop--;
 	    nb_args--;
-	    retj++;
 	}
 
 	if (pop_structs--) {
@@ -2172,7 +2173,7 @@ void gfunc_prolog(CType *func_type)
 		    }
 		}
 		if (arg_reg_num > REGN ||
-		    arg_sse_num > 8) {
+		    arg_sse_num > REGN_SSE) {
 		    goto stack_arg;
 		} else {
 		    seen_reg_num = arg_reg_num;
@@ -2249,7 +2250,7 @@ void gfunc_prolog(CType *func_type)
 		    ++reg_param_index;
 		} else if (ret[i].r == TREG_XMM0 ||
 			   ret[i].r == TREG_XMM1) {
-		    if (sse_param_index >= 8) {
+		    if (sse_param_index >= REGN_SSE) {
 			goto revert_assignments;
 		    }
 		    ret[i].r = TREG_XMM0 + sse_param_index;
