@@ -634,6 +634,15 @@ int get_index(void)
    reference to a symbol. It is in fact the same as oad ! */
 #define psym oad
 
+/* convenience function since x86 flags are so volatile */
+static void get_flags(void)
+{
+    if (vtop >= vstack && ((vtop->r & VT_VALMASK) == VT_CMP ||
+			   (vtop->r & VT_VALMASK) == VT_JMP ||
+			   (vtop->r & VT_VALMASK) == VT_JMPI))
+	gv(rc_int);
+}
+
 static int is64_type(int t)
 {
     return ((t & VT_BTYPE) == VT_PTR ||
@@ -1087,12 +1096,8 @@ void store(int r, SValue *v)
 /* 'is_jmp' is '1' if it is a jump */
 static void gcall_or_jmp(int is_jmp)
 {
+    get_flags();
     int r;
-    /* XXXpipcet I think this is the place where we go wrong when running
-     * code like
-     *    ((int (*)(int))1000000000000)(3).
-     * The constant is larger than 32 bits, but the relative call instruction
-     * is limited to 32-bit offsets. */
     if (((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST) &&
 	((vtop->r & VT_SYM) || ((vtop->c.ll-4) == (int)(vtop->c.ll-4)))) {
         /* constant case */
@@ -1946,9 +1951,7 @@ void gfunc_call(int nb_args)
         
         /* adjust stack to align SSE boundary */
         if (stack_adjust &= 15) {
-            /* fetch cpu flag before the following sub will change the value. What about VT_JMP[I]? */
-            if (vtop >= vstack && (vtop->r & VT_VALMASK) == VT_CMP)
-                gv(rc_int);
+	    get_flags();
 
             stack_adjust = 16 - stack_adjust;
             o(0x48);
@@ -2477,7 +2480,8 @@ void gen_opi(int op)
     case '+':
     case TOK_ADDC1: /* add with carry generation */
         opc = 0;
-    gen_op8: ;
+    gen_op8:
+	get_flags();
 	int uncache = 1;
         /* so I assume that's the idiom for checking 32-bit-ness */
         if (cc && (!ll || (int)vtop->c.ll == vtop->c.ll) &&
@@ -2583,6 +2587,7 @@ void gen_opi(int op)
     case TOK_SAR:
         opc = 7;
     gen_shift:
+	get_flags();
         opc = 0xc0 | (opc << 3);
         if (cc) {
 	    /* XXX cc = 1,2,3 -> lea */
@@ -2613,6 +2618,7 @@ void gen_opi(int op)
     case TOK_PDIV:
         uu = 0;
     divmod:
+	get_flags();
         /* first operand must be in eax */
         /* XXX: need better constraint for second operand */
         gv2(rc_rax, rc_rcx);
@@ -2642,7 +2648,7 @@ void gen_opl(int op)
 }
 
 /* generate a floating point operation 'v = t1 op t2' instruction. The
-   two operands are guaranted to have the same floating point type */
+   two operands are guaranteed to have the same floating point type */
 /* XXX: need to use ST1 too */
 void gen_opf(int op)
 {
@@ -2675,6 +2681,7 @@ void gen_opf(int op)
     }
     if ((vtop->type.t & VT_BTYPE) == VT_LDOUBLE) {
         if (op >= TOK_ULT && op <= TOK_GT) {
+	    get_flags();
             /* load on stack second operand */
             load(TREG_ST0, vtop);
             save_reg(TREG_RAX); /* eax is used by FP comparison code */
@@ -2704,6 +2711,7 @@ void gen_opf(int op)
             vtop->r = VT_CMP;
             vtop->c.i = op;
         } else {
+	    get_flags();
             /* no memory reference possible for long double operations */
             load(TREG_ST0, vtop);
             swapped = !swapped;
@@ -2735,6 +2743,8 @@ void gen_opf(int op)
         }
     } else {
         if (op >= TOK_ULT && op <= TOK_GT) {
+	    get_flags();
+
             /* if saved lvalue, then we must reload it */
             r = vtop->r;
             fc = vtop->c.ul;
@@ -2781,6 +2791,7 @@ void gen_opf(int op)
             vtop->r = VT_CMP;
             vtop->c.i = op | 0x100;
         } else {
+	    get_flags();
             assert((vtop->type.t & VT_BTYPE) != VT_LDOUBLE);
             switch(op) {
             default:
@@ -2850,6 +2861,7 @@ void gen_opf(int op)
 void gen_cvt_itof(int t)
 {
     if ((t & VT_BTYPE) == VT_LDOUBLE) {
+	get_flags();
         save_reg(TREG_ST0);
         gv(rc_int);
         if ((vtop->type.t & VT_BTYPE) == VT_LLONG) {
@@ -2877,6 +2889,7 @@ void gen_cvt_itof(int t)
         }
         vtop->r = TREG_ST0;
     } else {
+	get_flags();
         int r = get_reg(rc_float);
 	int bs = 32;
         gv(rc_int);
@@ -2902,6 +2915,7 @@ void gen_cvt_ftof(int t)
     tbt = t & VT_BTYPE;
     
     if (bt == VT_FLOAT) {
+	get_flags();
         gv(rc_float);
         if (tbt == VT_DOUBLE) {
 	    orex(0, vtop->r, vtop->r, 0);
@@ -2921,6 +2935,7 @@ void gen_cvt_ftof(int t)
             vtop->r = TREG_ST0;
         }
     } else if (bt == VT_DOUBLE) {
+	get_flags();
         gv(rc_float);
         if (tbt == VT_FLOAT) {
 	    orex(0, vtop->r, vtop->r, 0);
@@ -2940,6 +2955,7 @@ void gen_cvt_ftof(int t)
             vtop->r = TREG_ST0;
         }
     } else {
+	get_flags();
         int r;
         gv(rc_st0);
         r = get_reg(rc_float);
@@ -2981,6 +2997,7 @@ void gen_cvt_ftoi(int t)
         size = 4;
 
     r = get_reg(rc_int);
+    get_flags();
     if (bt == VT_FLOAT) {
         o(0xf3);
     } else if (bt == VT_DOUBLE) {
@@ -3003,17 +3020,20 @@ void ggoto(void)
 
 /* Save the stack pointer onto the stack and return the location of its address */
 ST_FUNC void gen_vla_sp_save(int addr) {
+    get_flags();
     /* mov %rsp,addr(%rbp)*/
     gen_modrm64(0x89, TREG_RSP, VT_LOCAL, NULL, addr, 0);
 }
 
 /* Restore the SP from a location on the stack */
 ST_FUNC void gen_vla_sp_restore(int addr) {
+    get_flags();
     gen_modrm64(0x8b, TREG_RSP, VT_LOCAL, NULL, addr, 0);
 }
 
 /* Subtract from the stack pointer, and push the resulting value onto the stack */
 ST_FUNC void gen_vla_alloc(CType *type, int align) {
+    get_flags();
 #ifdef TCC_TARGET_PE
     /* alloca does more than just adjust %rsp on Windows */
     vpush_global_sym(&func_old_type, TOK_alloca);
