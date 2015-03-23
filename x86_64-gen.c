@@ -1058,14 +1058,13 @@ void store(int r, SValue *v)
     }
 #endif
 
-    /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
 	o(0x66);
-	orex(0, v->r, r, 0x0f);
-	if (v->r < TREG_XMM0 || v->r > TREG_XMM0 + 15)
-	    o(0x7e); /* movd/movq */
+	orex(0, fr, r, 0x0f);
+	if (fr < TREG_XMM0 || fr > TREG_XMM0 + 15)
+	    o(0x7e); /* movd */
 	else
-	    o(0xd6);
+	    o(0xd6); /* movq */
     } else if (bt == VT_DOUBLE) {
         o(0x66);
 	orex(0, v->r, r, 0x0f);
@@ -1073,16 +1072,16 @@ void store(int r, SValue *v)
     } else if (bt == VT_LDOUBLE) {
         o(0xc0d9); /* fld %st(0) */
         r = 7;
-	orex(0, v->r, 0, 0xdb); /* fstpt */
+	orex(0, fr, 0, 0xdb); /* fstpt */
     } else {
         if (bt == VT_SHORT)
 	    o(0x66);
         if (bt == VT_BYTE || bt == VT_BOOL) {
-            orex(8, v->r, r, 0x88);
+            orex(8, fr, r, 0x88);
         } else if (is64_type(bt)) {
-	    orex(64, v->r, r, 0x89);
+	    orex(64, fr, r, 0x89);
         } else {
-	    orex(32, v->r, r, 0x89);
+	    orex(32, fr, r, 0x89);
 	}
     }
 
