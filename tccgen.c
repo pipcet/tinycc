@@ -696,20 +696,6 @@ ST_FUNC int get_reg_ex(int rc, int rc2)
 }
 #endif
 
-ST_FUNC int get_specific_reg(int r)
-{
-    SValue *p;
-
-    for(p=vstack;p<=vtop;p++) {
-	if ((p->r & VT_VALMASK) == r)
-	    return -1;
-    }
-    if (register_contents[r].special_use)
-	return -1;
-    uncache_value_by_register(r);
-    return r;
- }
-
 /* find a free register in set 'rs'. If none, save one register */
 ST_FUNC int get_reg(RegSet rs)
 {
@@ -972,7 +958,7 @@ ST_FUNC int gv(RegSet rc)
 	    if (r1 != -1)
 		/* XXX understand why this is ever false */
 		if(regset_has(rc, r1))
-		    r = get_specific_reg(r1);
+		    r = get_reg(regset_singleton(r1));
 	    if (r == -1)
 		r = get_reg(rc);
 	    assert(r != -1);

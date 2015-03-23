@@ -2065,7 +2065,7 @@ void gfunc_call(int nb_args)
 		save_reg(d);
 		vtop--;
 		vpushi(0);
-		get_specific_reg(d);
+		get_reg(regset_singleton(d));
 		start_special_use(d);
 
 		orex(64,d,r,0x89); /* mov */
@@ -2095,7 +2095,7 @@ void gfunc_call(int nb_args)
       o(0xc031); /* xor %eax,%eax */
     }
     save_reg(TREG_RAX);
-    get_specific_reg(TREG_RAX);
+    get_reg(regset_singleton(TREG_RAX));
     start_special_use(TREG_RAX);
 
     check_baddies(-1, 0);
