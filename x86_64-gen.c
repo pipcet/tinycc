@@ -1985,23 +1985,14 @@ void gfunc_call(int nb_args)
             vtop[idx] = tmp;
 
             int arg_stored = 1;
-	    for(j=offsets[i2+1]-1; j>=offsets[i2]; j--) {
+	    for(j=offsets[i2]; j<offsets[i2+1]; j++) {
 		if(ret[j].type.t == VT_VOID) {
 		    continue;
 		}
 
-		if(ret[j].c.ull & 7)
-		    new_eightbyte = 0;
-		else
-		    new_eightbyte = 1;
-
-		if(ret[j].r == VT_CONST) {
-		} else if(ret[j].r >= TREG_XMM0) {
+		if(ret[j].r != VT_CONST) {
 		    arg_stored = 0;
-		} else if(ret[j].r < TREG_XMM0) {
-		    arg_stored = 0;
-		} else {
-		    assert(0);
+		    break;
 		}
 	    }
 
@@ -2073,20 +2064,13 @@ void gfunc_call(int nb_args)
 	int j;
 
 	for(j=offsets[i2]; j<offsets[i2+1]; j++) {
-	    if(ret[j].r == VT_CONST) {
-		if (ret[j].type.t == VT_VOID &&
-		    ret[j].c.ull) {
-		    continue;
-		} else if (ret[j].type.t == VT_VOID) {
-		    continue;
-		} else {
-		    nb_args--;
-		    vtop--;
-		    continue;
-		}
+	    if (ret[j].type.t == VT_VOID) {
+		continue;
 	    }
 
-	    if (ret[j].type.t == VT_VOID) {
+	    if(ret[j].r == VT_CONST) {
+		vtop--;
+		nb_args--;
 		continue;
 	    }
 
