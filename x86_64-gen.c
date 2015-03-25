@@ -126,7 +126,7 @@ enum {
 #include "tcc.h"
 #include <assert.h>
 
-ST_DATA const RegSet rc_int   = 0x00c7;
+ST_DATA const RegSet rc_int   = 0x0000c7;
 ST_DATA const RegSet rc_float = 0xff0000;
 ST_DATA const RegSet rc_rax   = 1 <<  0;
 ST_DATA const RegSet rc_rcx   = 1 <<  1;
@@ -853,8 +853,6 @@ int gsym_addr(int t, int a)
 
 int gsym(int t)
 {
-    commit_instructions();
-
     return gsym_addr(t, get_index());
 }
 
@@ -1158,7 +1156,6 @@ void load(int r, SValue *sv)
             gen_modrm(r, VT_LOCAL, sv->sym, fc, 0);
         } else if (v == VT_CMP) {
 	    flags_used_counter++;
-	    ib();
             orex(32,r,0,0);
 	    if ((fc &  ~0x100) == TOK_NE)
 		oad(0xb8 + REG_VALUE(r), 1);
@@ -1184,15 +1181,12 @@ void load(int r, SValue *sv)
         } else if (v == VT_JMP || v == VT_JMPI) {
 	    flags_used_counter++;
             t = v & 1;
-	    ib();
             orex(32,r,0,0);
             oad(0xb8 + REG_VALUE(r), t); /* mov $1, r */
 	    check_baddies(r, 0);
-	    ib();
 	    int l = gjmp(0);
             if(gsym_nocommit(fc) > 1)
 	      commit_instructions();
-	    ib();
             orex_always(0,r,0,0); /* not orex! */
             oad(0xb8 + REG_VALUE(r), t ^ 1); /* mov $0, r */
 	    gsym(l);
@@ -1273,7 +1267,6 @@ void store_pic(int r,SValue *v)
         r = 7;
         orex(0, pic_reg, r, 0xdb); /* fstpt */
     } else {
-	ib();
         if (bt == VT_SHORT) {
 	    orex(16, pic_reg, r, 0x8966);
 	} else if (bt == VT_BYTE || bt == VT_BOOL) {
@@ -2366,7 +2359,6 @@ void gfunc_call(int nb_args)
     save_regset(rc_caller_saved);
     start_special_use_regset(rc_caller_saved);
     check_baddies(-1, 0);
-    ib();
 
     gcall_or_jmp(0);
     end_special_use_regset(rc_caller_saved);
@@ -2619,7 +2611,7 @@ int gtst(int inv, int t)
 	       otherwise if unordered we don't want to jump.  */
 	    vtop->c.i &= ~0x100;
 	    if (!inv == (vtop->c.i != TOK_NE))
-		l = oad(0x8a0f, 0);
+		l = psym(0x8a0f, 0);
 	    else
 	      {
 	        g(0x0f);
@@ -2740,7 +2732,6 @@ void gen_opi(int op)
             r = gv(rc_int);
             vswap();
             c = vtop->c.i;
-	    ib();
 	    /* lea 0xXXXX(r), or */
 	    if (opc == 0) {
 		int or = get_reg(rc_int);
@@ -2775,7 +2766,6 @@ void gen_opi(int op)
 		gv2(rc_int, rc_int);
 		r = vtop[-1].r;
 		fr = vtop[0].r;
-		ib();
 		orex4(ll, r, fr, or, 0x8d); /* XXX */
 		o(0x04 + REG_VALUE(or) * 8);
 		g(0x00 + REG_VALUE(r) * 8 + REG_VALUE(fr));
@@ -2786,7 +2776,6 @@ void gen_opi(int op)
 		gv2(rc_int, rc_int);
 		r = vtop[-1].r;
 		fr = vtop[0].r;
-		ib();
 		orex(ll?64:32, r, fr, (opc << 3) | 0x01);
 		o(0xc0 + REG_VALUE(r) + REG_VALUE(fr) * 8);
 	    }
@@ -3137,13 +3126,12 @@ void gen_cvt_itof(int t)
         int r = get_reg(rc_float);
 	int bs = 32;
         gv(rc_int);
-        o(0xf2 + ((t & VT_BTYPE) == VT_FLOAT?1:0));
         if ((vtop->type.t & (VT_BTYPE | VT_UNSIGNED)) ==
             (VT_INT | VT_UNSIGNED) ||
             (vtop->type.t & VT_BTYPE) == VT_LLONG) {
 	    bs = 64;
         }
-	orex(bs, vtop->r, r, 0x2a0f);
+	orex(bs, vtop->r, r, 0x2a0ff2 + ((t & VT_BTYPE) == VT_FLOAT?1:0));
         o(0xc0 + REG_VALUE(vtop->r & VT_VALMASK) + REG_VALUE(r)*8); /* cvtsi2sd */
         vtop->r = r;
     }
