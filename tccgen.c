@@ -5914,6 +5914,8 @@ static void func_decl_list(Sym *func_sym)
     }
 }
 
+extern int a,b,c,d,ap,bp,cp,dp;
+
 /* parse a function defined by symbol 'sym' and generate its code in
    'cur_text_section' */
 static void gen_function(Sym *sym)
@@ -5953,6 +5955,7 @@ static void gen_function(Sym *sym)
     if (tcc_state->do_debug) {
         put_stabn(N_FUN, 0, 0, get_index() - func_ind);
     }
+    a = b = c = d = ap = bp = cp = dp = -1;
     /* It's better to crash than to generate wrong code */
     cur_text_section = NULL;
     funcname = ""; /* for safety */

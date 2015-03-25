@@ -172,19 +172,222 @@ ST_FUNC RegSet regset_union(RegSet rs1, RegSet rs2)
 #else
 
 static int last_instruction_boundary[16] = { 0, };
+static int insn_prefix_a = -1;
+static int insn_post_prefix_b;
+static int in_insn = 0;
+
+/* not-an-instruction barrier. Generates this code:
+
+ x: jmp z
+ DATA HERE
+ y: jmp x
+ z: nop
+
+while ib() generates
+
+ a: jmp c_down
+ b: CODE HERE
+    jmp d_down
+ c: jmp b_up
+ d: nop
+*/
+
+void *addr_to_xib(int addr)
+{
+    int rel;
+#if 0
+    unsigned char *ptr = cur_text_section->data + addr; // jmp ^ XXX; x: jmp z; data; y: jmp x; z:
+
+    unsigned char *ptr_x, *ptr_y;
+    // assert(ptr[-1] == 0xe9); not always true, might be a call
+    ptr += 4; // jmp XXX ^ x: jmp z; data; y: jmp x; z:
+    assert(ptr[0] == 0xe9);
+    ptr_x = ptr;
+    ptr += 1; // jmp XXX; x: jmp ^ z; data; y: jmp x; z:
+    int rel = *(int *)ptr; // rel = z - x
+    ptr = ptr + 4 + rel; // jmp XXX; x: jmp z; data; y: jmp x; z: ^
+    ptr -= 5; // jmp XXX; x: jmp z; data; y: ^ jmp x; z:
+    assert(ptr[0] == 0xe9);
+    ptr += 1; // jmp XXX; x: jmp z; data; y: jmp ^ x; z:
+    rel = *(int *)ptr; // rel = x - y
+    ptr = ptr + 4 + rel; // jmp XXX; x: ^ jmp z; data; y: jmp ^ x; z:
+    assert(ptr == ptr_x);
+
+    return ptr_x + 5;
+#else
+    unsigned char *ptr = cur_text_section->data + addr; // jmp ^ XXX; jmp d_down; c: jmp b_up; d: nop
+    
+    unsigned char *ptr_x, *ptr_y, *ptr_a_or_x, *ptr_c_or_z, *ptr_d_or_x, *ptr_c, *ptr_b, *ptr_a, *ptr_bc_or_y, *ptr_d_or_z, *ptr_c_or_y, *ptr_b_or_x, *ptr_data, *ptr_d;
+    // assert(ptr[-1] == 0xe9); not always true, might be a call
+    ptr += 4; // jmp XXX; ^ jmp d_down; c: jmp b_up; d: nop
+
+    ptr_bc_or_y = ptr;
+    assert(ptr[0] == 0xe9);
+    ptr += 1; // jmp XXX; jmp ^ d_down; c: jmp b_up; d: nop
+    rel = *(int *)ptr; // rel = d - rip
+    ptr = ptr + 4 + rel; // d: ^ nop
+
+    ptr_d_or_x = ptr;
+    if(ptr[0] == 0x90) {
+	assert(ptr[0] == 0x90);
+	ptr -= 5;
+	ptr_c_or_y = ptr;
+	assert(ptr[0] == 0xe9);
+	ptr++;
+	rel = *(int *)ptr;
+	ptr = ptr + 4 + rel;
+	ptr_b_or_x = ptr;
+    } else {
+	assert(ptr[0] == 0xe9);
+	if (ptr[5+10+5+1+5+10+5] == 0x90)
+	    return ptr + 5 + 10 + 5 + 1 + 5 + 6;
+	else
+	    return NULL;
+    }
+
+    if(ptr_d_or_x == ptr_b_or_x) {
+	assert(0);
+	ptr_x = ptr;
+	assert(ptr[0] == 0xe9);
+	ptr += 5;
+	ptr_data = ptr;
+
+	return ptr_data + 6;
+    } else {
+	ptr_d = ptr_d_or_x;
+	ptr = ptr_d;
+	assert(ptr[0] == 0x90);
+	ptr++;
+	if (ptr[0] == 0)
+	    return NULL;
+	assert(ptr[0] == 0xe9);
+	ptr_x = ptr;
+	ptr++;
+	rel = *(int *)ptr;
+	ptr = ptr + 4 + rel;
+	assert(ptr[0] == 0x90);
+	ptr-=5;
+	assert(ptr[0] == 0xe9);
+	ptr++;
+	rel = *(int *)ptr;
+	ptr = ptr + 4 + rel;
+	if (ptr == ptr_x) {
+	    ptr += 5;
+	    ptr_data = ptr;
+
+	    return ptr_data + 6;
+	} else {
+	    return NULL;
+	}
+    }
+#endif
+}
+
+unsigned long long xib_decode(int addr, unsigned char op, unsigned long long *nextp)
+{
+    unsigned char *ptr;
+    for (ptr = addr_to_xib(addr); ptr; ptr = addr_to_xib(ptr - cur_text_section->data)) {
+	assert(ptr[-6] == 0x48);
+	if (ptr[-5] == op) {
+	    unsigned long long data = *(unsigned long long *)(ptr-4);
+
+	    return data;
+	}
+    }
+    assert(0);
+}
+
+void xib_encode(unsigned long long addr, unsigned char op, unsigned long long data, unsigned long long *nextp)
+{
+    unsigned char *ptr = cur_text_section->data + addr;
+    assert(ptr[-6] == 0x48);
+    assert(ptr[-5] == op);
+    *(unsigned long long *)(ptr-4) = data;
+
+    return;
+
+    assert(0);
+}
+
+int last_ib_end = -1;
+
+unsigned long long notaninstruction(unsigned char op, unsigned long long data)
+{
+    unsigned long long ret = ind;
+
+    if (1) {
+	in_insn++;
+	int a = ind;
+	int cp = gjmp(0);
+	int i;
+	g(0x48);
+	g(op);
+	for(i=0; i<8; i++) {
+	    g(data & 0xff);
+	    data >>= 8;
+	}
+	int b = ind;
+	int ap = gjmp(0);
+	int c = ind;
+	gsym_addr(cp, c);
+	gsym_addr(ap, a);
+	g(0x90);
+	in_insn--;
+    }
+
+    return ret+6+5;
+}
+
+int a = -1;
+int b = -1;
+int c = -1;
+int d = -1;
+
+int ap = -1;
+int bp = -1;
+int cp = -1;
+int dp = -1;
 
 void ib(void)
 {
-    check_baddies(-1, 0);
+    if(last_ib_end == ind)
+	return;
 
     if(last_instruction_boundary[0] == ind)
 	return;
+
+    if (in_insn == 0) {
+	in_insn++;
+
+	dp = gjmp(0);
+	c = ind;
+	if(cp > -1) {
+	    gsym_addr(cp, c);
+	    cp = -1;
+	}
+	if (b > -1) {
+	    bp = gjmp(0);
+	    gsym_addr(bp, b);
+	    b = -1;
+	}
+	d = ind;
+	if (dp > -1) {
+	    gsym_addr(dp, d);
+	    dp = -1;
+	}
+	g(0x90);
+	a = ind;
+	cp = gjmp(0);
+	b = ind;
+	in_insn--;
+    }
 
     int i;
     for(i=14; i>=0; i--) {
         last_instruction_boundary[i+1] = last_instruction_boundary[i];
     }
     last_instruction_boundary[0] = ind;
+    last_ib_end = ind;
 }
 
 /* undo count instruction barriers */
@@ -599,26 +802,60 @@ void orex4(int ll, int r3, int r, int r2, int b)
     o(b);
 }
 
+#define XIB_JUMPSHERE_LIST 0xb8 /* data is 0 or the address of an XIB packet containing another JUMPSHERE_LIST followed by a number of JUMPSHERE_LIST_ENTRY's */
+#define XIB_JUMPSHERE_ENTRY 0xb9
+#define XIB_JUMPSHERE_START 0xba
+
 /* output a symbol and patch all calls to it */
 int gsym_addr(int t, int a)
 {
-    int n, *ptr;
-    int ret = 0;
-    while (t) {
-        ptr = (int *)(cur_text_section->data + t);
-        n = *ptr; /* next value */
-        *ptr = a - t - 4;
-        t = n;
-	ret++;
+    if (!t)
+	return 0;
+
+    if (!in_insn) {
+	in_insn++;
+	int t2 = t;
+	int n, *ptr;
+	int ret = 0;
+	unsigned long long new_list = notaninstruction(XIB_JUMPSHERE_LIST, 0);
+	while (t2) {
+	    notaninstruction(XIB_JUMPSHERE_ENTRY, t2);
+	    ptr = (int *)(cur_text_section->data + t2);
+	    n = *ptr; /* next value */
+	    *ptr = a - t2 - 4;
+	    t2 = n;
+	    ret++;
+	}
+
+	unsigned long long jumpshere_list = xib_decode(t, XIB_JUMPSHERE_START, NULL);
+	unsigned long long jumpshere_start = (unsigned char *)addr_to_xib(t) - cur_text_section->data;
+	xib_encode(jumpshere_start, XIB_JUMPSHERE_START, new_list, NULL);
+	xib_encode(new_list, XIB_JUMPSHERE_LIST, jumpshere_list, NULL);
+	in_insn--;
+	return ret;
+    } else {
+	in_insn++;
+	int t2 = t;
+	int n, *ptr;
+	int ret = 0;
+	while (t2) {
+	    ptr = (int *)(cur_text_section->data + t2);
+	    n = *ptr; /* next value */
+	    *ptr = a - t2 - 4;
+	    t2 = n;
+	    ret++;
+	}
+
+	in_insn--;
+	return ret;
     }
-    return ret;
 }
 
 int gsym(int t)
 {
     commit_instructions();
 
-    return gsym_addr(t, ind);
+    return gsym_addr(t, get_index());
 }
 
 int gsym_nocommit(int t)
@@ -632,12 +869,30 @@ int get_index(void)
 {
     commit_instructions();
 
+    if(!in_insn) {
+	in_insn++;
+	notaninstruction(XIB_JUMPSHERE_START, 0);
+	in_insn--;
+    }
+
     return ind;
 }
 
-/* psym is used to put an instruction with a data field which is a
-   reference to a symbol. It is in fact the same as oad ! */
-#define psym oad
+/* instruction + 4 bytes data. Return the address of the data */
+ST_FUNC int psym(int c, int s)
+{
+    int ind1;
+
+    o(c);
+    ind1 = ind + 4;
+    if (ind1 > cur_text_section->data_allocated)
+        section_realloc(cur_text_section, ind1);
+    *(int *)(cur_text_section->data + ind) = s;
+    s = ind;
+    ind = ind1;
+    get_index();
+    return s;
+}
 
 /* convenience function since x86 flags are so volatile */
 static void get_flags(void)
@@ -1378,6 +1633,10 @@ void gfunc_epilog(void)
 {
     int v, saved_ind;
 
+    ap = bp = cp = dp = a = b = c = d = -1;
+    ib();
+    ap = bp = cp = dp = a = b = c = d = -1;
+
     o(0xc9); /* leave */
     if (func_ret_sub == 0) {
         o(0xc3); /* ret */
@@ -1387,6 +1646,15 @@ void gfunc_epilog(void)
         g(func_ret_sub >> 8);
     }
 
+    ap = bp = cp = dp = a = b = c = d = -1;
+    ib();
+    ap = bp = cp = dp = a = b = c = d = -1;
+
+    ap = bp = cp = dp = a = b = c = d = -1;
+    ib();
+    ap = bp = cp = dp = a = b = c = d = -1;
+
+    in_insn++;
     saved_ind = ind;
     ind = func_sub_sp_offset - FUNC_PROLOG_SIZE;
     /* align local size to word & save local variables */
@@ -1407,6 +1675,8 @@ void gfunc_epilog(void)
     cur_text_section->data_offset = saved_ind;
     pe_add_unwind_data(ind, saved_ind, v);
     ind = cur_text_section->data_offset;
+    in_insn--;
+    ap = bp = cp = dp = a = b = c = d = -1;
 }
 
 #else
@@ -2310,6 +2580,8 @@ void gfunc_epilog(void)
 int gjmp(int t)
 {
     ib();
+    get_index();
+    ib();
     return psym(0xe9, t);
 }
 
@@ -2396,6 +2668,7 @@ int gtst(int inv, int t)
             v = gv(rc_int);
             /* and $constant, r */
             int test = 0xe081 + 0x100 * REG_VALUE(v);
+#if 0
             if (check_last_instruction(test, 6)) {
 		uib(1);
 		ib();
@@ -2413,7 +2686,9 @@ int gtst(int inv, int t)
 		    g(0xc0 + REG_VALUE(v));
 		    g(c);
 		}
-            } else {
+            } else
+#endif
+	    {
 		/* XXX we currently generate code like this:
 		 * 81c3d19:	48 8b 45 f0          	mov    -0x10(%rbp),%rax
 		 * 81c3d1d:	85 c0                	test   %eax,%eax
