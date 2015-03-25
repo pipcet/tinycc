@@ -126,7 +126,7 @@ enum {
 #include "tcc.h"
 #include <assert.h>
 
-ST_DATA const RegSet rc_int   = 0x00c7;
+ST_DATA const RegSet rc_int   = 0x0000c7;
 ST_DATA const RegSet rc_float = 0xff0000;
 ST_DATA const RegSet rc_rax   = 1 <<  0;
 ST_DATA const RegSet rc_rcx   = 1 <<  1;
@@ -2851,13 +2851,12 @@ void gen_cvt_itof(int t)
         int r = get_reg(rc_float);
 	int bs = 32;
         gv(rc_int);
-        o(0xf2 + ((t & VT_BTYPE) == VT_FLOAT?1:0));
         if ((vtop->type.t & (VT_BTYPE | VT_UNSIGNED)) ==
             (VT_INT | VT_UNSIGNED) ||
             (vtop->type.t & VT_BTYPE) == VT_LLONG) {
 	    bs = 64;
         }
-	orex(bs, vtop->r, r, 0x2a0f);
+	orex(bs, vtop->r, r, 0x2a0ff2 + ((t & VT_BTYPE) == VT_FLOAT?1:0));
         o(0xc0 + REG_VALUE(vtop->r & VT_VALMASK) + REG_VALUE(r)*8); /* cvtsi2sd */
         vtop->r = r;
     }
