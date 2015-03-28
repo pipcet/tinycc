@@ -727,7 +727,7 @@ ST_FUNC int get_reg_ex(int rc, int rc2)
 #endif
 
 /* find a free register in set 'rs'. If none, save one register */
-ST_FUNC int get_reg(RegSet rs)
+ST_FUNC int get_reg_nofree(RegSet rs)
 {
     static int last_r = -1;
     int r;
@@ -817,8 +817,21 @@ ST_FUNC int get_reg(RegSet rs)
             return r;
         }
     }
+
+    assert(0);
     /* Should never come here */
     return -1;
+}
+
+/* find a free register in set 'rs'. If none, save one register */
+ST_FUNC int get_reg(RegSet rs)
+{
+    int r;
+
+    r = get_reg_nofree(rs);
+    uncache_value_by_register(r);
+
+    return r;
 }
 
 ST_FUNC void save_regset(RegSet rs)
@@ -986,6 +999,8 @@ ST_FUNC int gv(RegSet rc)
 
         r = vtop->r & VT_VALMASK;
 
+	int r1 = -1;
+
         /* need to reload if:
            - constant
            - lvalue (need to dereference pointer)
@@ -994,20 +1009,24 @@ ST_FUNC int gv(RegSet rc)
          || (vtop->r & VT_LVAL)
 	    || !(regset_has(rc, r)))
         {
-	    int r1 = find_cached_value(vtop);
+	    r1 = find_cached_value(vtop);
 	    r = -1;
 
-	    if (r1 != -1)
+	    if (0 && r1 != -1)
 		/* XXX understand why this is ever false */
-		if(regset_has(rc, r1))
+		if(regset_has(rc, r1)) {
 		    r = get_reg(regset_singleton(r1));
+
+		    vtop->r = r;
+
+		    return r;
+		}
+
 	    if (r == -1)
 		r = get_reg(rc);
 	    assert(r != -1);
 
 	    if(r1 != -1) {
-		//fprintf(stderr, "found cached value %d -> %d (%08x)\n", r1, r, vtop->type.t);
-
 		if (r1 == r) {
 		    int i;
 		    for(i=0; i<r+1; i++)
@@ -1089,6 +1108,39 @@ ST_FUNC int gv(RegSet rc)
             }
         }
         vtop->r = r;
+	if (r1 != -1 && r1 < 16) {
+	    /* XXX understand why this is ever false */
+	    if(regset_has(rc, r1)) {
+		g(0x48);
+		g(0x90);
+		g(0x90);
+		vdup();
+		vdup();
+		vtop->r = get_reg_nofree(regset_singleton(r1));
+		gen_op(TOK_EQ);
+		int a = gtst(0,0);
+		vdup();
+		vtop->type.t = VT_INT;
+		vdup();
+		vtop->type.t = VT_INT;
+		gen_op('^');
+		CType ty = vtop->type;
+		mk_pointer(&ty);
+		vtop->type = ty;
+		indir();
+		vpushi(0);
+		vswap();
+		vstore();
+		gsym(a);
+		vpop();
+
+		g(0x48);
+		g(0x90);
+		vtop->r = r1;
+		return r1;
+	    }
+	}
+
 #ifdef TCC_TARGET_C67
         /* uses register pairs for doubles */
         if ((vtop->type.t & VT_BTYPE) == VT_DOUBLE) 

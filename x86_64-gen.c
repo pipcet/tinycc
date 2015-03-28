@@ -2473,17 +2473,21 @@ void gen_opi(int op)
                 /* inc r */
                 orex(ll?64:32, r, 0, 0xff);
                 o(0xc0 + REG_VALUE(r));
+		uncache_value_by_register(r);
             } else if ((c == -1 && opc == 0) || (c == 1 && opc == 5)) {
                 /* dec r */
                 orex(ll?64:32, r, 0, 0xff);
                 o(0xc8 + REG_VALUE(r));
+		uncache_value_by_register(r);
             } else if (c == (char)c) {
                 orex(ll?64:32, r, 0, 0x83);
                 o(0xc0 | (opc << 3) | REG_VALUE(r));
                 g(c);
+		uncache_value_by_register(r);
             } else {
                 orex(ll?64:32, r, 0, 0x81);
                 oad(0xc0 | (opc << 3) | REG_VALUE(r), c);
+		uncache_value_by_register(r);
             }
         } else {
 	    if (opc == 0) {
@@ -2503,6 +2507,7 @@ void gen_opi(int op)
 		fr = vtop[0].r;
 		orex(ll?64:32, r, fr, (opc << 3) | 0x01);
 		o(0xc0 + REG_VALUE(r) + REG_VALUE(fr) * 8);
+		uncache_value_by_register(r);
 	    }
         }
         vtop--;
@@ -2539,6 +2544,7 @@ void gen_opi(int op)
         orex(ll?64:32, fr, r, 0xaf0f); /* imul fr, r */
         o(0xc0 + REG_VALUE(fr) + REG_VALUE(r) * 8);
         vtop--;
+	uncache_value_by_register(r);
 	uncache_value(&vtop[0]);
         break;
     case TOK_SHL:
@@ -2933,6 +2939,7 @@ void gen_cvt_ftof(int t)
             vtop->r = r;
         }
     }
+    uncache_value_by_register(vtop->r);
 }
 
 /* convert fp to int 't' type */
