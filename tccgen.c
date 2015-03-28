@@ -3547,7 +3547,7 @@ static void post_type(CType *type, AttributeDef *ad)
 
             vla_runtime_type_size(type, &align);
             gen_op('*');
-            vset(&int_type, VT_LOCAL|VT_LVAL, loc);
+            vset(&int_type, VT_LOCAL|VT_LVAL, n);
             vswap();
             vstore();
         }
