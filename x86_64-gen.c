@@ -126,7 +126,7 @@ enum {
 #include "tcc.h"
 #include <assert.h>
 
-ST_DATA const RegSet rc_int   = 0x0000c7;
+ST_DATA const RegSet rc_int   = 0x000fc7; /* this must contain %r11 or calls won't work */
 ST_DATA const RegSet rc_float = 0xff0000;
 ST_DATA const RegSet rc_rax   = 1 <<  0;
 ST_DATA const RegSet rc_rcx   = 1 <<  1;
@@ -146,7 +146,8 @@ ST_DATA const RegSet rc_xmm6  = 1 << 22;
 ST_DATA const RegSet rc_xmm7  = 1 << 23;
 ST_DATA const RegSet rc_flags = 1L<< 32;
 ST_DATA const RegSet rc_callee_saved = 0x000000038;
-ST_DATA const RegSet rc_caller_saved = 0x101ffffc7;
+ST_DATA const RegSet rc_caller_saved = 0x101ff0fc7;
+ST_DATA const RegSet rc_arguments    = 0x101ff03c7;
 
 static unsigned long func_sub_sp_offset;
 static int func_ret_sub;
@@ -2087,11 +2088,11 @@ void gfunc_call(int nb_args)
 	//o(0xc031); /*	   xor %eax,%eax */
     }
     save_regset(rc_caller_saved);
-    start_special_use_regset(rc_caller_saved);
+    start_special_use_regset(rc_arguments);
     check_baddies(-1, 0);
 
     gcall_or_jmp(0);
-    end_special_use_regset(rc_caller_saved);
+    end_special_use_regset(rc_arguments);
 
     if (args_size)
         gadd_sp(args_size);
