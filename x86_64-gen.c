@@ -2469,6 +2469,7 @@ void gen_opi(int op)
 
 		vtop[-1].r = or;
 		cache_value(&vtop[0], vtop[0].r);
+		uncache_values();
 		uncache = 0;
 	    } else if ((c == 1 && opc == 0) || (c == -1 && opc == 5)) {
                 /* inc r */
