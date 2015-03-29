@@ -311,12 +311,23 @@ void xib_encode(unsigned long long addr, unsigned char op, unsigned long long da
     assert(0);
 }
 
+int a = -1;
+int b = -1;
+int c = -1;
+int d = -1;
+
+int ap = -1;
+int bp = -1;
+int cp = -1;
+int dp = -1;
+
 int last_ib_end = -1;
 
 unsigned long long notaninstruction(unsigned char op, unsigned long long data)
 {
     unsigned long long ret = ind;
 
+    ib();
     if (1) {
 	in_insn++;
 	int a = ind;
@@ -336,19 +347,10 @@ unsigned long long notaninstruction(unsigned char op, unsigned long long data)
 	g(0x90);
 	in_insn--;
     }
+    a = b = c = d = ap = bp = cp = dp = -1;
 
     return ret+6+5;
 }
-
-int a = -1;
-int b = -1;
-int c = -1;
-int d = -1;
-
-int ap = -1;
-int bp = -1;
-int cp = -1;
-int dp = -1;
 
 void ib(void)
 {
@@ -869,6 +871,7 @@ int get_index(void)
 {
     commit_instructions();
 
+    ib();
     if(!in_insn) {
 	in_insn++;
 	notaninstruction(XIB_JUMPSHERE_START, 0);
@@ -1158,6 +1161,7 @@ void load(int r, SValue *sv)
             gen_modrm(r, VT_LOCAL, sv->sym, fc, 0);
         } else if (v == VT_CMP) {
 	    flags_used_counter++;
+	    ib();
             orex(32,r,0,0);
 	    if ((fc &  ~0x100) == TOK_NE)
 		oad(0xb8 + REG_VALUE(r), 1);
@@ -1183,12 +1187,15 @@ void load(int r, SValue *sv)
         } else if (v == VT_JMP || v == VT_JMPI) {
 	    flags_used_counter++;
             t = v & 1;
+	    ib();
             orex(32,r,0,0);
             oad(0xb8 + REG_VALUE(r), t); /* mov $1, r */
 	    check_baddies(r, 0);
+	    ib();
 	    int l = gjmp(0);
             if(gsym_nocommit(fc) > 1)
 	      commit_instructions();
+	    ib();
             orex_always(0,r,0,0); /* not orex! */
             oad(0xb8 + REG_VALUE(r), t ^ 1); /* mov $0, r */
 	    gsym(l);
@@ -1269,6 +1276,7 @@ void store_pic(int r,SValue *v)
         r = 7;
         orex(0, pic_reg, r, 0xdb); /* fstpt */
     } else {
+	ib();
         if (bt == VT_SHORT) {
 	    orex(16, pic_reg, r, 0x8966);
 	} else if (bt == VT_BYTE || bt == VT_BOOL) {
@@ -2361,6 +2369,7 @@ void gfunc_call(int nb_args)
     save_regset(rc_caller_saved);
     start_special_use_regset(rc_caller_saved);
     check_baddies(-1, 0);
+    ib();
 
     gcall_or_jmp(0);
     end_special_use_regset(rc_caller_saved);
@@ -2734,6 +2743,7 @@ void gen_opi(int op)
             r = gv(rc_int);
             vswap();
             c = vtop->c.i;
+	    ib();
 	    /* lea 0xXXXX(r), or */
 	    if (opc == 0) {
 		int or = get_reg(rc_int);
@@ -2768,6 +2778,7 @@ void gen_opi(int op)
 		gv2(rc_int, rc_int);
 		r = vtop[-1].r;
 		fr = vtop[0].r;
+		ib();
 		orex4(ll, r, fr, or, 0x8d); /* XXX */
 		o(0x04 + REG_VALUE(or) * 8);
 		g(0x00 + REG_VALUE(r) * 8 + REG_VALUE(fr));
@@ -2778,6 +2789,7 @@ void gen_opi(int op)
 		gv2(rc_int, rc_int);
 		r = vtop[-1].r;
 		fr = vtop[0].r;
+		ib();
 		orex(ll?64:32, r, fr, (opc << 3) | 0x01);
 		o(0xc0 + REG_VALUE(r) + REG_VALUE(fr) * 8);
 	    }
