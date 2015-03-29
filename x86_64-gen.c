@@ -258,13 +258,15 @@ void *addr_to_xib(int addr)
 	ptr = ptr_d;
 	assert(ptr[0] == 0x90);
 	ptr++;
-	if (ptr[0] == 0)
-	    return NULL;
-	assert(ptr[0] == 0xe9);
-	ptr_x = ptr;
-	ptr++;
-	rel = *(int *)ptr;
-	ptr = ptr + 4 + rel;
+	do {
+	    if (ptr[0] == 0)
+		return NULL;
+	    assert(ptr[0] == 0xe9);
+	    ptr_x = ptr;
+	    ptr++;
+	    rel = *(int *)ptr;
+	    ptr = ptr + 4 + rel;
+	} while(rel == 0);
 	assert(ptr[0] == 0x90);
 	ptr-=5;
 	assert(ptr[0] == 0xe9);
