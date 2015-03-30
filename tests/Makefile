@@ -98,7 +98,7 @@ test1: test.ref
 	@echo ------------ $@ ------------
 	$(TCC) $(SRCDIR)/tcctest.c -g -o tcctest1
 	$(TCC) -run $(SRCDIR)/tcctest.c > test.out1
-	$(TCC) -g ../tcc.c -ltcc -lm -ldl -o metatcc
+	$(TCC) -g ../tcc.c -L.. -ltcc -lm -ldl -o metatcc
 	diff -u test.ref test.out1
 
 
