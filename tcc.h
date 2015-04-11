@@ -280,6 +280,18 @@
 /* -------------------------------------------- */
 /* include the target specific definitions */
 
+#ifdef ONE_SOURCE
+#define ST_INLN static inline
+#define ST_FUNC static
+#define ST_DATA static
+#else
+#define ST_INLN
+#define ST_FUNC
+#define ST_DATA extern
+#endif
+
+typedef unsigned long long RegSet;
+
 #define TARGET_DEFS_ONLY
 #ifdef TCC_TARGET_I386
 # include "i386-gen.c"
@@ -358,11 +370,16 @@ typedef union CValue {
 typedef struct SValue {
     CType type;      /* type */
     unsigned short r;      /* register + flags */
-    unsigned short r2;     /* second register, used for 'long long'
-                              type. If not used, set to VT_CONST */
     CValue c;              /* constant, if VT_CONST */
     struct Sym *sym;       /* symbol, if (VT_SYM | VT_CONST) */
 } SValue;
+
+/* register contents */
+typedef struct RContents {
+    SValue v;
+    unsigned short callee_saved_index;
+    int special_use; /* no longer available for gv() */
+} RContents;
 
 struct Attribute {
     unsigned
@@ -738,6 +755,7 @@ struct TCCState {
 #define VT_CMP       0x0033  /* the value is stored in processor flags (in vc) */
 #define VT_JMP       0x0034  /* value is the consequence of jmp true (even) */
 #define VT_JMPI      0x0035  /* value is the consequence of jmp false (odd) */
+#define VT_CALLEE    0x0036  /* register must be saved by the callee */
 #define VT_REF       0x0040  /* value is pointer to structure rather than address */
 #define VT_LVAL      0x0100  /* var is an lvalue */
 #define VT_SYM       0x0200  /* a symbol value is added */
@@ -769,8 +787,6 @@ struct TCCState {
 #define VT_LLONG           12  /* 64 bit integer */
 #define VT_LONG            13  /* long integer (NEVER USED as type, only
                                   during parsing) */
-#define VT_QLONG           14  /* 128-bit integer. Only used for x86-64 ABI */
-#define VT_QFLOAT          15  /* 128-bit float. Only used for x86-64 ABI */
 #define VT_UNSIGNED    0x0010  /* unsigned type */
 #define VT_ARRAY       0x0020  /* array type (also has VT_PTR) */
 #define VT_BITFIELD    0x0040  /* bitfield modifier */
@@ -1006,16 +1022,6 @@ static inline int toup(int c)
 # define PUB_FUNC
 #endif
 
-#ifdef ONE_SOURCE
-#define ST_INLN static inline
-#define ST_FUNC static
-#define ST_DATA static
-#else
-#define ST_INLN
-#define ST_FUNC
-#define ST_DATA extern
-#endif
-
 /* ------------ libtcc.c ------------ */
 
 /* use GNU C extensions */
@@ -1193,6 +1199,19 @@ ST_DATA int func_vc;
 ST_DATA int last_line_num, last_ind, func_ind; /* debug last line number and pc */
 ST_DATA char *funcname;
 
+ST_FUNC void uncache_value_by_register(int r);
+ST_FUNC void uncache_value(SValue *);
+ST_FUNC void uncache_values(void);
+ST_FUNC void cache_value(SValue *, int);
+ST_FUNC int find_cached_value(SValue *v);
+
+ST_FUNC void start_special_use(int);
+ST_FUNC void end_special_use(int);
+
+ST_FUNC int regset_has(RegSet, int);
+ST_FUNC RegSet regset_singleton(int);
+ST_FUNC RegSet regset_union(RegSet, RegSet);
+
 ST_INLN int is_float(int t);
 ST_FUNC int ieee_finite(double d);
 ST_FUNC void test_lvalue(void);
@@ -1211,15 +1230,19 @@ ST_FUNC void lexpand_nr(void);
 #endif
 ST_FUNC void vpushv(SValue *v);
 ST_FUNC void save_reg(int r);
-ST_FUNC int get_reg(int rc);
+ST_FUNC int get_reg(RegSet rs);
 ST_FUNC void save_regs(int n);
-ST_FUNC int gv(int rc);
-ST_FUNC void gv2(int rc1, int rc2);
+ST_FUNC void save_regset(RegSet rs);
+ST_FUNC void start_special_use_regset(RegSet rs);
+ST_FUNC void end_special_use_regset(RegSet rs);
+ST_FUNC int gv(RegSet rc);
+ST_FUNC void gv2(RegSet rc1, RegSet rc2);
 ST_FUNC void vpop(void);
 ST_FUNC void gen_op(int op);
 ST_FUNC int type_size(CType *type, int *a);
 ST_FUNC void mk_pointer(CType *type);
 ST_FUNC void vstore(void);
+ST_FUNC void vdup(void);
 ST_FUNC void inc(int post, int c);
 ST_FUNC void parse_asm_str(CString *astr);
 ST_FUNC int lvalue_type(int t);
@@ -1227,6 +1250,7 @@ ST_FUNC void indir(void);
 ST_FUNC void unary(void);
 ST_FUNC void expr_prod(void);
 ST_FUNC void expr_sum(void);
+ST_FUNC void gaddrof(void);
 ST_FUNC void gexpr(void);
 ST_FUNC int expr_const(void);
 ST_FUNC void gen_inline_functions(void);
@@ -1298,11 +1322,18 @@ ST_FUNC int handle_eob(void);
 
 ST_DATA const int reg_classes[NB_REGS];
 
-ST_FUNC void gsym_addr(int t, int a);
-ST_FUNC void gsym(int t);
+ST_FUNC void ib(void);
+ST_FUNC int check_baddies(int clobber_reg, int flags_okay);
+ST_FUNC int check_last_instruction(unsigned int, int);
+ST_FUNC void commit_instructions(void);
+ST_FUNC int get_index(void);
+
+ST_FUNC int gsym_addr(int t, int a);
+ST_FUNC int gsym(int t);
 ST_FUNC void load(int r, SValue *sv);
 ST_FUNC void store(int r, SValue *v);
-ST_FUNC int gfunc_sret(CType *vt, int variadic, CType *ret, int *align);
+ST_FUNC int gfunc_sret(CType *vt, CType *ret, int *align);
+ST_FUNC int gfunc_sret_new(CType *vt, SValue *ret, int nret, int *align);
 ST_FUNC void gfunc_call(int nb_args);
 ST_FUNC void gfunc_prolog(CType *func_type);
 ST_FUNC void gfunc_epilog(void);

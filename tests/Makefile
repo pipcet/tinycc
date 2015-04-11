@@ -16,6 +16,9 @@ TESTS = \
  hello-exe \
  hello-run \
  libtest \
+ test1 \
+ test15 \
+ test2 \
  test3 \
  abitest \
  vla_test-run \
@@ -109,26 +112,44 @@ moretests:
 w32-prep:
 	cp ../libtcc1.a ../lib
 
-# test.ref - generate using cc
-test.ref: tcctest.c
-	$(CC) -o tcctest.cc $< -I$(top_srcdir) $(CPPFLAGS) -w $(CFLAGS) $(NATIVE_DEFINES) -std=gnu99 -O0 -fno-omit-frame-pointer $(LDFLAGS)
-	./tcctest.cc > $@
+# test.ref - generate using gcc
+# copy only tcclib.h so GCC's stddef and stdarg will be used
+test.ref: ../tests/tcctest.c
+	gcc -o tcctest.gcc $< -I$(top_srcdir) $(CPPFLAGS) -w $(CFLAGS) $(NATIVE_DEFINES) -std=gnu99 -O0 -fno-omit-frame-pointer $(LDFLAGS)
+	./tcctest.gcc > $@
 
 # auto test
 test1 test1b: tcctest.c test.ref
 	@echo ------------ $@ ------------
-	$(TCC) -run $< > test.out1
-	@diff -u test.ref test.out1 && echo "Auto Test OK"
+	$(TCC) $(SRCDIR)/tcctest.c -g -o tcctest1
+	$(TCC) -run $(SRCDIR)/tcctest.c > test.out1
+	$(TCC) -g ../tcc.c -L.. -ltcc -lm -ldl -o metatcc
+	diff -u test.ref test.out1
+
+
+# iterated test2 (compile tcc then compile tcctest.c !)
+test15: test.ref
+	@echo ------------ $@ ------------
+	$(TCC) $(RUN_TCC) $(SRCDIR)/tcctest.c -g -o tcctest15
+	$(TCC) $(RUN_TCC) -run $(SRCDIR)/tcctest.c > test.out15
+	diff -u test.ref test.out15
 
 # iterated test2 (compile tcc then compile tcctest.c !)
 test2 test2b: tcctest.c test.ref
 	@echo ------------ $@ ------------
-	$(TCC) $(RUN_TCC) $(RUN_TCC) -run $< > test.out2
-	@diff -u test.ref test.out2 && echo "Auto Test2 OK"
+	$(TCC) $(RUN_TCC) $(RUN_TCC) $(SRCDIR)/tcctest.c -g -o tcctest2
+	$(TCC) $(RUN_TCC) $(RUN_TCC) -run $(SRCDIR)/tcctest.c > test.out2
+	diff -u test.ref test.out2
 
 # iterated test3 (compile tcc then compile tcc then compile tcctest.c !)
 test3 test3b: tcctest.c test.ref
 	@echo ------------ $@ ------------
+	$(TCC) $(RUN_TCC) $(RUN_TCC) $(RUN_TCC) $(SRCDIR)/tcctest.c -g -o tcctest3
+	$(TCC) $(RUN_TCC) $(RUN_TCC) $(RUN_TCC) -run $(SRCDIR)/tcctest.c > test.out3
+	diff -u test.ref test.out3
+
+# binary output test
+test4: test.ref
 	$(TCC) $(RUN_TCC) $(RUN_TCC) $(RUN_TCC) -run $< > test.out3
 	@diff -u test.ref test.out3 && echo "Auto Test3 OK"
 
@@ -221,11 +242,16 @@ ifneq ($(CONFIG_arm_eabi),yes) # not ARM soft-float
 	ABITESTS += abitest-tcc$(EXESUF)
 endif
 
-abitest: $(ABITESTS)
+run-abitest-cc: abitest-cc$(EXESUF)
 	@echo ------------ $@ ------------
 	./abitest-cc$(EXESUF) lib_path=.. include="$(top_srcdir)/include"
-	if [ $(CONFIG_arm_eabi) != "yes" ]; then \
-		./abitest-tcc$(EXESUF) lib_path=.. include="$(top_srcdir)/include"; fi
+
+run-abitest-tcc: abitest-tcc$(EXESUF)
+	@echo ------------ $@ ------------
+	./abitest-tcc$(EXESUF) lib_path=.. include="$(top_srcdir)/include"
+
+abitest: run-abitest-cc run-abitest-tcc
+	true
 
 vla_test$(EXESUF): vla_test.c
 	$(TCC) -o $@ $^ $(CPPFLAGS) $(CFLAGS)

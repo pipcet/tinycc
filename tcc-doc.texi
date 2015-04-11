@@ -264,7 +264,7 @@ Make string constants be of type @code{const char *} instead of @code{char
 Abort compilation if warnings are issued.
 
 @item -Wall 
-Activate all warnings, except @option{-Werror}, @option{-Wunusupported} and
+Activate all warnings, except @option{-Werror}, @option{-Wunsupported} and
 @option{-Wwrite-strings}.
 
 @end table
