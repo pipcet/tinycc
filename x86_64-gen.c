@@ -2436,7 +2436,6 @@ int gtst(int inv, int t)
             t = psym(0x85 ^ inv, t);
 	    check_baddies(-1, 0);
         }
->>>>>>>
     }
     vtop--;
     return t;

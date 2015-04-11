@@ -1205,7 +1205,7 @@ ST_FUNC void lexpand(void)
     int u;
 
     u = vtop->type.t & (VT_DEFSIGN | VT_UNSIGNED);
-    gv(RC_INT);
+    gv(rc_int);
     vdup();
     vtop[0].type.t = VT_LLONG | u;
     vpushi(32);
@@ -4291,8 +4291,7 @@ ST_FUNC void unary(void)
         } else if (tok == '(') {
             SValue ret[16];
             Sym *sa;
-            int nb_args, ret_nregs, ret_align, variadic;
-            int nb_args, sret, sret_addr;
+            int nb_args, ret_nregs, ret_align, variadic, sret, sret_addr;
 	    int i;
 
 	    for(i=0; i<16; i++) {
@@ -4322,8 +4321,6 @@ ST_FUNC void unary(void)
             next();
             sa = s->next; /* first parameter */
             nb_args = 0;
-            /* compute first implicit argument if a structure is returned */
-	    int ret_align;
 
 	    sret = gfunc_sret_new(&s->type, ret, 16, &ret_align);
 	    if (sret) {
@@ -4362,32 +4359,38 @@ ST_FUNC void unary(void)
                 vtop -= (nb_args + 1);
             }
 
-            /* return value */
-            for (r = ret.r + ret_nregs + !ret_nregs; r-- > ret.r;) {
-                vsetc(&ret.type, r, &ret.c);
-                vtop->r2 = ret.r2; /* Loop only happens when r2 is VT_CONST */
-            }
+            /* return value(s) */
+	    if ((s->type.t & VT_BTYPE) == VT_STRUCT) {
+                int addr;
+		if (sret) {
+		    addr = sret_addr;
+		} else {
+		    size = type_size(&s->type, &align);
+		    loc = (loc - size) & -align;
+		    addr = loc;
+		}
 
-            /* handle packed struct return */
-            if (((s->type.t & VT_BTYPE) == VT_STRUCT) && ret_nregs) {
-                int addr, offset;
+		if (!sret) {
+		    int i;
+		    for(i=0; i<16; i++) {
+			if (ret[i].type.t != VT_VOID) {
+			    vset(&ret[i].type, VT_LOCAL | VT_LVAL, addr + ret[i].c.ull);
+			    vset(&ret[i].type, ret[i].r, 0);
+			    vstore();
+			    vtop--;
+			}
+		    }
+		    vset(&s->type, VT_LOCAL|VT_LVAL, addr);
+		} else {
+		    vset(&s->type, VT_LOCAL|VT_LVAL, addr);
+		}
 
-                size = type_size(&s->type, &align);
-                loc = (loc - size) & -align;
-                addr = loc;
-                offset = 0;
-                for (;;) {
-                    vset(&ret.type, VT_LOCAL | VT_LVAL, addr + offset);
-                    vswap();
-                    vstore();
-                    vtop--;
-                    if (--ret_nregs == 0)
-                        break;
-                    /* XXX: compatible with arm only: ret_align == register_size */
-                    offset += ret_align;
-                }
-                vset(&s->type, VT_LOCAL | VT_LVAL, addr);
-            }
+		save_regs(0); /* XXX */
+	    } else {
+		//assert(ret[0].c.ull == 0);
+		vset(&ret[0].type, ret[0].r, 0);
+		save_regs(0); /* XXX */
+	    }
         } else {
             break;
         }
@@ -4960,7 +4963,6 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
                 CType type, ret_type;
 		SValue ret[16];
                 int ret_align;
-		CType type;
 		int i;
 
 		for(i=0; i<16; i++) {
@@ -4972,13 +4974,6 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
 		}
 
                 if (gfunc_sret_new(&func_vt, ret, 16, &ret_align)) {
-                    /* if returning structure, must copy it to implicit
-                       first pointer arg location */
-                    type = func_vt;
-                int ret_align, ret_nregs;
-                ret_nregs = gfunc_sret(&func_vt, func_var, &ret_type,
-                                       &ret_align);
-                if (0 == ret_nregs) {
                     /* if returning structure, must copy it to implicit
                        first pointer arg location */
                     type = func_vt;
@@ -5016,8 +5011,8 @@ static void block(int *bsym, int *csym, int *case_sym, int *def_sym,
             } else {
                 gv(rc_iret);
             }
-            vtop--; /* NOT vpop() because on x86 it would flush the fp stack */
-        }
+		vtop--; /* NOT vpop() because on x86 it would flush the fp stack */
+	    }
         skip(';');
         rsym = gjmp(rsym); /* jmp */
     } else if (tok == TOK_BREAK) {
@@ -5480,7 +5475,6 @@ static void init_putz(CType *t, Section *sec, unsigned long long c, int size)
         vset(&ty, VT_LOCAL, c);
         vpushi(0);
         vpushs(size);
-#endif
         gfunc_call(3);
     }
 }
